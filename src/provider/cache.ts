@@ -1,3 +1,5 @@
+import { MAX_CACHE_SIZE } from '../consts';
+
 /**
  * Reasoning cache: persists across turns so multi-turn tool-call conversations
  * can inject reasoning_content back into prior assistant messages.
@@ -13,8 +15,6 @@ export interface ReasoningEntry {
 	text: string;
 	timestamp: number;
 }
-
-export const MAX_CACHE_SIZE = 200;
 
 export function pruneReasoningCache(
 	cache: Map<string, ReasoningEntry>,

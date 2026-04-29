@@ -1,6 +1,5 @@
-import * as vscode from 'vscode';
-
-const API_KEY_SECRET = 'deepseek-copilot.apiKey';
+import vscode from 'vscode';
+import { API_KEY_SECRET } from './consts';
 
 /**
  * Manages DeepSeek API key via VS Code SecretStorage (secure) with
@@ -80,33 +79,5 @@ export class AuthManager {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Get base URL from settings.
-	 */
-	getBaseUrl(): string {
-		const config = vscode.workspace.getConfiguration('deepseek-copilot');
-		return config.get<string>('baseUrl') || 'https://api.deepseek.com';
-	}
-
-	/**
-	 * Resolve the API model ID to send to the DeepSeek endpoint.
-	 * Users can override the default IDs via settings to support compatible APIs.
-	 */
-	getApiModelId(vscodeModelId: string): string {
-		const config = vscode.workspace.getConfiguration('deepseek-copilot');
-		const overrides = config.get<Record<string, string>>('modelIdOverrides');
-		const override = overrides?.[vscodeModelId]?.trim();
-		return override || vscodeModelId;
-	}
-
-	/**
-	 * Get max tokens limit (0 = no limit).
-	 */
-	getMaxTokens(): number | undefined {
-		const config = vscode.workspace.getConfiguration('deepseek-copilot');
-		const value = config.get<number>('maxTokens', 0);
-		return value > 0 ? value : undefined;
 	}
 }

@@ -1,12 +1,13 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
+import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
+import { API_KEY_REQUIRED_DETAIL, MODELS, THINKING_EFFORT_CONFIGURATION_SCHEMA } from '../consts';
 import { logger } from '../logger';
 import type {
 	DeepSeekToolCall,
 	ModelDefinition
 } from '../types';
-import { MODELS } from '../types';
 import { type ReasoningEntry, pruneReasoningCache } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import {
@@ -14,8 +15,6 @@ import {
 	resolveImageMessages,
 	setVisionProxyModel,
 } from './vision';
-
-const API_KEY_REQUIRED_DETAIL = 'Please run DeepSeek: Set API Key to configure.';
 
 /**
  * NOTE: Non-public API surface.
@@ -30,23 +29,6 @@ const API_KEY_REQUIRED_DETAIL = 'Please run DeepSeek: Set API Key to configure.'
  * If/when VS Code stabilizes these as proposed API, switch to the official
  * types and drop the casts below.
  */
-const THINKING_EFFORT_CONFIGURATION_SCHEMA = {
-	properties: {
-		reasoningEffort: {
-			type: 'string',
-			title: 'Thinking Effort',
-			enum: ['none', 'high', 'max'],
-			enumItemLabels: ['None', 'High', 'Max'],
-			enumDescriptions: [
-				'Disable thinking for faster responses',
-				'Recommended for most tasks',
-				'Maximum reasoning depth for complex agent tasks',
-			],
-			default: 'high',
-			group: 'navigation',
-		},
-	},
-} as const;
 
 type ThinkingEffort = 'none' | 'high' | 'max';
 
@@ -194,13 +176,13 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			);
 		}
 
-		const baseUrl = this.authManager.getBaseUrl();
+		const baseUrl = getBaseUrl();
 		const client = new DeepSeekClient(baseUrl, apiKey);
 
-		const modelDef = findModel(modelInfo.id);
+		const modelDef = MODELS.find(m => m.id === modelInfo.id);
 		const isThinkingModel = modelDef?.capabilities.thinking ?? false;
 		const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
-		const maxTokens = this.authManager.getMaxTokens();
+		const maxTokens = getMaxTokens();
 
 		// Heuristic: detect conversation start to clear stale cache.
 		if (messages.length <= 2) {
@@ -231,7 +213,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		return new Promise<void>((resolve, reject) => {
 			client.streamChatCompletion(
 				{
-					model: this.authManager.getApiModelId(modelInfo.id),
+					model: getApiModelId(modelInfo.id),
 					messages: deepseekMessages,
 					stream: true,
 					tools,
@@ -369,10 +351,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 }
 
 // ---- Helpers ----
-
-function findModel(id: string): ModelDefinition | undefined {
-	return MODELS.find((m) => m.id === id);
-}
 
 function toChatInfo(
 	m: ModelDefinition,

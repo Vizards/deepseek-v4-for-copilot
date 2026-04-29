@@ -1,9 +1,7 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
+import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
-
-const WELCOME_SHOWN_KEY = 'deepseek-copilot.welcomeShown';
-const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingStarted';
 
 let activeProvider: DeepSeekChatProvider | undefined;
 

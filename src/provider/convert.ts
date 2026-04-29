@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
 import type { ReasoningEntry } from './cache';
 

@@ -1,10 +1,6 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
+import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../consts';
 import { logger } from '../logger';
-
-const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
-
-export const IMAGE_DESCRIPTION_PROMPT =
-	'Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.';
 
 /**
  * Resolve any image parts in user messages by forwarding them to a vision

@@ -231,7 +231,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		return new Promise<void>((resolve, reject) => {
 			client.streamChatCompletion(
 				{
-					model: modelInfo.id,
+					model: this.authManager.getApiModelId(modelInfo.id),
 					messages: deepseekMessages,
 					stream: true,
 					tools,

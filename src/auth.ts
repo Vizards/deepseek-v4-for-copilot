@@ -91,6 +91,21 @@ export class AuthManager {
 	}
 
 	/**
+	 * Resolve the API model ID to send to the DeepSeek endpoint.
+	 * Users can override the default IDs via settings to support compatible APIs.
+	 */
+	getApiModelId(vscodeModelId: string): string {
+		const config = vscode.workspace.getConfiguration('deepseek-copilot');
+		if (vscodeModelId === 'deepseek-v4-flash') {
+			return config.get<string>('flashModelId')?.trim() || 'deepseek-v4-flash';
+		}
+		if (vscodeModelId === 'deepseek-v4-pro') {
+			return config.get<string>('proModelId')?.trim() || 'deepseek-v4-pro';
+		}
+		return vscodeModelId;
+	}
+
+	/**
 	 * Get max tokens limit (0 = no limit).
 	 */
 	getMaxTokens(): number | undefined {

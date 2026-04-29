@@ -3,7 +3,7 @@
   "displayName": "DeepSeek V4 for Copilot Chat",
   "description": "Pick DeepSeek V4 Pro & Flash from the Copilot Chat model picker. Vision, thinking mode, agent tools — zero config, BYOK.",
   "icon": "resources/icon.png",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "Vizards",
   "license": "MIT",
   "repository": {

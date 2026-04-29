@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.2.0...v0.3.0) (2026-04-29)
+
+
+### Features
+
+* add configurable API model IDs for DeepSeek V4 Flash and Pro models ([#4](https://github.com/Vizards/deepseek-v4-for-copilot/issues/4)) ([de132ca](https://github.com/Vizards/deepseek-v4-for-copilot/commit/de132ca14f46a03584932e646c76ebe2add01aef))
+
 ## 0.2.0
 
 - Show DeepSeek models in the Copilot Chat model picker as soon as the extension is active, even before an API key is configured.

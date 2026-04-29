@@ -26,9 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.registerCommand('deepseek-copilot.setApiKey', () =>
 				provider.configureApiKey(),
 			),
-			vscode.commands.registerCommand('deepseek-copilot.clearApiKey', () =>
-				provider.clearApiKey(),
-			),
+			vscode.commands.registerCommand('deepseek-copilot.clearApiKey', () => provider.clearApiKey()),
 			vscode.commands.registerCommand('deepseek-copilot.setVisionModel', () =>
 				provider.setVisionProxyModel(),
 			),
@@ -62,11 +60,7 @@ async function showWelcomeIfNeeded(
 		return;
 	}
 
-	await vscode.commands.executeCommand(
-		'workbench.action.openWalkthrough',
-		WALKTHROUGH_ID,
-		false,
-	);
+	await vscode.commands.executeCommand('workbench.action.openWalkthrough', WALKTHROUGH_ID, false);
 	await context.globalState.update(WELCOME_SHOWN_KEY, true);
 }
 

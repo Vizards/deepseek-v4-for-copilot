@@ -11,7 +11,8 @@
     "url": "https://github.com/Vizards/deepseek-v4-for-copilot"
   },
   "engines": {
-    "vscode": "^1.116.0"
+    "vscode": "^1.116.0",
+    "node": ">=24"
   },
   "extensionKind": [
     "workspace"
@@ -153,6 +154,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "lint": "oxlint",
+    "format": "oxfmt --write src/",
+    "format:check": "oxfmt --check src/",
     "package": "vsce package -o dist/",
     "publish": "vsce publish",
     "login": "vsce login Vizards"
@@ -161,6 +165,8 @@
     "@types/node": "^25.6.0",
     "@types/vscode": "^1.116.0",
     "@vscode/vsce": "^3.9.1",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
     "typescript": "^6.0.3"
   }
 }

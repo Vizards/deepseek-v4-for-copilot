@@ -1,6 +1,11 @@
 import type { CancellationToken } from 'vscode';
 import { logger } from './logger';
-import type { DeepSeekRequest, DeepSeekStreamChunk, DeepSeekToolCall, StreamCallbacks } from './types';
+import type {
+	DeepSeekRequest,
+	DeepSeekStreamChunk,
+	DeepSeekToolCall,
+	StreamCallbacks,
+} from './types';
 
 /**
  * Lightweight SSE-streaming DeepSeek API client.

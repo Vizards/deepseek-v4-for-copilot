@@ -4,17 +4,10 @@ import { DeepSeekClient } from '../client';
 import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { API_KEY_REQUIRED_DETAIL, MODELS, THINKING_EFFORT_CONFIGURATION_SCHEMA } from '../consts';
 import { logger } from '../logger';
-import type {
-	DeepSeekToolCall,
-	ModelDefinition
-} from '../types';
+import type { DeepSeekToolCall, ModelDefinition } from '../types';
 import { type ReasoningEntry, pruneReasoningCache } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
-import {
-	createVisionModelGetter,
-	resolveImageMessages,
-	setVisionProxyModel,
-} from './vision';
+import { createVisionModelGetter, resolveImageMessages, setVisionProxyModel } from './vision';
 
 /**
  * NOTE: Non-public API surface.
@@ -63,7 +56,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly onDidChangeLanguageModelChatInformationEmitter = new vscode.EventEmitter<void>();
 	private isActive = true;
 
-	readonly onDidChangeLanguageModelChatInformation = this.onDidChangeLanguageModelChatInformationEmitter.event;
+	readonly onDidChangeLanguageModelChatInformation =
+		this.onDidChangeLanguageModelChatInformationEmitter.event;
 
 	/** reasoning text → tool_call IDs cache. */
 	private readonly reasoningCache = new Map<string, ReasoningEntry>();
@@ -146,8 +140,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		await setVisionProxyModel();
 	}
 
-
-
 	// ---- LanguageModelChatProvider ----
 
 	async provideLanguageModelChatInformation(
@@ -179,7 +171,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		const baseUrl = getBaseUrl();
 		const client = new DeepSeekClient(baseUrl, apiKey);
 
-		const modelDef = MODELS.find(m => m.id === modelInfo.id);
+		const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 		const isThinkingModel = modelDef?.capabilities.thinking ?? false;
 		const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 		const maxTokens = getMaxTokens();
@@ -190,19 +182,13 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		}
 
 		// Vision proxy: resolve images → text descriptions before sending to DeepSeek
-		const resolvedMessages = await resolveImageMessages(
-			messages,
-			token,
-			() => this.vision.get(),
-		);
+		const resolvedMessages = await resolveImageMessages(messages, token, () => this.vision.get());
 		const deepseekMessages = convertMessages(
 			resolvedMessages,
 			isThinkingModel,
 			this.reasoningCache,
 		);
-		const tools = modelDef?.capabilities.toolCalling
-			? convertTools(options.tools)
-			: undefined;
+		const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
 
 		const totalRequestChars = countMessageChars(deepseekMessages);
 
@@ -222,11 +208,9 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 					...(isThinkingModel
 						? {
 								thinking: {
-									type: thinkingEffort === 'none' ? 'disabled' as const : 'enabled' as const,
+									type: thinkingEffort === 'none' ? ('disabled' as const) : ('enabled' as const),
 								},
-								...(thinkingEffort === 'none'
-									? {}
-									: { reasoning_effort: thinkingEffort }),
+								...(thinkingEffort === 'none' ? {} : { reasoning_effort: thinkingEffort }),
 							}
 						: {}),
 				},
@@ -263,19 +247,11 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 						try {
 							const args = JSON.parse(toolCall.function.arguments);
 							progress.report(
-								new vscode.LanguageModelToolCallPart(
-									toolCall.id,
-									toolCall.function.name,
-									args,
-								),
+								new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.function.name, args),
 							);
 						} catch {
 							progress.report(
-								new vscode.LanguageModelToolCallPart(
-									toolCall.id,
-									toolCall.function.name,
-									{},
-								),
+								new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.function.name, {}),
 							);
 						}
 					},
@@ -286,11 +262,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 					onDone: () => {
 						// Cache reasoning for the final response (non-tool-call case).
-						if (
-							isThinkingModel &&
-							accumulatedReasoning &&
-							pendingToolCallIds.length === 0
-						) {
+						if (isThinkingModel && accumulatedReasoning && pendingToolCallIds.length === 0) {
 							responseMessageId = `resp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 							this.reasoningCache.set(responseMessageId, {
 								text: accumulatedReasoning,
@@ -306,8 +278,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 						// Calibrate chars-per-token ratio from real API usage data.
 						if (totalRequestChars > 0 && usage.prompt_tokens > 0) {
 							const observedRatio = totalRequestChars / usage.prompt_tokens;
-							this.charsPerToken =
-								this.charsPerToken * 0.7 + observedRatio * 0.3;
+							this.charsPerToken = this.charsPerToken * 0.7 + observedRatio * 0.3;
 						}
 
 						// Log KV cache hit stats for observability.
@@ -317,8 +288,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 						const hitRate = cacheTotal > 0 ? ((cacheHit / cacheTotal) * 100).toFixed(0) : 'n/a';
 						logger.info(
 							`tokens: prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
-							` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${hitRate}%` +
-							` | chars/tok=${this.charsPerToken.toFixed(2)}`,
+								` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${hitRate}%` +
+								` | chars/tok=${this.charsPerToken.toFixed(2)}`,
 						);
 					},
 				},
@@ -352,10 +323,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 // ---- Helpers ----
 
-function toChatInfo(
-	m: ModelDefinition,
-	hasApiKey: boolean,
-): ModelPickerChatInformation {
+function toChatInfo(m: ModelDefinition, hasApiKey: boolean): ModelPickerChatInformation {
 	return {
 		id: m.id,
 		name: m.name,
@@ -378,8 +346,8 @@ function toChatInfo(
 }
 
 function getConfiguredThinkingEffort(options: ModelConfigurationOptions): ThinkingEffort {
-	const configuredEffort = options.modelConfiguration?.reasoningEffort
-		?? options.configuration?.reasoningEffort;
+	const configuredEffort =
+		options.modelConfiguration?.reasoningEffort ?? options.configuration?.reasoningEffort;
 
 	if (configuredEffort === 'none') {
 		return 'none';

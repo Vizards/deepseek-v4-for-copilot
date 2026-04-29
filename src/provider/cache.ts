@@ -16,10 +16,7 @@ export interface ReasoningEntry {
 	timestamp: number;
 }
 
-export function pruneReasoningCache(
-	cache: Map<string, ReasoningEntry>,
-	clearAll: boolean,
-): void {
+export function pruneReasoningCache(cache: Map<string, ReasoningEntry>, clearAll: boolean): void {
 	if (clearAll) {
 		cache.clear();
 		return;
@@ -30,8 +27,7 @@ export function pruneReasoningCache(
 	}
 
 	// Evict oldest entries
-	const sorted = [...cache.entries()]
-		.sort((a, b) => a[1].timestamp - b[1].timestamp);
+	const sorted = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
 	const toRemove = sorted.slice(0, sorted.length - MAX_CACHE_SIZE);
 	for (const [key] of toRemove) {
 		cache.delete(key);

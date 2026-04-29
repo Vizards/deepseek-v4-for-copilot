@@ -57,7 +57,7 @@ Pure VS Code API + Node.js built-ins. No Python, no Docker, no local proxy serve
 
 ### Prerequisites
 
-- VS Code 1.104 or later
+- VS Code 1.116 or later. This extension relies on non-public Copilot Chat APIs that may break on newer VS Code versions — [report an issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues) if you hit one.
 - GitHub Copilot subscription (Free / Pro / Enterprise — the free tier works)
 - DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com)
 

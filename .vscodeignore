@@ -6,6 +6,9 @@ out/**/*.d.ts.map
 tsconfig.json
 .github/**
 .gitignore
+.nvmrc
+.oxlintrc.json
+.oxfmtrc.json
 *.vsix
 .vscode-test/
 .dev/**

@@ -12,9 +12,7 @@ export async function resolveImageMessages(
 	token: vscode.CancellationToken,
 	getModel: () => Promise<vscode.LanguageModelChat | undefined>,
 ): Promise<readonly vscode.LanguageModelChatRequestMessage[]> {
-	const hasImages = messages.some((m) =>
-		m.content.some((p) => isImageDataPart(p)),
-	);
+	const hasImages = messages.some((m) => m.content.some((p) => isImageDataPart(p)));
 	if (!hasImages) {
 		return messages;
 	}
@@ -26,7 +24,10 @@ export async function resolveImageMessages(
 			const filtered = (m.content as readonly vscode.LanguageModelInputPart[]).filter(
 				(p) => !isImageDataPart(p),
 			);
-			return { role: m.role, content: filtered } as unknown as vscode.LanguageModelChatRequestMessage;
+			return {
+				role: m.role,
+				content: filtered,
+			} as unknown as vscode.LanguageModelChatRequestMessage;
 		});
 	}
 
@@ -50,12 +51,10 @@ export async function resolveImageMessages(
 		}
 
 		try {
-			const visionMsg = vscode.LanguageModelChatMessage.User(
-				[
-					...imageParts,
-					new vscode.LanguageModelTextPart(getVisionPrompt()),
-				] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[],
-			);
+			const visionMsg = vscode.LanguageModelChatMessage.User([
+				...imageParts,
+				new vscode.LanguageModelTextPart(getVisionPrompt()),
+			] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
 
 			const response = await visionModel.sendRequest([visionMsg], {}, token);
 			let description = '';
@@ -132,7 +131,9 @@ export async function setVisionProxyModel(): Promise<void> {
 	const candidates = allModels.filter((m) => m.vendor !== 'deepseek');
 
 	if (candidates.length === 0) {
-		vscode.window.showInformationMessage('No language models available in your VS Code environment.');
+		vscode.window.showInformationMessage(
+			'No language models available in your VS Code environment.',
+		);
 		return;
 	}
 
@@ -167,5 +168,7 @@ function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
 
 function getVisionPrompt(): string {
 	const config = vscode.workspace.getConfiguration('deepseek-copilot');
-	return config.get<string>('visionPrompt', IMAGE_DESCRIPTION_PROMPT).trim() || IMAGE_DESCRIPTION_PROMPT;
+	return (
+		config.get<string>('visionPrompt', IMAGE_DESCRIPTION_PROMPT).trim() || IMAGE_DESCRIPTION_PROMPT
+	);
 }

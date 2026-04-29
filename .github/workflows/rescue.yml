@@ -20,7 +20,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag_name }}
+          ref: refs/tags/${{ inputs.tag_name }}
+
+      - name: Validate requested tag matches checked out commit
+        shell: bash
+        run: |
+          git fetch --force --tags
+          tag_ref="refs/tags/${{ inputs.tag_name }}"
+          if ! git rev-parse --verify "${tag_ref}" >/dev/null 2>&1; then
+            echo "Tag ${tag_ref} does not exist." >&2
+            exit 1
+          fi
+
+          head_commit="$(git rev-parse HEAD)"
+          tag_commit="$(git rev-list -n 1 "${tag_ref}")"
+
+          if [ "${head_commit}" != "${tag_commit}" ]; then
+            echo "Checked out commit ${head_commit} does not match tag ${tag_ref} (${tag_commit})." >&2
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:

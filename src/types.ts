@@ -2,6 +2,7 @@
  * Shared types for the DeepSeek Copilot extension.
  */
 
+
 // ---- API request/response types ----
 
 export interface DeepSeekMessage {
@@ -113,7 +114,8 @@ export const MODELS: ModelDefinition[] = [
 		name: 'DeepSeek V4 Flash',
 		family: 'deepseek',
 		version: 'v4',
-		detail: 'Fast, general-purpose model',
+		/** i18n key — translated in provider toChatInfo() */
+		detail: 'model.flash.detail',
 		maxInputTokens: 1048576,
 		maxOutputTokens: 393216,
 		capabilities: {
@@ -128,7 +130,8 @@ export const MODELS: ModelDefinition[] = [
 		name: 'DeepSeek V4 Pro',
 		family: 'deepseek',
 		version: 'v4',
-		detail: 'Most capable reasoning model',
+		/** i18n key — translated in provider toChatInfo() */
+		detail: 'model.pro.detail',
 		maxInputTokens: 1048576,
 		maxOutputTokens: 393216,
 		capabilities: {

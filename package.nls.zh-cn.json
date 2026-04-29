@@ -1,0 +1,20 @@
+{
+  "deepseek-copilot.command.setApiKey": "DeepSeek: 设置 API Key",
+  "deepseek-copilot.command.getApiKey": "DeepSeek: 获取 API Key",
+  "deepseek-copilot.command.clearApiKey": "DeepSeek: 清除 API Key",
+  "deepseek-copilot.command.setVisionModel": "DeepSeek: 设置视觉代理模型",
+  "deepseek-copilot.command.openSettings": "DeepSeek: 打开设置",
+  "deepseek-copilot.command.showLogs": "DeepSeek: 显示日志",
+  "deepseek-copilot.command.showContextDetails": "DeepSeek: 显示上下文详情",
+  "deepseek-copilot.walkthrough.title": "DeepSeek V4 for Copilot Chat",
+  "deepseek-copilot.walkthrough.description": "在 Copilot Chat 中配置 DeepSeek V4 模型。",
+  "deepseek-copilot.walkthrough.setApiKey.title": "设置你的 DeepSeek API Key",
+  "deepseek-copilot.walkthrough.setApiKey.description": "从 deepseek.com [获取 API Key](command:deepseek-copilot.getApiKey)。\n[设置 API Key](command:deepseek-copilot.setApiKey)",
+  "deepseek-copilot.walkthrough.showModels.title": "显示 DeepSeek 模型",
+  "deepseek-copilot.walkthrough.showModels.description": "如果模型被隐藏，打开 VS Code 的语言模型管理器并显示 DeepSeek 模型。\n[打开语言模型管理](command:workbench.action.chat.manage)",
+  "deepseek-copilot.config.title": "DeepSeek 助手",
+  "deepseek-copilot.config.baseUrl.description": "DeepSeek API 基础 URL。默认为官方 DeepSeek API 端点。",
+  "deepseek-copilot.config.maxTokens.description": "每次请求的最大输出 Token 数。设为 0 使用 API 默认值（不限制）。可用于控制成本。",
+  "deepseek-copilot.config.visionModel.description": "视觉代理模型 ID（为纯文本 DeepSeek 模型描述图片）。留空自动检测。使用「DeepSeek: 设置视觉代理模型」命令从列表中选择。",
+  "deepseek-copilot.config.visionPrompt.description": "在将图片附件转发给 DeepSeek 之前，发送给视觉代理模型的提示词。"
+}

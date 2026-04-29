@@ -1,21 +1,21 @@
 import * as vscode from 'vscode';
 import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
+import { type UsageSnapshot } from '../context-display';
+import { t } from '../i18n';
 import { logger } from '../logger';
 import type {
-	DeepSeekToolCall,
-	ModelDefinition
+    DeepSeekToolCall,
+    ModelDefinition
 } from '../types';
 import { MODELS } from '../types';
 import { type ReasoningEntry, pruneReasoningCache } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import {
-	createVisionModelGetter,
-	resolveImageMessages,
-	setVisionProxyModel,
+    createVisionModelGetter,
+    resolveImageMessages,
+    setVisionProxyModel,
 } from './vision';
-
-const API_KEY_REQUIRED_DETAIL = 'Please run DeepSeek: Set API Key to configure.';
 
 /**
  * NOTE: Non-public API surface.
@@ -30,23 +30,30 @@ const API_KEY_REQUIRED_DETAIL = 'Please run DeepSeek: Set API Key to configure.'
  * If/when VS Code stabilizes these as proposed API, switch to the official
  * types and drop the casts below.
  */
-const THINKING_EFFORT_CONFIGURATION_SCHEMA = {
-	properties: {
-		reasoningEffort: {
-			type: 'string',
-			title: 'Thinking Effort',
-			enum: ['none', 'high', 'max'],
-			enumItemLabels: ['None', 'High', 'Max'],
-			enumDescriptions: [
-				'Disable thinking for faster responses',
-				'Recommended for most tasks',
-				'Maximum reasoning depth for complex agent tasks',
-			],
-			default: 'high',
-			group: 'navigation',
+/**
+ * Build thinking effort configuration schema dynamically.
+ * Called at runtime so t() picks up the current locale (respects
+ * deepseek-copilot.language config changes).
+ */
+function buildThinkingEffortSchema() {
+	return {
+		properties: {
+			reasoningEffort: {
+				type: 'string',
+				title: t('status.thinking'),
+				enum: ['none', 'high', 'max'],
+				enumItemLabels: [t('thinking.none'), t('thinking.high'), t('thinking.max')],
+				enumDescriptions: [
+					t('thinking.none.desc'),
+					t('thinking.high.desc'),
+					t('thinking.max.desc'),
+				],
+				default: 'high',
+				group: 'navigation',
+			},
 		},
-	},
-} as const;
+	} as const;
+}
 
 type ThinkingEffort = 'none' | 'high' | 'max';
 
@@ -69,7 +76,7 @@ type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseOptions 
 type ModelPickerChatInformation = vscode.LanguageModelChatInformation & {
 	readonly isUserSelectable: boolean;
 	readonly statusIcon?: vscode.ThemeIcon;
-	readonly configurationSchema?: typeof THINKING_EFFORT_CONFIGURATION_SCHEMA;
+	readonly configurationSchema?: ReturnType<typeof buildThinkingEffortSchema>;
 };
 
 /**
@@ -94,6 +101,16 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	 * Updated via exponential moving average each time the API reports real token counts.
 	 */
 	private charsPerToken = 4.0;
+
+	/** 上下文显示器用量回调 */
+	private usageCallbacks: Array<(modelId: string, thinkingEffort: string, usage: UsageSnapshot) => void> = [];
+
+	/**
+	 * 注册用量更新回调，供 ContextDisplay 使用。
+	 */
+	onUsageUpdate(cb: (modelId: string, thinkingEffort: string, usage: UsageSnapshot) => void): void {
+		this.usageCallbacks.push(cb);
+	}
 
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
@@ -136,7 +153,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	async clearApiKey(): Promise<void> {
 		await this.authManager.deleteApiKey();
 		this.onDidChangeLanguageModelChatInformationEmitter.fire();
-		vscode.window.showInformationMessage('DeepSeek API key removed.');
+		vscode.window.showInformationMessage(t('auth.removed'));
 	}
 
 	async hasApiKey(): Promise<boolean> {
@@ -189,9 +206,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	): Promise<void> {
 		const apiKey = await this.authManager.getApiKey();
 		if (!apiKey) {
-			throw new Error(
-				'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
-			);
+			throw new Error(t('auth.notConfigured'));
 		}
 
 		const baseUrl = this.authManager.getBaseUrl();
@@ -328,15 +343,32 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 								this.charsPerToken * 0.7 + observedRatio * 0.3;
 						}
 
-						// Log KV cache hit stats for observability.
+						// Notify context display
 						const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
 						const cacheMiss = usage.prompt_cache_miss_tokens ?? 0;
+						const snapshot: UsageSnapshot = {
+							promptTokens: usage.prompt_tokens,
+							completionTokens: usage.completion_tokens,
+							totalTokens: usage.total_tokens,
+							cacheHitTokens: cacheHit,
+							cacheMissTokens: cacheMiss,
+							charsPerToken: this.charsPerToken,
+						};
+						for (const cb of this.usageCallbacks) {
+							try {
+								cb(modelInfo.id, thinkingEffort, snapshot);
+							} catch (error) {
+								logger.debug('Context display callback error', error);
+							}
+						}
+
+						// Log KV cache hit stats for observability.
 						const cacheTotal = cacheHit + cacheMiss;
 						const hitRate = cacheTotal > 0 ? ((cacheHit / cacheTotal) * 100).toFixed(0) : 'n/a';
 						logger.info(
-							`tokens: prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
-							` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${hitRate}%` +
-							` | chars/tok=${this.charsPerToken.toFixed(2)}`,
+							t('log.tokens', usage.prompt_tokens, usage.completion_tokens) +
+							' | ' + t('log.cache', cacheHit, cacheMiss, hitRate) +
+							' | ' + t('log.charsPerToken', Number(this.charsPerToken.toFixed(2))),
 						);
 					},
 				},
@@ -378,13 +410,14 @@ function toChatInfo(
 	m: ModelDefinition,
 	hasApiKey: boolean,
 ): ModelPickerChatInformation {
+	const noKeyDetail = t('auth.apiKeyRequiredDetail');
 	return {
 		id: m.id,
 		name: m.name,
 		family: m.family,
 		version: m.version,
-		detail: hasApiKey ? m.detail : API_KEY_REQUIRED_DETAIL,
-		tooltip: hasApiKey ? undefined : API_KEY_REQUIRED_DETAIL,
+		detail: hasApiKey ? t(m.detail) : noKeyDetail,
+		tooltip: hasApiKey ? undefined : noKeyDetail,
 		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
 		maxInputTokens: m.maxInputTokens,
 		maxOutputTokens: m.maxOutputTokens,
@@ -394,7 +427,7 @@ function toChatInfo(
 			imageInput: m.capabilities.imageInput,
 		},
 		...(m.capabilities.thinking
-			? { configurationSchema: THINKING_EFFORT_CONFIGURATION_SCHEMA }
+			? { configurationSchema: buildThinkingEffortSchema() }
 			: {}),
 	};
 }

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { ContextDisplay, type UsageSnapshot } from './context-display';
+import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
 
@@ -6,9 +8,12 @@ const WELCOME_SHOWN_KEY = 'deepseek-copilot.welcomeShown';
 const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingStarted';
 
 let activeProvider: DeepSeekChatProvider | undefined;
+let contextDisplay: ContextDisplay | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
 	logger.info('Activating extension');
+
+	contextDisplay = new ContextDisplay(context);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('deepseek-copilot.showLogs', () => logger.show()),
@@ -18,10 +23,19 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('deepseek-copilot.openSettings', () =>
 			vscode.commands.executeCommand('workbench.action.openSettings', 'deepseek-copilot'),
 		),
+		vscode.commands.registerCommand('deepseek-copilot.showContextDetails', () =>
+			logger.show(),
+		),
 	);
 
 	try {
 		const provider = new DeepSeekChatProvider(context);
+
+		// 将 API 用量数据传递给上下文显示器
+		provider.onUsageUpdate((modelId: string, thinkingEffort: string, usage: UsageSnapshot) => {
+			contextDisplay?.update(modelId, thinkingEffort, usage);
+		});
+
 		activeProvider = provider;
 
 		context.subscriptions.push(
@@ -38,16 +52,14 @@ export function activate(context: vscode.ExtensionContext) {
 		);
 
 		void showWelcomeIfNeeded(context, provider).catch((error) => {
-			logger.warn('Failed to show DeepSeek welcome prompt', error);
+			logger.warn(t('extension.welcomeFailed'), error);
 		});
 
 		logger.info('Extension activated');
 	} catch (error) {
 		activeProvider = undefined;
 		logger.error('Failed to activate DeepSeek extension', error);
-		void vscode.window.showErrorMessage(
-			'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',
-		);
+		void vscode.window.showErrorMessage(t('extension.activateFailed'));
 		throw error;
 	}
 }
@@ -76,8 +88,9 @@ export async function deactivate() {
 	try {
 		await activeProvider?.prepareForDeactivate();
 	} catch (error) {
-		logger.warn('Failed to prepare DeepSeek provider for deactivate', error);
+		logger.warn(t('extension.deactivateFailed'), error);
 	} finally {
+		contextDisplay = undefined;
 		activeProvider = undefined;
 		logger.info('Extension deactivated');
 		logger.dispose();

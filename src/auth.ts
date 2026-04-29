@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from './i18n';
 
 const API_KEY_SECRET = 'deepseek-copilot.apiKey';
 
@@ -58,16 +59,16 @@ export class AuthManager {
 	 */
 	async promptForApiKey(): Promise<boolean> {
 		const apiKey = await vscode.window.showInputBox({
-			prompt: 'Enter your DeepSeek API key',
-			placeHolder: 'sk-...',
+			prompt: t('auth.prompt'),
+			placeHolder: t('auth.placeholder'),
 			password: true,
 			ignoreFocusOut: true,
 			validateInput: (value: string) => {
 				if (!value?.trim()) {
-					return 'API key cannot be empty';
+					return t('auth.emptyValidation');
 				}
 				if (!value.startsWith('sk-')) {
-					return 'API key should start with "sk-"';
+					return t('auth.prefixValidation');
 				}
 				return undefined;
 			},
@@ -75,7 +76,7 @@ export class AuthManager {
 
 		if (apiKey) {
 			await this.setApiKey(apiKey);
-			vscode.window.showInformationMessage('DeepSeek API key saved securely.');
+			vscode.window.showInformationMessage(t('auth.saved'));
 			return true;
 		}
 

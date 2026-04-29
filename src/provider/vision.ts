@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { logger } from '../logger';
 
 const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
@@ -25,7 +26,7 @@ export async function resolveImageMessages(
 
 	const visionModel = await getModel();
 	if (!visionModel) {
-		logger.warn('No vision model available; images will be dropped.');
+		logger.warn(t('vision.unavailable'));
 		return messages.map((m) => {
 			const filtered = (m.content as readonly vscode.LanguageModelInputPart[]).filter(
 				(p) => !isImageDataPart(p),
@@ -73,8 +74,8 @@ export async function resolveImageMessages(
 				new vscode.LanguageModelTextPart(`[Image Description: ${description.trim()}]`),
 			);
 		} catch (err) {
-			logger.error('Vision proxy error:', err);
-			otherParts.push(new vscode.LanguageModelTextPart('[Image: unable to describe]'));
+			logger.error(t('vision.proxyError'), err);
+			otherParts.push(new vscode.LanguageModelTextPart(t('vision.unableToDescribe')));
 		}
 
 		result.push({
@@ -110,11 +111,11 @@ export function createVisionModelGetter(): {
 				const id = getConfiguredVisionModelId() ?? DEFAULT_VISION_MODEL_ID;
 				const models = await vscode.lm.selectChatModels({ id });
 				if (models.length > 0) {
-					logger.info(`Using vision proxy model: ${models[0].id}`);
+					logger.info(t('vision.proxyUsing', models[0].id));
 					visionModel = models[0];
 					return models[0];
 				}
-				logger.warn(`Vision model "${id}" not found.`);
+				logger.warn(t('vision.notFound', id));
 				return undefined;
 			})();
 
@@ -136,7 +137,7 @@ export async function setVisionProxyModel(): Promise<void> {
 	const candidates = allModels.filter((m) => m.vendor !== 'deepseek');
 
 	if (candidates.length === 0) {
-		vscode.window.showInformationMessage('No language models available in your VS Code environment.');
+		vscode.window.showInformationMessage(t('vision.noModel'));
 		return;
 	}
 
@@ -145,11 +146,11 @@ export async function setVisionProxyModel(): Promise<void> {
 	const items = candidates.map((m) => ({
 		label: m.id,
 		description: `vendor: ${m.vendor}`,
-		detail: m.id === currentId ? '✓ current' : undefined,
+		detail: m.id === currentId ? `✓ ${t('vision.current')}` : undefined,
 	}));
 
 	const picked = await vscode.window.showQuickPick(items, {
-		placeHolder: `Pick a model to describe image attachments (default: ${DEFAULT_VISION_MODEL_ID})`,
+		placeHolder: t('vision.pickPlaceholder', DEFAULT_VISION_MODEL_ID),
 		matchOnDescription: true,
 	});
 

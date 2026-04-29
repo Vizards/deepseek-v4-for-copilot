@@ -1,0 +1,57 @@
+name: Rescue Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Existing release tag to publish, e.g. v0.3.0.'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: publish-${{ inputs.tag_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: rm -rf dist && mkdir -p dist && npm run package
+
+      - name: Locate VSIX
+        id: vsix
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(dist/*.vsix)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one VSIX in dist, found ${#files[@]}" >&2
+            printf '%s\n' "${files[@]}" >&2
+            exit 1
+          fi
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to VS Code Marketplace
+        run: npm exec -- vsce publish --packagePath "${{ steps.vsix.outputs.path }}" --skip-duplicate
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Attach VSIX to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          files: ${{ steps.vsix.outputs.path }}
+          fail_on_unmatched_files: true

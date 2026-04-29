@@ -96,13 +96,9 @@ export class AuthManager {
 	 */
 	getApiModelId(vscodeModelId: string): string {
 		const config = vscode.workspace.getConfiguration('deepseek-copilot');
-		if (vscodeModelId === 'deepseek-v4-flash') {
-			return config.get<string>('flashModelId')?.trim() || 'deepseek-v4-flash';
-		}
-		if (vscodeModelId === 'deepseek-v4-pro') {
-			return config.get<string>('proModelId')?.trim() || 'deepseek-v4-pro';
-		}
-		return vscodeModelId;
+		const overrides = config.get<Record<string, string>>('modelIdOverrides');
+		const override = overrides?.[vscodeModelId]?.trim();
+		return override || vscodeModelId;
 	}
 
 	/**

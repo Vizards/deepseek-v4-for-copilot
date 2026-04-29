@@ -116,15 +116,24 @@
           "minimum": 0,
           "description": "Maximum number of output tokens per request. Set to 0 to use the API default (no limit). Useful for controlling costs."
         },
-        "deepseek-copilot.flashModelId": {
-          "type": "string",
-          "default": "deepseek-v4-flash",
-          "description": "API model ID sent to the DeepSeek endpoint for the DeepSeek V4 Flash model. Change this when using a compatible third-party API that uses a different model name."
-        },
-        "deepseek-copilot.proModelId": {
-          "type": "string",
-          "default": "deepseek-v4-pro",
-          "description": "API model ID sent to the DeepSeek endpoint for the DeepSeek V4 Pro model. Change this when using a compatible third-party API that uses a different model name."
+        "deepseek-copilot.modelIdOverrides": {
+          "type": "object",
+          "default": {
+            "deepseek-v4-flash": "deepseek-v4-flash",
+            "deepseek-v4-pro": "deepseek-v4-pro"
+          },
+          "description": "Override the API model ID sent for each DeepSeek model. Defaults are prefilled with official DeepSeek IDs; change them only when using a compatible third-party API that uses different model names.",
+          "additionalProperties": false,
+          "properties": {
+            "deepseek-v4-flash": {
+              "type": "string",
+              "description": "API model ID for DeepSeek V4 Flash"
+            },
+            "deepseek-v4-pro": {
+              "type": "string",
+              "description": "API model ID for DeepSeek V4 Pro"
+            }
+          }
         },
         "deepseek-copilot.visionModel": {
           "type": "string",

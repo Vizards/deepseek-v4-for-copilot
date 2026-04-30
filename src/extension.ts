@@ -43,13 +43,13 @@ export function activate(context: vscode.ExtensionContext) {
 		// Chat to re-query our provider through the full (non-cached) path, which
 		// correctly picks up configurationSchema.
 		//
-		// This works because registerLanguageModelChatProvider() is synchronous —
-		// the provider is fully registered before the async event is dispatched,
-		// so Copilot Chat always receives complete model information when it
-		// processes the event. The extensionDependencies on github.copilot-chat
-		// in package.json additionally guarantees Copilot Chat is fully activated
-		// before this extension's activate() runs, eliminating any activation
-		// ordering race.
+		// This works because registerLanguageModelChatProvider() is synchronous,
+		// so the provider is fully registered before we fire the refresh and the
+		// host has already subscribed to receive the change. Copilot Chat can then
+		// re-query complete model information through the non-cached path. The
+		// extensionDependencies on github.copilot-chat in package.json
+		// additionally guarantees Copilot Chat is fully activated before this
+		// extension's activate() runs, eliminating any activation ordering race.
 		provider.refreshModelPicker();
 
 		void showWelcomeIfNeeded(context, provider).catch((error) => {

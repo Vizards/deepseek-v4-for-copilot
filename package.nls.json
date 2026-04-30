@@ -1,0 +1,22 @@
+{
+  "deepseek-copilot.command.setApiKey": "DeepSeek: Set API Key",
+  "deepseek-copilot.command.getApiKey": "DeepSeek: Get API Key",
+  "deepseek-copilot.command.clearApiKey": "DeepSeek: Clear API Key",
+  "deepseek-copilot.command.setVisionModel": "DeepSeek: Set Vision Proxy Model",
+  "deepseek-copilot.command.openSettings": "DeepSeek: Open Settings",
+  "deepseek-copilot.command.showLogs": "DeepSeek: Show Logs",
+  "deepseek-copilot.walkthrough.title": "DeepSeek V4 for Copilot Chat",
+  "deepseek-copilot.walkthrough.description": "Set up DeepSeek V4 models in Copilot Chat.",
+  "deepseek-copilot.walkthrough.setApiKey.title": "Set your DeepSeek API key",
+  "deepseek-copilot.walkthrough.setApiKey.description": "[Get an API key](command:deepseek-copilot.getApiKey) from deepseek.com.\n[Set API Key](command:deepseek-copilot.setApiKey)",
+  "deepseek-copilot.walkthrough.showModels.title": "Show DeepSeek models",
+  "deepseek-copilot.walkthrough.showModels.description": "If the models are hidden, open VS Code's Language Models manager and show the DeepSeek models.\n[Open Language Models](command:workbench.action.chat.manage)",
+  "deepseek-copilot.config.title": "DeepSeek Copilot",
+  "deepseek-copilot.config.baseUrl.description": "DeepSeek API base URL. Defaults to official DeepSeek API endpoint.",
+  "deepseek-copilot.config.maxTokens.description": "Maximum number of output tokens per request. Set to 0 to use the API default (no limit). Useful for controlling costs.",
+  "deepseek-copilot.config.modelIdOverrides.description": "Override the API model ID sent for each DeepSeek model. Defaults are prefilled with official DeepSeek IDs; change them only when using a compatible third-party API that uses different model names.",
+  "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "API model ID for DeepSeek V4 Flash",
+  "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "API model ID for DeepSeek V4 Pro",
+  "deepseek-copilot.config.visionModel.description": "Model ID for vision proxy (describes images for text-only DeepSeek models). Leave empty for auto-detection. Use 'DeepSeek: Set Vision Proxy Model' command to pick one from a list.",
+  "deepseek-copilot.config.visionPrompt.description": "Prompt sent to the vision proxy model when describing image attachments before forwarding them to DeepSeek."
+}

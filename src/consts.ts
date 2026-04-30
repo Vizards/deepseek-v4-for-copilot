@@ -23,30 +23,6 @@ export const WELCOME_SHOWN_KEY = 'deepseek-copilot.welcomeShown';
 /** Walkthrough contribution ID. */
 export const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingStarted';
 
-// ---- Model picker ----
-
-/** Detail text shown in the model picker when no API key is configured. */
-export const API_KEY_REQUIRED_DETAIL = 'Please run DeepSeek: Set API Key to configure.';
-
-/** Per-model configuration schema consumed by Copilot Chat's model picker. */
-export const THINKING_EFFORT_CONFIGURATION_SCHEMA = {
-	properties: {
-		reasoningEffort: {
-			type: 'string',
-			title: 'Thinking Effort',
-			enum: ['none', 'high', 'max'],
-			enumItemLabels: ['None', 'High', 'Max'],
-			enumDescriptions: [
-				'Disable thinking for faster responses',
-				'Recommended for most tasks',
-				'Maximum reasoning depth for complex agent tasks',
-			],
-			default: 'high',
-			group: 'navigation',
-		},
-	},
-} as const;
-
 // ---- Vision proxy ----
 
 /** Default model ID used for the vision proxy when auto-detection is enabled. */

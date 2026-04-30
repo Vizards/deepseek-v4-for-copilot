@@ -356,8 +356,10 @@ function buildThinkingEffortSchema() {
 
 /**
  * Derive the i18n key for a model's detail line from the model ID.
- * Falls back to `undefined` for unknown models — `toChatInfo()` will
- * use the untranslated `m.detail` from the model registry in that case.
+ * Returns `undefined` when the key is missing from *both* locales —
+ * `toChatInfo()` will then fall back to `m.detail`. When the key exists
+ * in English but not the active locale, the English translation is used
+ * (per `t()`'s fallback behaviour).
  */
 function resolveDetailKey(m: ModelDefinition): string | undefined {
 	// Map known DeepSeek V4 models: deepseek-v4-flash → model.flash.detail

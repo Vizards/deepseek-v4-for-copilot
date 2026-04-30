@@ -113,9 +113,9 @@ export function t(key: string, ...args: (string | number)[]): string {
 	if (text === undefined) {
 		return key;
 	}
-	// Replace positional placeholders.
+	// Replace all occurrences of each positional placeholder.
 	for (let i = 0; i < args.length; i++) {
-		text = text.replace(`{${i}}`, String(args[i]));
+		text = text.replaceAll(`{${i}}`, String(args[i]));
 	}
 	return text;
 }

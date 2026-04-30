@@ -33,6 +33,25 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
 		);
 
+		// Fix(#12): configurationSchema (Thinking Effort dropdown) is a non-public
+		// field that Copilot Chat does not persist in its chatLanguageModels.json
+		// cache. On startup, Copilot Chat initialises the model picker from cache
+		// and silently drops configurationSchema, so the per-model config menu
+		// never appears on first launch.
+		//
+		// Re-firing onDidChangeLanguageModelChatInformation here forces Copilot
+		// Chat to re-query our provider through the full (non-cached) path, which
+		// correctly picks up configurationSchema.
+		//
+		// This works because registerLanguageModelChatProvider() is synchronous —
+		// the provider is fully registered before the async event is dispatched,
+		// so Copilot Chat always receives complete model information when it
+		// processes the event. The extensionDependencies on github.copilot-chat
+		// in package.json additionally guarantees Copilot Chat is fully activated
+		// before this extension's activate() runs, eliminating any activation
+		// ordering race.
+		provider.refreshModelPicker();
+
 		void showWelcomeIfNeeded(context, provider).catch((error) => {
 			logger.warn('Failed to show DeepSeek welcome prompt', error);
 		});

@@ -119,6 +119,11 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		return this.authManager.hasApiKey();
 	}
 
+	/** Force Copilot Chat to re-query model information (including configurationSchema). */
+	refreshModelPicker(): void {
+		this.onDidChangeLanguageModelChatInformationEmitter.fire();
+	}
+
 	async prepareForDeactivate(): Promise<void> {
 		this.isActive = false;
 		this.onDidChangeLanguageModelChatInformationEmitter.fire();

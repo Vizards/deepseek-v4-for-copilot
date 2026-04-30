@@ -354,8 +354,24 @@ function buildThinkingEffortSchema() {
 	} as const;
 }
 
+/**
+ * Derive the i18n key for a model's detail line from the model ID.
+ * Falls back to `undefined` for unknown models — `toChatInfo()` will
+ * use the untranslated `m.detail` from the model registry in that case.
+ */
+function resolveDetailKey(m: ModelDefinition): string | undefined {
+	// Map known DeepSeek V4 models: deepseek-v4-flash → model.flash.detail
+	const suffix = m.id.startsWith('deepseek-v4-') ? m.id.slice('deepseek-v4-'.length) : m.id;
+	const key = `model.${suffix}.detail`;
+	// t() returns the raw key string when no translation is defined in either
+	// locale — treat that as "no translation available" and fall back.
+	const translated = t(key);
+	return translated !== key ? key : undefined;
+}
+
 function toChatInfo(m: ModelDefinition, hasApiKey: boolean): ModelPickerChatInformation {
-	const modelDetail = m.id === 'deepseek-v4-flash' ? t('model.flash.detail') : t('model.pro.detail');
+	const detailKey = resolveDetailKey(m);
+	const modelDetail = detailKey ? t(detailKey) : m.detail;
 	return {
 		id: m.id,
 		name: m.name,

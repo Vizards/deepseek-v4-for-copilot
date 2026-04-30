@@ -41,6 +41,7 @@ const zh: Translations = {
 	'thinking.max.desc': '深度推理，适合复杂任务',
 
 	// Vision
+	'vision.vendorLabel': 'vendor: {0}',
 	'vision.noModel': '当前环境中无可用的语言模型。',
 	'vision.pickPlaceholder': '选择用于描述图片的模型 (默认 {0})',
 	'vision.current': '当前',
@@ -81,6 +82,7 @@ const en: Translations = {
 	'thinking.max.desc': 'Maximum reasoning depth for complex agent tasks',
 
 	// Vision
+	'vision.vendorLabel': 'vendor: {0}',
 	'vision.noModel': 'No language models available in the current environment',
 	'vision.pickPlaceholder': 'Select a model for image description (default: {0})',
 	'vision.current': 'Current',

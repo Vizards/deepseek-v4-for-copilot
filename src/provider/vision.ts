@@ -140,7 +140,7 @@ export async function setVisionProxyModel(): Promise<void> {
 
 	const items = candidates.map((m) => ({
 		label: m.id,
-		description: `vendor: ${m.vendor}`,
+		description: t('vision.vendorLabel', m.vendor),
 		detail: m.id === currentId ? t('vision.current') : undefined,
 	}));
 

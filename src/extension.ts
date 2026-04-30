@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
+import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
 
@@ -53,16 +54,14 @@ export function activate(context: vscode.ExtensionContext) {
 		provider.refreshModelPicker();
 
 		void showWelcomeIfNeeded(context, provider).catch((error) => {
-			logger.warn('Failed to show DeepSeek welcome prompt', error);
+			logger.warn(t('extension.welcomeFailed'), error);
 		});
 
 		logger.info('Extension activated');
 	} catch (error) {
 		activeProvider = undefined;
 		logger.error('Failed to activate DeepSeek extension', error);
-		void vscode.window.showErrorMessage(
-			'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',
-		);
+		void vscode.window.showErrorMessage(t('extension.activateFailed'));
 		throw error;
 	}
 }
@@ -87,7 +86,7 @@ export async function deactivate() {
 	try {
 		await activeProvider?.prepareForDeactivate();
 	} catch (error) {
-		logger.warn('Failed to prepare DeepSeek provider for deactivate', error);
+		logger.warn(t('extension.deactivateFailed'), error);
 	} finally {
 		activeProvider = undefined;
 		logger.info('Extension deactivated');

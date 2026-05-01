@@ -39,10 +39,16 @@ This proxy is a compatibility bridge; if DeepSeek native vision becomes availabl
 Full support for DeepSeek V4's `reasoning_content`. Use Copilot Chat's native model picker menu to choose `none` (off), `high` (balanced, default), or `max` (deep reasoning for hard agent tasks).
 
 ### Token Usage Tracker
-Keep an eye on your token burn right from the status bar. A live counter shows total tokens consumed in the current session, with a hover tooltip breaking down prompt, completion, and cache-hit tokens. The bar changes colour as you approach the context limit — yellow at 80%, red at 95% — so you never hit a surprise truncation mid-task.
+Keep an eye on your token burn right from the status bar. A live counter shows the **last request's** prompt tokens (not the accumulated total — Copilot truncates history, so the meaningful number is what each request actually used), with a rich hover tooltip breaking down both the last request and session totals including **cost in USD and CNY**.
+
+The bar changes colour as you approach the context limit — yellow at 80%, red at 95% — so you never hit a surprise truncation mid-task. **Click the status bar** to open a persistent detail panel with the full breakdown and a **Reset Session Counter** button.
 
 <p align="center">
-  <img src="resources/screenshots/05-token-count.png" alt="DeepSeek token usage status bar showing live token count and hover tooltip with usage breakdown" width="800">
+  <img src="resources/screenshots/05-token-count.png" alt="DeepSeek token usage status bar showing last-request token count and rich hover tooltip with cost breakdown" width="800">
+</p>
+
+<p align="center">
+  <img src="resources/screenshots/06-token-count-detail.png" alt="DeepSeek token usage detail panel opened by clicking the status bar, showing last request, session totals, cost, and pricing table" width="600">
 </p>
 
 ### Inherits Every Copilot Capability

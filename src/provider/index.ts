@@ -134,6 +134,9 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
+		// Set active model for cost calculation before proceeding.
+		this.tokenUsageTracker.setModel(modelInfo.id);
+
 		const prepared = await prepareChatRequest({
 			authManager: this.authManager,
 			modelInfo,

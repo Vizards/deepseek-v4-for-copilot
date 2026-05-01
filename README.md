@@ -38,6 +38,13 @@ This proxy is a compatibility bridge; if DeepSeek native vision becomes availabl
 ### Thinking Mode with Reasoning Effort Control
 Full support for DeepSeek V4's `reasoning_content`. Use Copilot Chat's native model picker menu to choose `none` (off), `high` (balanced, default), or `max` (deep reasoning for hard agent tasks).
 
+### Token Usage Tracker
+Keep an eye on your token burn right from the status bar. A live counter shows total tokens consumed in the current session, with a hover tooltip breaking down prompt, completion, and cache-hit tokens. The bar changes colour as you approach the context limit — yellow at 80%, red at 95% — so you never hit a surprise truncation mid-task.
+
+<p align="center">
+  <img src="resources/screenshots/05-token-count.png" alt="DeepSeek token usage status bar showing live token count and hover tooltip with usage breakdown" width="800">
+</p>
+
 ### Inherits Every Copilot Capability
 Because this plugs into Copilot's native provider API, you get the full stack for free:
 - **Agent mode** — autonomous multi-step tasks

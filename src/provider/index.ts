@@ -3,6 +3,7 @@ import { AuthManager } from '../auth';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
+import type { TokenUsageTracker } from '../tokenUsage';
 import type { ReasoningEntry } from './cache';
 import { createCacheDiagnosticsRecorder } from './diagnostics';
 import { toChatInfo } from './models';
@@ -36,8 +37,12 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	 */
 	private charsPerToken = 4.0;
 
-	constructor(context: vscode.ExtensionContext) {
+	/** Session-scoped token usage tracker. */
+	private readonly tokenUsageTracker: TokenUsageTracker;
+
+	constructor(context: vscode.ExtensionContext, tokenUsageTracker: TokenUsageTracker) {
 		this.authManager = new AuthManager(context);
+		this.tokenUsageTracker = tokenUsageTracker;
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
@@ -72,6 +77,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	}
 
 	async clearApiKey(): Promise<void> {
+		this.tokenUsageTracker.reset();
 		await this.authManager.deleteApiKey();
 		this.onDidChangeLanguageModelChatInformationEmitter.fire();
 		vscode.window.showInformationMessage(t('auth.removed'));
@@ -148,6 +154,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			setCharsPerToken: (charsPerToken) => {
 				this.charsPerToken = charsPerToken;
 			},
+			tokenUsageTracker: this.tokenUsageTracker,
 		});
 	}
 

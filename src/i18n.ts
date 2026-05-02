@@ -4,13 +4,13 @@ import vscode from 'vscode';
  * Lightweight i18n module — zero dependencies, follows VS Code display language.
  *
  *  - en / en-US / en-*      → English (default)
- *  - zh-cn / zh-hans / zh   → Simplified Chinese
- *  - other zh-* locales     → English until translated
+ *  - zh-cn                  → Simplified Chinese
+ *  - all other locales      → English until translated
  */
 
 function isZh(): boolean {
 	const lang = vscode.env.language.toLowerCase();
-	return lang === 'zh-cn' || lang === 'zh-hans' || lang === 'zh';
+	return lang === 'zh-cn';
 }
 
 // ---- Translation dictionaries ----

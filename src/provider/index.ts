@@ -82,10 +82,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 					this.onDidChangeLanguageModelChatInformationEmitter.fire();
 				}
 
-				if (
-					e.affectsConfiguration('deepseek-copilot.visionModel') ||
-					e.affectsConfiguration('deepseek-copilot.visionFallbackIds')
-				) {
+				if (e.affectsConfiguration('deepseek-copilot.visionModel')) {
 					this.vision.reset();
 				}
 			}),

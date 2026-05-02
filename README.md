@@ -84,7 +84,7 @@ Both support optional thinking mode, tool calling, and 1M token context.
 |---|---|---|
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = no limit). Useful for cost control |
-| `deepseek-copilot.modelIdOverrides` | official DeepSeek IDs | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
+| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
 | `deepseek-copilot.visionModel` | *(auto)* | Which Copilot model to proxy images through |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |
 
@@ -93,9 +93,11 @@ Thinking Effort is configured from Copilot Chat's model picker for each DeepSeek
 Example `settings.json` override for compatible API proxies:
 
 ```json
-"deepseek-copilot.modelIdOverrides": {
-  "deepseek-v4-flash": "your-flash-model-id",
-  "deepseek-v4-pro": "your-pro-model-id"
+{
+  "deepseek-copilot.modelIdOverrides": {
+    "deepseek-v4-flash": "your-flash-model-id",
+    "deepseek-v4-pro": "your-pro-model-id"
+  }
 }
 ```
 

@@ -42,7 +42,7 @@ const zh: Translations = {
 	'thinking.max.desc': '深度推理，适合复杂任务',
 
 	// Vision
-	'vision.vendorLabel': 'vendor: {0}',
+	'vision.vendorLabel': '提供商：{0}',
 	'vision.noModel': '当前环境中无可用的语言模型。',
 	'vision.pickPlaceholder': '选择用于描述图片的模型 (默认 {0})',
 	'vision.current': '当前',
@@ -50,7 +50,6 @@ const zh: Translations = {
 	'vision.notFound': '未找到视觉模型 "{0}"',
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
-	'vision.unableToDescribe': '[Image Description unavailable]',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
@@ -83,9 +82,8 @@ const en: Translations = {
 	'thinking.max.desc': 'Maximum reasoning depth for complex agent tasks',
 
 	// Vision
-	// NOTE: vision.unableToDescribe is inserted into LanguageModelTextPart
-	// (prompt content sent to the chat model). Keep the value stable in
-	// English across all locales to avoid affecting model behaviour.
+	// NOTE: vision.unableToDescribe has been moved to consts.ts as
+	// IMAGE_DESCRIPTION_UNAVAILABLE — it is prompt content, not UI text.
 	'vision.vendorLabel': 'vendor: {0}',
 	'vision.noModel': 'No language models available in the current environment',
 	'vision.pickPlaceholder': 'Select a model for image description (default: {0})',
@@ -94,7 +92,6 @@ const en: Translations = {
 	'vision.notFound': 'Vision model "{0}" not found',
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
-	'vision.unableToDescribe': '[Image Description unavailable]',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

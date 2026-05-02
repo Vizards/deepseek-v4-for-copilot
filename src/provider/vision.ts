@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../consts';
+import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT, IMAGE_DESCRIPTION_UNAVAILABLE } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
 
@@ -70,7 +70,7 @@ export async function resolveImageMessages(
 			);
 		} catch (err) {
 			logger.error(t('vision.proxyError'), err);
-			otherParts.push(new vscode.LanguageModelTextPart(t('vision.unableToDescribe')));
+			otherParts.push(new vscode.LanguageModelTextPart(IMAGE_DESCRIPTION_UNAVAILABLE));
 		}
 
 		result.push({

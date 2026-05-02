@@ -35,6 +35,13 @@ export const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
 export const IMAGE_DESCRIPTION_PROMPT =
 	'Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.';
 
+/**
+ * Stable fallback marker inserted into the chat prompt when the vision proxy
+ * fails to describe an image. Keep this in English and out of i18n so prompt
+ * shape and cache behaviour do not vary by VS Code display language.
+ */
+export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
+
 // ---- Cache ----
 
 /** Max entries in the reasoning-content cache before eviction kicks in. */

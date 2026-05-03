@@ -3,25 +3,33 @@
   "configurations": [
     {
       "name": "Run Extension (Insiders)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}"
+      "type": "node",
+      "request": "attach",
+      "port": 9333,
+      "timeout": 30000,
+      "continueOnAttach": true,
+      "skipFiles": [
+        "<node_internals>/**"
       ],
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
       ],
-      "preLaunchTask": "npm: watch"
+      "preLaunchTask": "Launch Extension Host (Insiders)"
     },
     {
       "name": "Run Extension (Stable)",
       "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
-      "runtimeArgs": [
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}"
-      ]
+      "request": "attach",
+      "port": 9334,
+      "timeout": 30000,
+      "continueOnAttach": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "Launch Extension Host (Stable)"
     }
   ]
 }

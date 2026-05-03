@@ -1,5 +1,9 @@
 import vscode from 'vscode';
-import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT, IMAGE_DESCRIPTION_UNAVAILABLE } from '../consts';
+import {
+	DEFAULT_VISION_MODEL_ID,
+	IMAGE_DESCRIPTION_PROMPT,
+	IMAGE_DESCRIPTION_UNAVAILABLE,
+} from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
 

@@ -70,7 +70,8 @@ const en: Translations = {
 	'auth.prefixValidation': 'API key should start with "sk-"',
 	'auth.saved': 'DeepSeek API key saved.',
 	'auth.removed': 'DeepSeek API key removed.',
-	'auth.notConfigured': 'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
+	'auth.notConfigured':
+		'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
 
 	// Thinking Effort
 	'status.thinking': 'Thinking Effort',

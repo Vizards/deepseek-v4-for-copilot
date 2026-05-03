@@ -46,13 +46,35 @@ try {
   $connections = @()
 }
 
+function Test-PortListening {
+  try {
+    return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+  } catch {
+    return $false
+  }
+}
+
+function Wait-ForPortRelease {
+  for ($attempt = 0; $attempt -lt 10; $attempt++) {
+    if (-not (Test-PortListening)) {
+      return
+    }
+    Start-Sleep -Milliseconds 200
+  }
+
+  [Console]::Error.WriteLine("Port $Port is still in use after stopping stale extension host processes.")
+  exit 1
+}
+
 $processIds = @($connections | ForEach-Object { $_.OwningProcess } | Where-Object { $_ } | Sort-Object -Unique)
+$stoppedProcess = $false
 
 foreach ($processId in $processIds) {
   $commandLine = Get-ProcessCommandLine -ProcessId $processId
 
   if ([string]::IsNullOrWhiteSpace($commandLine)) {
-    continue
+    [Console]::Error.WriteLine("Port $Port is already used by PID $processId, but its command line could not be inspected.`nRefusing to stop it automatically.")
+    exit 1
   }
 
   $isExtensionHost = $commandLine -like "*--inspect=127.0.0.1:$Port*" `
@@ -62,11 +84,16 @@ foreach ($processId in $processIds) {
 
   if ($isExtensionHost) {
     Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+    $stoppedProcess = $true
     continue
   }
 
   [Console]::Error.WriteLine("Port $Port is already used by PID $processId, but it does not look like a VS Code extension host:`n$commandLine`nRefusing to stop it automatically.")
   exit 1
+}
+
+if ($stoppedProcess) {
+  Wait-ForPortRelease
 }
 
 & $cli `

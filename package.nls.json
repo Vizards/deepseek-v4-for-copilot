@@ -21,6 +21,5 @@
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "API model ID for DeepSeek V4 Flash",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "API model ID for DeepSeek V4 Pro",
   "deepseek-copilot.config.visionModel.description": "Model ID for vision proxy (describes images for text-only DeepSeek models). Leave empty for auto-detection. Use 'DeepSeek: Set Vision Proxy Model' command to pick one from a list.",
-  "deepseek-copilot.config.visionPrompt.description": "Prompt sent to the vision proxy model when describing image attachments before forwarding them to DeepSeek.",
-  "deepseek-copilot.config.visionPrompt.default": "Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements."
+  "deepseek-copilot.config.visionPrompt.description": "Prompt sent to the vision proxy model when describing image attachments before forwarding them to DeepSeek."
 }

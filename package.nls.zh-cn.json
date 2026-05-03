@@ -21,6 +21,5 @@
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "DeepSeek V4 Flash 的 API 模型 ID。",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "DeepSeek V4 Pro 的 API 模型 ID。",
   "deepseek-copilot.config.visionModel.description": "用于描述图片的视觉代理模型 ID，留空则自动检测，也可通过「DeepSeek: 设置视觉代理模型」命令从列表中选择。",
-  "deepseek-copilot.config.visionPrompt.description": "在将图片附件转发给 DeepSeek 之前，发送给视觉代理模型的提示词。",
-  "deepseek-copilot.config.visionPrompt.default": "Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements."
+  "deepseek-copilot.config.visionPrompt.description": "在将图片附件转发给 DeepSeek 之前，发送给视觉代理模型的提示词。"
 }

@@ -147,7 +147,7 @@
         "deepseek-copilot.visionPrompt": {
           "type": "string",
           "editPresentation": "multilineText",
-          "default": "%deepseek-copilot.config.visionPrompt.default%",
+          "default": "Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.",
           "description": "%deepseek-copilot.config.visionPrompt.description%"
         }
       }

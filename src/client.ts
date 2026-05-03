@@ -1,4 +1,5 @@
 import type { CancellationToken } from 'vscode';
+import { t } from './i18n';
 import { logger } from './logger';
 import type {
 	DeepSeekRequest,
@@ -58,11 +59,11 @@ export class DeepSeekClient {
 				} catch {
 					errorMessage = errorText;
 				}
-				throw new Error(`DeepSeek API error (${response.status}): ${errorMessage}`);
+				throw new Error(t('client.apiError', response.status, errorMessage));
 			}
 
 			if (!response.body) {
-				throw new Error('No response body received');
+				throw new Error(t('client.noResponseBody'));
 			}
 
 			const reader = response.body.getReader();

@@ -43,13 +43,17 @@ const zh: Translations = {
 
 	// Vision
 	'vision.vendorLabel': '提供商：{0}',
-	'vision.noModel': '当前环境中无可用的语言模型。',
+	'vision.noModel': '当前环境中没有可用的非 DeepSeek 视觉代理模型。',
 	'vision.pickPlaceholder': '选择用于描述图片的模型 (默认 {0})',
 	'vision.current': '当前',
 	'vision.proxyUsing': '视觉代理：{0}',
 	'vision.notFound': '未找到视觉模型 "{0}"',
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
+
+	// Client
+	'client.apiError': 'DeepSeek API 错误（{0}）：{1}',
+	'client.noResponseBody': '未收到响应正文',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
@@ -86,13 +90,17 @@ const en: Translations = {
 	// NOTE: vision.unableToDescribe has been moved to consts.ts as
 	// IMAGE_DESCRIPTION_UNAVAILABLE — it is prompt content, not UI text.
 	'vision.vendorLabel': 'vendor: {0}',
-	'vision.noModel': 'No language models available in the current environment',
+	'vision.noModel': 'No non-DeepSeek vision proxy models are available in the current environment',
 	'vision.pickPlaceholder': 'Select a model for image description (default: {0})',
 	'vision.current': 'Current',
 	'vision.proxyUsing': 'Vision proxy: {0}',
 	'vision.notFound': 'Vision model "{0}" not found',
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
+
+	// Client
+	'client.apiError': 'DeepSeek API error ({0}): {1}',
+	'client.noResponseBody': 'No response body received',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

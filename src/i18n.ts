@@ -51,10 +51,6 @@ const zh: Translations = {
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
 
-	// Client
-	'client.apiError': 'DeepSeek API 错误（{0}）：{1}',
-	'client.noResponseBody': '未收到响应正文',
-
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
 	'extension.deactivateFailed': 'DeepSeek 停用异常',
@@ -97,10 +93,6 @@ const en: Translations = {
 	'vision.notFound': 'Vision model "{0}" not found',
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
-
-	// Client
-	'client.apiError': 'DeepSeek API error ({0}): {1}',
-	'client.noResponseBody': 'No response body received',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

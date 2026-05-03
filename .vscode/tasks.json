@@ -12,17 +12,29 @@
       "group": "build"
     },
     {
-      "label": "Launch Extension Host (Insiders)",
+      "label": "Launch Extension Host (Insiders CLI)",
       "type": "shell",
-      "command": "debug_pid=$(lsof -tiTCP:9333 -sTCP:LISTEN | head -n 1); if [ -n \"$debug_pid\" ]; then debug_ppid=$(ps -p \"$debug_pid\" -o ppid= | tr -d ' '); kill \"$debug_ppid\" 2>/dev/null || kill \"$debug_pid\" 2>/dev/null || true; fi; open -n '/Applications/Visual Studio Code - Insiders.app' --args --new-window --inspect-extensions=9333 --extensionDevelopmentPath='${workspaceFolder}' '${workspaceFolder}'",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/launch-extension-host.sh",
+        "insiders",
+        "9333",
+        "${workspaceFolder}"
+      ],
       "dependsOn": "npm: watch",
       "dependsOrder": "sequence",
       "problemMatcher": []
     },
     {
-      "label": "Launch Extension Host (Stable)",
+      "label": "Launch Extension Host (Stable CLI)",
       "type": "shell",
-      "command": "debug_pid=$(lsof -tiTCP:9334 -sTCP:LISTEN | head -n 1); if [ -n \"$debug_pid\" ]; then debug_ppid=$(ps -p \"$debug_pid\" -o ppid= | tr -d ' '); kill \"$debug_ppid\" 2>/dev/null || kill \"$debug_pid\" 2>/dev/null || true; fi; open -n '/Applications/Visual Studio Code.app' --args --new-window --inspect-extensions=9334 --extensionDevelopmentPath='${workspaceFolder}' '${workspaceFolder}'",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/launch-extension-host.sh",
+        "stable",
+        "9334",
+        "${workspaceFolder}"
+      ],
       "dependsOn": "npm: watch",
       "dependsOrder": "sequence",
       "problemMatcher": []

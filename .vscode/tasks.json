@@ -21,6 +21,19 @@
         "9333",
         "${workspaceFolder}"
       ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/.vscode/launch-extension-host.ps1",
+          "insiders",
+          "9333",
+          "${workspaceFolder}"
+        ]
+      },
       "dependsOn": "npm: watch",
       "dependsOrder": "sequence",
       "problemMatcher": []
@@ -35,6 +48,19 @@
         "9334",
         "${workspaceFolder}"
       ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/.vscode/launch-extension-host.ps1",
+          "stable",
+          "9334",
+          "${workspaceFolder}"
+        ]
+      },
       "dependsOn": "npm: watch",
       "dependsOrder": "sequence",
       "problemMatcher": []

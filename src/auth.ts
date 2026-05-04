@@ -66,9 +66,6 @@ export class AuthManager {
 				if (!value?.trim()) {
 					return t('auth.emptyValidation');
 				}
-				if (!value.startsWith('sk-')) {
-					return t('auth.prefixValidation');
-				}
 				return undefined;
 			},
 		});

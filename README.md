@@ -59,13 +59,13 @@ Pure VS Code API + Node.js built-ins. No Python, no Docker, no local proxy serve
 
 - VS Code 1.116 or later. This extension relies on non-public Copilot Chat APIs that may break on newer VS Code versions — [report an issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues) if you hit one.
 - GitHub Copilot subscription (Free / Pro / Enterprise — the free tier works)
-- DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com)
+- DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com), or a compatible provider token when using a custom `deepseek-copilot.baseUrl`
 
 ### Usage
 
 1. Install from the VS Code Marketplace
 2. Run **DeepSeek: Set API Key** from the Command Palette (`Cmd+Shift+P`)
-3. Paste your key (starts with `sk-`)
+3. Paste your key or compatible provider token (official DeepSeek keys usually start with `sk-`)
 4. Open Copilot Chat, click the model picker, pick **DeepSeek V4 Pro** or **DeepSeek V4 Flash**
 5. That's it — chat away
 

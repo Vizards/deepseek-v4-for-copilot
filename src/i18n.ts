@@ -24,10 +24,9 @@ const zh: Translations = {
 
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
-	'auth.prompt': '请输入 DeepSeek API Key',
-	'auth.placeholder': 'sk-...',
+	'auth.prompt': '请输入 DeepSeek API Key 或兼容服务令牌。官方 DeepSeek Key 通常以 "sk-" 开头。',
+	'auth.placeholder': 'sk-... 或服务商令牌',
 	'auth.emptyValidation': 'API Key 不能为空',
-	'auth.prefixValidation': 'API Key 应以 "sk-" 开头',
 	'auth.saved': 'API Key 已安全保存。',
 	'auth.removed': 'API Key 已移除。',
 	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DeepSeek: 设置 API Key"。',
@@ -64,10 +63,10 @@ const en: Translations = {
 
 	// API Key
 	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',
-	'auth.prompt': 'Enter your DeepSeek API key',
-	'auth.placeholder': 'sk-...',
+	'auth.prompt':
+		'Enter your DeepSeek API key or compatible provider token. Official DeepSeek keys usually start with "sk-".',
+	'auth.placeholder': 'sk-... or provider token',
 	'auth.emptyValidation': 'API key cannot be empty',
-	'auth.prefixValidation': 'API key should start with "sk-"',
 	'auth.saved': 'DeepSeek API key saved.',
 	'auth.removed': 'DeepSeek API key removed.',
 	'auth.notConfigured':

@@ -120,6 +120,11 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
+        "deepseek-copilot.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "%deepseek-copilot.config.debug.description%"
+        },
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",
           "default": {

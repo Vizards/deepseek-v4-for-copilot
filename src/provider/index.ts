@@ -1,55 +1,15 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { DeepSeekClient } from '../client';
-import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import type { DeepSeekToolCall, ModelDefinition } from '../types';
-import { type ReasoningEntry, pruneReasoningCache } from './cache';
-import { convertMessages, convertTools, countMessageChars } from './convert';
-import { createVisionModelGetter, resolveImageMessages, setVisionProxyModel } from './vision';
-
-/**
- * NOTE: Non-public API surface.
- *
- * The fields below (`configurationSchema` on chat info, `modelConfiguration`
- * on response options, plus `isUserSelectable` / `statusIcon`) are not part
- * of the stable `vscode.LanguageModelChat*` typings yet. They are the same
- * shape currently consumed by GitHub Copilot Chat to render a per-model
- * config dropdown in the model picker (see Copilot Chat's built-in
- * providers, e.g. its OpenAI/Anthropic providers using `reasoningEffort`).
- *
- * If/when VS Code stabilizes these as proposed API, switch to the official
- * types and drop the casts below.
- */
-
-type ThinkingEffort = 'none' | 'high' | 'max';
-
-/**
- * Non-public: Copilot Chat passes the user's per-model picker selections
- * back to providers via `modelConfiguration` (newer hosts) / `configuration`
- * (older hosts) on the response options. Both names are checked at runtime.
- */
-type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseOptions & {
-	readonly modelConfiguration?: Record<string, unknown>;
-	readonly configuration?: Record<string, unknown>;
-};
-
-/**
- * Non-public: extra fields on `LanguageModelChatInformation` consumed by the
- * Copilot Chat model picker — `isUserSelectable` controls picker visibility,
- * `statusIcon` renders a leading icon (e.g. warning when key missing), and
- * `configurationSchema` declares the per-model dropdown schema.
- */
-/** Shape of the per-model configuration schema rendered by Copilot Chat's model picker. */
-type ThinkingEffortConfigurationSchema = ReturnType<typeof buildThinkingEffortSchema>;
-
-type ModelPickerChatInformation = vscode.LanguageModelChatInformation & {
-	readonly isUserSelectable: boolean;
-	readonly statusIcon?: vscode.ThemeIcon;
-	readonly configurationSchema?: ThinkingEffortConfigurationSchema;
-};
+import type { ReasoningEntry } from './cache';
+import { createCacheDiagnosticsRecorder } from './diagnostics';
+import { toChatInfo } from './models';
+import { prepareChatRequest } from './request';
+import { streamChatCompletion } from './stream';
+import { estimateTokenCount } from './tokens';
+import { createVisionModelGetter, setVisionProxyModel } from './vision';
 
 /**
  * DeepSeek Chat Provider — implements vscode.LanguageModelChatProvider so
@@ -65,6 +25,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 	/** reasoning text → tool_call IDs cache. */
 	private readonly reasoningCache = new Map<string, ReasoningEntry>();
+	private readonly cacheDiagnostics = createCacheDiagnosticsRecorder();
 
 	/** Vision proxy: resolver + cached model. */
 	private readonly vision = createVisionModelGetter();
@@ -167,138 +128,26 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
-		const apiKey = await this.authManager.getApiKey();
-		if (!apiKey) {
-			throw new Error(t('auth.notConfigured'));
-		}
+		const prepared = await prepareChatRequest({
+			authManager: this.authManager,
+			modelInfo,
+			messages,
+			options,
+			token,
+			reasoningCache: this.reasoningCache,
+			cacheDiagnostics: this.cacheDiagnostics,
+			getVisionModel: () => this.vision.get(),
+		});
 
-		const baseUrl = getBaseUrl();
-		const client = new DeepSeekClient(baseUrl, apiKey);
-
-		const modelDef = MODELS.find((m) => m.id === modelInfo.id);
-		const isThinkingModel = modelDef?.capabilities.thinking ?? false;
-		const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
-		const maxTokens = getMaxTokens();
-
-		// Heuristic: detect conversation start to clear stale cache.
-		if (messages.length <= 2) {
-			pruneReasoningCache(this.reasoningCache, true);
-		}
-
-		// Vision proxy: resolve images → text descriptions before sending to DeepSeek
-		const resolvedMessages = await resolveImageMessages(messages, token, () => this.vision.get());
-		const deepseekMessages = convertMessages(
-			resolvedMessages,
-			isThinkingModel,
-			this.reasoningCache,
-		);
-		const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
-
-		const totalRequestChars = countMessageChars(deepseekMessages);
-
-		let accumulatedReasoning = '';
-		const pendingToolCallIds: string[] = [];
-		let responseMessageId: string | undefined;
-
-		return new Promise<void>((resolve, reject) => {
-			client.streamChatCompletion(
-				{
-					model: getApiModelId(modelInfo.id),
-					messages: deepseekMessages,
-					stream: true,
-					tools,
-					tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
-					max_tokens: maxTokens,
-					...(isThinkingModel
-						? {
-								thinking: {
-									type: thinkingEffort === 'none' ? ('disabled' as const) : ('enabled' as const),
-								},
-								...(thinkingEffort === 'none' ? {} : { reasoning_effort: thinkingEffort }),
-							}
-						: {}),
-				},
-				{
-					onContent: (content: string) => {
-						progress.report(new vscode.LanguageModelTextPart(content));
-					},
-
-					onThinking: (text: string) => {
-						accumulatedReasoning += text;
-
-						// LanguageModelThinkingPart is a proposed API — the class
-						// exists at runtime in both stable and Insiders, but the
-						// stable vscode.d.ts doesn't include it. The .d.ts
-						// augmentation in the project root provides type safety.
-						progress.report(
-							new vscode.LanguageModelThinkingPart(
-								text,
-							) as unknown as vscode.LanguageModelResponsePart,
-						);
-					},
-
-					onToolCall: (toolCall: DeepSeekToolCall) => {
-						pendingToolCallIds.push(toolCall.id);
-
-						// Cache reasoning keyed by tool_call ID
-						if (isThinkingModel && accumulatedReasoning) {
-							this.reasoningCache.set(toolCall.id, {
-								text: accumulatedReasoning,
-								timestamp: Date.now(),
-							});
-						}
-
-						try {
-							const args = JSON.parse(toolCall.function.arguments);
-							progress.report(
-								new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.function.name, args),
-							);
-						} catch {
-							progress.report(
-								new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.function.name, {}),
-							);
-						}
-					},
-
-					onError: (error: Error) => {
-						reject(error);
-					},
-
-					onDone: () => {
-						// Cache reasoning for the final response (non-tool-call case).
-						if (isThinkingModel && accumulatedReasoning && pendingToolCallIds.length === 0) {
-							responseMessageId = `resp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-							this.reasoningCache.set(responseMessageId, {
-								text: accumulatedReasoning,
-								timestamp: Date.now(),
-							});
-						}
-
-						pruneReasoningCache(this.reasoningCache, false);
-						resolve();
-					},
-
-					onUsage: (usage) => {
-						// Calibrate chars-per-token ratio from real API usage data.
-						if (totalRequestChars > 0 && usage.prompt_tokens > 0) {
-							const observedRatio = totalRequestChars / usage.prompt_tokens;
-							this.charsPerToken = this.charsPerToken * 0.7 + observedRatio * 0.3;
-						}
-
-						// Log KV cache hit stats for observability.
-						const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
-						const cacheMiss = usage.prompt_cache_miss_tokens ?? 0;
-						const cacheTotal = cacheHit + cacheMiss;
-						const hitRate = cacheTotal > 0 ? ((cacheHit / cacheTotal) * 100).toFixed(0) : 'n/a';
-						logger.info(
-							`tokens: prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
-								` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${hitRate}%` +
-								` | chars/tok=${this.charsPerToken.toFixed(2)}`,
-						);
-					},
-				},
-				token,
-			);
+		return streamChatCompletion({
+			prepared,
+			progress,
+			token,
+			reasoningCache: this.reasoningCache,
+			getCharsPerToken: () => this.charsPerToken,
+			setCharsPerToken: (charsPerToken) => {
+				this.charsPerToken = charsPerToken;
+			},
 		});
 	}
 
@@ -307,100 +156,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		text: string | vscode.LanguageModelChatRequestMessage,
 		_token: vscode.CancellationToken,
 	): Promise<number> {
-		if (typeof text === 'string') {
-			return Math.max(1, Math.ceil(text.length / this.charsPerToken));
-		}
-
-		if (!text?.content || !Array.isArray(text.content)) {
-			return 1;
-		}
-
-		let total = 0;
-		for (const part of text.content) {
-			if (part instanceof vscode.LanguageModelTextPart) {
-				total += part.value.length;
-			}
-		}
-		return Math.max(1, Math.ceil(total / this.charsPerToken));
+		return estimateTokenCount(text, this.charsPerToken);
 	}
-}
-
-// ---- Helpers ----
-
-/**
- * Build the thinking effort configuration schema with translated labels.
- * Called inside toChatInfo() so translations reflect the current locale.
- */
-function buildThinkingEffortSchema() {
-	return {
-		properties: {
-			reasoningEffort: {
-				type: 'string',
-				title: t('status.thinking'),
-				enum: ['none', 'high', 'max'],
-				enumItemLabels: [t('thinking.none'), t('thinking.high'), t('thinking.max')],
-				enumDescriptions: [
-					t('thinking.none.desc'),
-					t('thinking.high.desc'),
-					t('thinking.max.desc'),
-				],
-				default: 'high',
-				group: 'navigation',
-			},
-		},
-	} as const;
-}
-
-/**
- * Derive the i18n key for a model's detail line from the model ID.
- * Returns `undefined` when the key is missing from *both* locales —
- * `toChatInfo()` will then fall back to `m.detail`. When the key exists
- * in English but not the active locale, the English translation is used
- * (per `t()`'s fallback behaviour).
- */
-function resolveDetailKey(m: ModelDefinition): string | undefined {
-	// Map known DeepSeek V4 models: deepseek-v4-flash → model.flash.detail
-	const suffix = m.id.startsWith('deepseek-v4-') ? m.id.slice('deepseek-v4-'.length) : m.id;
-	const key = `model.${suffix}.detail`;
-	// t() returns the raw key string when no translation is defined in either
-	// locale — treat that as "no translation available" and fall back.
-	const translated = t(key);
-	return translated !== key ? key : undefined;
-}
-
-function toChatInfo(m: ModelDefinition, hasApiKey: boolean): ModelPickerChatInformation {
-	const detailKey = resolveDetailKey(m);
-	const modelDetail = detailKey ? t(detailKey) : m.detail;
-	return {
-		id: m.id,
-		name: m.name,
-		family: m.family,
-		version: m.version,
-		detail: hasApiKey ? modelDetail : t('auth.apiKeyRequiredDetail'),
-		tooltip: hasApiKey ? undefined : t('auth.apiKeyRequiredDetail'),
-		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
-		maxInputTokens: m.maxInputTokens,
-		maxOutputTokens: m.maxOutputTokens,
-		isUserSelectable: true,
-		capabilities: {
-			toolCalling: m.capabilities.toolCalling,
-			imageInput: m.capabilities.imageInput,
-		},
-		...(m.capabilities.thinking ? { configurationSchema: buildThinkingEffortSchema() } : {}),
-	};
-}
-
-function getConfiguredThinkingEffort(options: ModelConfigurationOptions): ThinkingEffort {
-	const configuredEffort =
-		options.modelConfiguration?.reasoningEffort ?? options.configuration?.reasoningEffort;
-
-	if (configuredEffort === 'none') {
-		return 'none';
-	}
-
-	if (configuredEffort === 'high') {
-		return 'high';
-	}
-
-	return configuredEffort === 'max' ? 'max' : 'high';
 }

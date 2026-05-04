@@ -17,6 +17,7 @@
   "deepseek-copilot.config.title": "DeepSeek 助手",
   "deepseek-copilot.config.baseUrl.description": "DeepSeek API 基础 URL，默认为官方 DeepSeek API 端点。",
   "deepseek-copilot.config.maxTokens.description": "每次请求的最大输出 Token 数，设为 0 则不限制，可用于控制成本。",
+  "deepseek-copilot.config.debug.description": "启用用于排查问题的诊断调试日志。日志只包含请求哈希、前缀重合度、工具定义变化、缺失 reasoning_content 等隐私保护后的元数据，不记录提示词原文。",
   "deepseek-copilot.config.modelIdOverrides.description": "覆盖各 DeepSeek 模型实际使用的 API 模型 ID，默认使用官方 DeepSeek ID，仅在对接不同模型名称的第三方 API 时需要修改。",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "DeepSeek V4 Flash 的 API 模型 ID。",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "DeepSeek V4 Pro 的 API 模型 ID。",

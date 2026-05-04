@@ -85,6 +85,7 @@ Both support optional thinking mode, tool calling, and 1M token context.
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = no limit). Useful for cost control |
 | `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
+| `deepseek-copilot.debug` | `false` | Enable privacy-preserving diagnostic debug logs for troubleshooting. Does not log prompt text |
 | `deepseek-copilot.visionModel` | *(auto)* | Which Copilot model to proxy images through |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |
 

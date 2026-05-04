@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { getDebugLoggingEnabled } from './config';
 import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { t } from './i18n';
 import { logger } from './logger';
@@ -7,7 +8,10 @@ import { DeepSeekChatProvider } from './provider';
 let activeProvider: DeepSeekChatProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-	logger.info('Activating extension');
+	logger.info(
+		`Activating extension version=${context.extension.packageJSON.version}` +
+			` debug=${getDebugLoggingEnabled()}`,
+	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('deepseek-copilot.showLogs', () => logger.show()),
@@ -57,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
 			logger.warn(t('extension.welcomeFailed'), error);
 		});
 
-		logger.info('Extension activated');
+		logger.info(`Extension activated version=${context.extension.packageJSON.version}`);
 	} catch (error) {
 		activeProvider = undefined;
 		logger.error('Failed to activate DeepSeek extension', error);

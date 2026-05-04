@@ -17,6 +17,7 @@
   "deepseek-copilot.config.title": "DeepSeek Copilot",
   "deepseek-copilot.config.baseUrl.description": "DeepSeek API base URL. Defaults to official DeepSeek API endpoint.",
   "deepseek-copilot.config.maxTokens.description": "Maximum number of output tokens per request. Set to 0 to use the API default (no limit). Useful for controlling costs.",
+  "deepseek-copilot.config.debug.description": "Enable diagnostic debug logging for troubleshooting. Logs privacy-preserving metadata such as request hashes, prefix overlap, tool schema changes, and missing reasoning_content. Does not log prompt text.",
   "deepseek-copilot.config.modelIdOverrides.description": "Override the API model ID sent for each DeepSeek model. Defaults are prefilled with official DeepSeek IDs; change them only when using a compatible third-party API that uses different model names.",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "API model ID for DeepSeek V4 Flash",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "API model ID for DeepSeek V4 Pro",

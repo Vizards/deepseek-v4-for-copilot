@@ -33,3 +33,11 @@ export function getMaxTokens(): number | undefined {
 	const value = config.get<number>('maxTokens', 0);
 	return value > 0 ? value : undefined;
 }
+
+/**
+ * Whether to log privacy-preserving diagnostic debug information.
+ */
+export function getDebugLoggingEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('debug', false);
+}

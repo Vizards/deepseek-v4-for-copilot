@@ -1,4 +1,5 @@
 import type { CancellationToken } from 'vscode';
+import { safeStringify } from './json';
 import { logger } from './logger';
 import type {
 	DeepSeekRequest,
@@ -47,7 +48,7 @@ export class DeepSeekClient {
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${this.apiKey}`,
 				},
-				body: JSON.stringify(requestBody),
+				body: safeStringify(requestBody),
 				signal: controller.signal,
 			});
 

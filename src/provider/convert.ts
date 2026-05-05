@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { safeStringify } from '../json';
 import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
 import { createPostToolReasoningKey, createToolReasoningKey, type ReasoningEntry } from './cache';
 
@@ -31,7 +32,7 @@ export function convertMessages(
 					type: 'function',
 					function: {
 						name: part.name,
-						arguments: JSON.stringify(part.input),
+						arguments: safeStringify(part.input),
 					},
 				});
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
@@ -43,7 +44,7 @@ export function convertMessages(
 				}
 				toolResults.push({
 					callId: part.callId,
-					content: toolContent || JSON.stringify(part.content),
+					content: toolContent || safeStringify(part.content),
 				});
 			}
 		}

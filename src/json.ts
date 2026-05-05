@@ -14,7 +14,7 @@ export function safeStringify(value: unknown): string {
 	});
 
 	if (json === undefined) {
-		throw new TypeError('Value cannot be serialized as a JSON request body');
+		throw new TypeError('Value cannot be serialized as JSON');
 	}
 
 	return json;

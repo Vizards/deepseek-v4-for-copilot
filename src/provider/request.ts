@@ -9,7 +9,7 @@ import { pruneReasoningCache, type ReasoningEntry } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
-import { resolveImageMessages } from './vision';
+import { resolveImageMessages } from './vision/index';
 
 export interface PreparedChatRequest {
 	client: DeepSeekClient;
@@ -54,13 +54,9 @@ export async function prepareChatRequest({
 
 	clearStaleReasoningCache(messages, reasoningCache, cacheDiagnostics);
 	const reasoningCacheSize = reasoningCache.size;
-	let visionModelId: string | undefined;
 
-	const resolvedMessages = await resolveImageMessages(messages, token, async () => {
-		const model = await getVisionModel();
-		visionModelId = model?.id;
-		return model;
-	});
+	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
+	const resolvedMessages = visionResolution.messages;
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningCache);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
 
@@ -90,7 +86,8 @@ export async function prepareChatRequest({
 		reasoningCacheSize,
 		inputMessages: messages,
 		resolvedMessages,
-		visionModelId,
+		visionModelId: visionResolution.visionModelId,
+		visionCacheStats: visionResolution.stats,
 	});
 
 	return {

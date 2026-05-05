@@ -9,7 +9,7 @@ import { toChatInfo } from './models';
 import { prepareChatRequest } from './request';
 import { streamChatCompletion } from './stream';
 import { estimateTokenCount } from './tokens';
-import { createVisionModelGetter, setVisionProxyModel } from './vision';
+import { createVisionModelGetter, setVisionProxyModel } from './vision/index';
 
 /**
  * DeepSeek Chat Provider — implements vscode.LanguageModelChatProvider so
@@ -102,7 +102,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		}
 	}
 
-	/** See provider/vision.ts */
+	/** See provider/vision */
 	async setVisionProxyModel(): Promise<void> {
 		await setVisionProxyModel();
 	}

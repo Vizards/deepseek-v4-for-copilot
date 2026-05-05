@@ -29,6 +29,8 @@ Both models show up alongside GPT-4o, Claude, and friends in Copilot Chat's mode
 ### Transparent Vision Proxy
 DeepSeek V4 is text-only. Drop a screenshot into chat and this extension automatically hands the image to another installed Copilot model (Claude, GPT-4o, whatever you've got), gets a description, and feeds that back to DeepSeek. **Zero config** — just pick your preferred vision model once.
 
+This proxy is a compatibility bridge; if DeepSeek native vision becomes available, the extension will move toward a more unified vision path.
+
 <p align="center">
   <img src="resources/screenshots/03-vision.png" alt="Dropping an image into Copilot Chat and DeepSeek responding to it via the vision proxy" width="800">
 </p>

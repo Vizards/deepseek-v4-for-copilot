@@ -1,9 +1,10 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { getDebugLoggingEnabled } from '../config';
-import { MAX_CACHE_SIZE } from '../consts';
+import { IMAGE_DESCRIPTION_UNAVAILABLE, MAX_CACHE_SIZE } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
+import type { VisionDescriptionCacheStats } from './vision/index';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
@@ -106,6 +107,7 @@ export interface BeginCacheDiagnosticsOptions {
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	visionModelId?: string;
+	visionCacheStats?: VisionDescriptionCacheStats;
 }
 
 export interface CacheDiagnosticsDoneInfo {
@@ -136,6 +138,7 @@ interface VisionResolutionStats {
 	describedImageMessages: number;
 	failedImageMessages: number;
 	droppedImageParts: number;
+	historyDescriptionMessages: number;
 	visionModelId?: string;
 }
 
@@ -194,10 +197,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
 			logger.info(`[cache-trace #${requestId}] ${detailLine}`);
 		}
-		const visionTrace = formatVisionTrace(
-			visionResolution,
-			cacheTrace.stats.imageDescriptionMessages,
-		);
+		const visionTrace = formatVisionTrace(visionResolution, options.visionCacheStats);
 		if (visionTrace) {
 			logger.info(`[cache-trace #${requestId}] ${visionTrace}`);
 		}
@@ -229,7 +229,10 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				logger.warn(`[cache-trace #${requestId}] conversationChanged fallback diff: ${warning}`);
 			}
 		}
-		for (const warning of getCacheTraceWarnings(cacheTrace)) {
+		for (const warning of getCacheTraceWarnings(
+			cacheTrace,
+			visionResolution.historyDescriptionMessages,
+		)) {
 			logger.warn(`[cache-trace #${requestId}] ${warning}`);
 		}
 
@@ -331,18 +334,23 @@ function summarizeVisionResolution(
 		describedImageMessages: 0,
 		failedImageMessages: 0,
 		droppedImageParts: 0,
+		historyDescriptionMessages: 0,
 		visionModelId,
 	};
 
 	for (const [index, message] of inputMessages.entries()) {
 		const imageParts = countImageDataParts(message);
+		const inputText = getMessageText(message);
+		if (countLiteral(inputText, '[Image Description:') > 0) {
+			stats.historyDescriptionMessages += 1;
+		}
+
 		if (imageParts > 0) {
 			stats.inputImageMessages += 1;
 			stats.inputImageParts += imageParts;
 
 			const resolvedMessage = resolvedMessages[index];
 			const resolvedImageParts = resolvedMessage ? countImageDataParts(resolvedMessage) : 0;
-			const inputText = getMessageText(message);
 			const resolvedText = resolvedMessage ? getMessageText(resolvedMessage) : '';
 			const newDescriptions = Math.max(
 				0,
@@ -351,8 +359,8 @@ function summarizeVisionResolution(
 			);
 			const newFailures = Math.max(
 				0,
-				countLiteral(resolvedText, '[Image: unable to describe]') -
-					countLiteral(inputText, '[Image: unable to describe]'),
+				countLiteral(resolvedText, IMAGE_DESCRIPTION_UNAVAILABLE) -
+					countLiteral(inputText, IMAGE_DESCRIPTION_UNAVAILABLE),
 			);
 
 			if (newDescriptions > 0) {
@@ -390,15 +398,16 @@ function getMessageText(message: vscode.LanguageModelChatRequestMessage): string
 
 function formatVisionTrace(
 	stats: VisionResolutionStats,
-	historyDescriptionMessages: number,
+	cacheStats: VisionDescriptionCacheStats | undefined,
 ): string | undefined {
-	if (stats.inputImageParts === 0 && historyDescriptionMessages === 0) {
+	if (stats.inputImageParts === 0 && stats.historyDescriptionMessages === 0) {
 		return undefined;
 	}
 
 	const note =
-		stats.inputImageParts === 0 && historyDescriptionMessages > 0 ? ' note=history-only' : '';
+		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats);
+	const cacheTrace = formatVisionCacheStats(stats, cacheStats);
 	return (
 		`vision rawImageParts=${stats.inputImageParts}` +
 		` rawImageMessages=${stats.inputImageMessages}` +
@@ -406,8 +415,37 @@ function formatVisionTrace(
 		` failedDescriptionMessages=${stats.failedImageMessages}` +
 		` droppedImageParts=${stats.droppedImageParts}` +
 		` visionModel=${visionModel}` +
-		` historyDescriptionMessages=${historyDescriptionMessages}` +
+		` historyDescriptionMessages=${stats.historyDescriptionMessages}` +
+		cacheTrace +
 		note
+	);
+}
+
+function formatVisionCacheStats(
+	resolutionStats: VisionResolutionStats,
+	cacheStats: VisionDescriptionCacheStats | undefined,
+): string {
+	if (!cacheStats) {
+		return '';
+	}
+
+	const hasCacheActivity =
+		cacheStats.hits > 0 ||
+		cacheStats.misses > 0 ||
+		cacheStats.generatedDescriptions > 0 ||
+		cacheStats.failedDescriptions > 0 ||
+		cacheStats.droppedImageParts > 0;
+	if (!hasCacheActivity && resolutionStats.inputImageParts === 0) {
+		return '';
+	}
+
+	return (
+		` cache(enabled=${cacheStats.enabled}` +
+		`,hits=${cacheStats.hits}` +
+		`,misses=${cacheStats.misses}` +
+		`,entries=${cacheStats.entries}` +
+		`,generated=${cacheStats.generatedDescriptions}` +
+		`,failed=${cacheStats.failedDescriptions})`
 	);
 }
 
@@ -681,7 +719,10 @@ export function formatCacheTraceComparisonDetailLines(comparison: CacheTraceComp
 	];
 }
 
-export function getCacheTraceWarnings(snapshot: CacheTraceSnapshot): string[] {
+export function getCacheTraceWarnings(
+	snapshot: CacheTraceSnapshot,
+	historyDescriptionMessages = snapshot.stats.imageDescriptionMessages,
+): string[] {
 	const warnings: string[] = [];
 	if (snapshot.stats.missingToolReasoningMessages > 0) {
 		warnings.push(
@@ -700,9 +741,9 @@ export function getCacheTraceWarnings(snapshot: CacheTraceSnapshot): string[] {
 			`${emptyReasoningMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; this is protocol-safe but may indicate the original reasoning cache was unavailable after extension restart/reload.`,
 		);
 	}
-	if (snapshot.stats.imageDescriptionMessages > 0) {
+	if (historyDescriptionMessages > 0) {
 		warnings.push(
-			`${snapshot.stats.imageDescriptionMessages} message(s) already contain generated image-description text in request history; check the vision trace rawImageParts field to see whether this request actually processed image data.`,
+			`${historyDescriptionMessages} message(s) already contain generated image-description text in request history; check the vision trace rawImageParts field to see whether this request actually processed image data.`,
 		);
 	}
 	return warnings;
@@ -771,7 +812,7 @@ function summarizeMessage(
 	const hasReasoningContent = message.reasoning_content !== undefined;
 	const hasEmptyReasoningContent = hasReasoningContent && reasoningChars === 0;
 	const imageDescriptionCount = countLiteral(message.content, '[Image Description:');
-	const unableImageCount = countLiteral(message.content, '[Image: unable to describe]');
+	const unableImageCount = countLiteral(message.content, IMAGE_DESCRIPTION_UNAVAILABLE);
 	const urlCount = countRegex(message.content, /https?:\/\//g);
 	const codeFenceCount = countLiteral(message.content, '```');
 	const likelyPathCount = countLikelyPaths(message.content);
@@ -859,7 +900,7 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 			imageDescriptionMessages += 1;
 			imageDescriptionParts += imageDescriptions;
 		}
-		if (message.content.includes('[Image: unable to describe]')) {
+		if (message.content.includes(IMAGE_DESCRIPTION_UNAVAILABLE)) {
 			unableImageMessages += 1;
 		}
 

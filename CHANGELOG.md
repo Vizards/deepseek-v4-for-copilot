@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.4.0...v0.4.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **manifest:** resolve marketplace display metadata ([#41](https://github.com/Vizards/deepseek-v4-for-copilot/issues/41)) ([20b86b7](https://github.com/Vizards/deepseek-v4-for-copilot/commit/20b86b791cbd068477cc46a556e2e061cee581e3))
+
 ## [0.4.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.3.1...v0.4.0) (2026-05-05)
 
 

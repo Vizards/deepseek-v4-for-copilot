@@ -1,6 +1,5 @@
 import { createHash } from 'crypto';
 import type vscode from 'vscode';
-import type { PendingVisionDescription } from './pending';
 import type { VisionDescriptionCacheStats } from './types';
 
 const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 100;
@@ -10,7 +9,8 @@ interface VisionDescriptionCacheEntry {
 }
 
 const visionDescriptionCache = new Map<string, VisionDescriptionCacheEntry>();
-const pendingVisionDescriptions = new Map<string, PendingVisionDescription>();
+// Promise-only single-flight: caller cancellation does not abort shared vision work.
+const pendingVisionDescriptions = new Map<string, Promise<string>>();
 
 export function createVisionDescriptionCacheStats(): VisionDescriptionCacheStats {
 	return {
@@ -67,16 +67,15 @@ export function rememberDescription(key: string, description: string): void {
 	}
 }
 
-export function getPendingDescription(key: string): PendingVisionDescription | undefined {
-	const pending = pendingVisionDescriptions.get(key);
-	return pending?.cancelledWhenUnused ? undefined : pending;
+export function getPendingDescription(key: string): Promise<string> | undefined {
+	return pendingVisionDescriptions.get(key);
 }
 
-export function rememberPendingDescription(key: string, pending: PendingVisionDescription): void {
-	pendingVisionDescriptions.set(key, pending);
-	void pending.promise
+export function rememberPendingDescription(key: string, description: Promise<string>): void {
+	pendingVisionDescriptions.set(key, description);
+	void description
 		.finally(() => {
-			if (pendingVisionDescriptions.get(key) === pending) {
+			if (pendingVisionDescriptions.get(key) === description) {
 				pendingVisionDescriptions.delete(key);
 			}
 		})

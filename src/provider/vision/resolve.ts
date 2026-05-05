@@ -12,7 +12,6 @@ import {
 	rememberPendingDescription,
 } from './cache';
 import { getVisionPrompt } from './model';
-import { PendingVisionDescription } from './pending';
 import type { VisionDescriptionCacheStats, VisionResolutionResult } from './types';
 
 /**
@@ -102,6 +101,7 @@ async function resolveImageDescription(
 		stats.hits += 1;
 		return createImageDescriptionText(cachedDescription);
 	}
+	// Avoid starting proxy work for requests that were already cancelled.
 	if (token.isCancellationRequested) {
 		return IMAGE_DESCRIPTION_UNAVAILABLE;
 	}
@@ -139,28 +139,31 @@ function createPendingDescriptionRequest(
 	part: vscode.LanguageModelDataPart,
 	visionModel: vscode.LanguageModelChat,
 	visionPrompt: string,
-): PendingVisionDescription {
-	return new PendingVisionDescription({
-		start: (token) => describeImagePart(part, visionModel, visionPrompt, token),
-		onDescription: (description) => {
+): Promise<string> {
+	return describeImagePart(part, visionModel, visionPrompt).then(
+		(description) => {
 			if (description.length > 0) {
 				rememberDescription(cacheKey, description);
 			}
+			return description;
 		},
-		onError: (err) => {
+		(err: unknown) => {
 			logger.error(t('vision.proxyError'), err);
+			throw err;
 		},
-	});
+	);
 }
 
 async function resolvePendingDescription(
-	pending: PendingVisionDescription,
+	pending: Promise<string>,
 	stats: VisionDescriptionCacheStats,
 	countProxyResult: boolean,
 	token: vscode.CancellationToken,
 ): Promise<string | undefined> {
+	// Stats are request-local: joiners count de-dupe, while the miss creator
+	// records the proxy outcome only if it remains active until that outcome.
 	try {
-		const result = await pending.wait(token);
+		const result = await waitForDescription(pending, token);
 		if (result.cancelled) {
 			return undefined;
 		}
@@ -182,26 +185,59 @@ async function resolvePendingDescription(
 	}
 }
 
+function waitForDescription(
+	description: Promise<string>,
+	token: vscode.CancellationToken,
+): Promise<{ cancelled: true } | { cancelled: false; description: string }> {
+	if (token.isCancellationRequested) {
+		return Promise.resolve({ cancelled: true });
+	}
+
+	return new Promise((resolve, reject) => {
+		let cancellation: vscode.Disposable | undefined;
+		const cleanup = () => cancellation?.dispose();
+		cancellation = token.onCancellationRequested(() => {
+			cleanup();
+			resolve({ cancelled: true });
+		});
+		description.then(
+			(value) => {
+				cleanup();
+				resolve({ cancelled: false, description: value });
+			},
+			(err: unknown) => {
+				cleanup();
+				reject(err);
+			},
+		);
+	});
+}
+
 async function describeImagePart(
 	part: vscode.LanguageModelDataPart,
 	visionModel: vscode.LanguageModelChat,
 	visionPrompt: string,
-	token: vscode.CancellationToken,
 ): Promise<string> {
 	const visionMsg = vscode.LanguageModelChatMessage.User([
 		part,
 		new vscode.LanguageModelTextPart(visionPrompt),
 	] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
 
-	const response = await visionModel.sendRequest([visionMsg], {}, token);
-	let description = '';
-	for await (const chunk of response.stream) {
-		if (chunk instanceof vscode.LanguageModelTextPart) {
-			description += chunk.value;
+	// Keep the shared proxy request independent from individual caller cancellation.
+	const tokenSource = new vscode.CancellationTokenSource();
+	try {
+		const response = await visionModel.sendRequest([visionMsg], {}, tokenSource.token);
+		let description = '';
+		for await (const chunk of response.stream) {
+			if (chunk instanceof vscode.LanguageModelTextPart) {
+				description += chunk.value;
+			}
 		}
-	}
 
-	return description.trim();
+		return description.trim();
+	} finally {
+		tokenSource.dispose();
+	}
 }
 
 function createImageDescriptionText(description: string): string {

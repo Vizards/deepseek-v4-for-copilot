@@ -25,9 +25,17 @@ export interface CacheTraceStats {
 	emptyToolReasoningMessages: number;
 	missingToolReasoningMessages: number;
 	assistantAfterToolResultMessages: number;
+	assistantAfterToolResultToolCallMessages: number;
+	assistantAfterToolResultFinalMessages: number;
 	nonEmptyPostToolReasoningMessages: number;
 	emptyPostToolReasoningMessages: number;
 	missingPostToolReasoningMessages: number;
+	nonEmptyPostToolCallReasoningMessages: number;
+	emptyPostToolCallReasoningMessages: number;
+	missingPostToolCallReasoningMessages: number;
+	nonEmptyPostToolFinalReasoningMessages: number;
+	emptyPostToolFinalReasoningMessages: number;
+	missingPostToolFinalReasoningMessages: number;
 	imageDescriptionMessages: number;
 	imageDescriptionParts: number;
 	unableImageMessages: number;
@@ -59,7 +67,10 @@ export interface CacheTraceMessageSummary {
 	emptyReasoning: boolean;
 	missingToolReasoning: boolean;
 	followsToolResult: boolean;
+	afterToolResultKind: 'none' | 'tool-call' | 'final';
 	missingPostToolReasoning: boolean;
+	missingPostToolCallReasoning: boolean;
+	missingPostToolFinalReasoning: boolean;
 }
 
 export interface CacheTraceToolSummary {
@@ -119,7 +130,29 @@ export interface CacheDiagnosticsDoneInfo {
 
 export interface CacheDiagnosticsRun {
 	onDone(info: CacheDiagnosticsDoneInfo): void;
+	onCancellationTokenRequested(): void;
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void;
+}
+
+export function observeCancellationToken(
+	token: vscode.CancellationToken,
+	diagnosticsRun: CacheDiagnosticsRun,
+	onCancellationRequested?: () => void,
+): vscode.Disposable {
+	let notified = false;
+	const notifyCancellationRequested = (): void => {
+		if (notified) {
+			return;
+		}
+		notified = true;
+		diagnosticsRun.onCancellationTokenRequested();
+		onCancellationRequested?.();
+	};
+	const listener = token.onCancellationRequested(notifyCancellationRequested);
+	if (token.isCancellationRequested) {
+		notifyCancellationRequested();
+	}
+	return listener;
 }
 
 export interface CacheDiagnosticsRecorder {
@@ -266,6 +299,8 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 }
 
 class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
+	private cancellationLogged = false;
+
 	constructor(
 		private readonly recorder: DefaultCacheDiagnosticsRecorder,
 		private readonly requestId: number,
@@ -296,10 +331,20 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			);
 		}
 	}
+
+	onCancellationTokenRequested(): void {
+		if (this.cancellationLogged) {
+			return;
+		}
+		this.cancellationLogged = true;
+		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
+	}
 }
 
 class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onDone(_info: CacheDiagnosticsDoneInfo): void {}
+
+	onCancellationTokenRequested(): void {}
 
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void {
 		logUsage(usage, charsPerToken);
@@ -487,6 +532,11 @@ function formatVscodeMessageTrace(
 			let imageParts = 0;
 			let toolCallParts = 0;
 			let toolResultParts = 0;
+			let thinkingParts = 0;
+			let thinkingChars = 0;
+			const thinkingValueTypes = new Set<string>();
+			const thinkingHashes: string[] = [];
+			const unknownPartConstructors = new Map<string, number>();
 
 			for (const part of msg.content) {
 				if (part instanceof vscode.LanguageModelTextPart) {
@@ -500,6 +550,18 @@ function formatVscodeMessageTrace(
 					toolCallParts += 1;
 				} else if (part instanceof vscode.LanguageModelToolResultPart) {
 					toolResultParts += 1;
+				} else if (isLanguageModelThinkingPart(part)) {
+					const value = normalizeThinkingPartValue(part.value);
+					thinkingParts += 1;
+					thinkingChars += value.text.length;
+					thinkingValueTypes.add(value.type);
+					thinkingHashes.push(hashString(value.text));
+				} else {
+					const constructorName = getPartConstructorName(part);
+					unknownPartConstructors.set(
+						constructorName,
+						(unknownPartConstructors.get(constructorName) ?? 0) + 1,
+					);
 				}
 			}
 
@@ -513,12 +575,43 @@ function formatVscodeMessageTrace(
 			if (toolResultParts) {
 				parts.push(`toolResults=${toolResultParts}`);
 			}
+			if (thinkingParts) {
+				parts.push(
+					`thinking=${thinkingParts}:chars=${thinkingChars}:types=${[...thinkingValueTypes].join(
+						'+',
+					)}:hashes=${thinkingHashes.join(',')}`,
+				);
+			}
+			for (const [constructorName, count] of unknownPartConstructors) {
+				parts.push(`unknown=${constructorName}:${count}`);
+			}
 
 			const suffix = parts.length > 0 ? ` (${parts.join(',')})` : '';
 
 			return `${role}#${index}:chars=${textChars}${suffix}`;
 		})
 		.join(' | ');
+}
+
+function isLanguageModelThinkingPart(part: unknown): part is vscode.LanguageModelThinkingPart {
+	return (
+		typeof vscode.LanguageModelThinkingPart === 'function' &&
+		part instanceof vscode.LanguageModelThinkingPart
+	);
+}
+
+function normalizeThinkingPartValue(value: string | string[]): { text: string; type: string } {
+	if (Array.isArray(value)) {
+		return { text: value.join(''), type: 'string[]' };
+	}
+	return { text: value, type: 'string' };
+}
+
+function getPartConstructorName(part: unknown): string {
+	if (!part || typeof part !== 'object') {
+		return typeof part;
+	}
+	return part.constructor?.name ?? 'object';
 }
 
 export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSnapshot {
@@ -622,7 +715,10 @@ export function formatCacheTraceSnapshot(snapshot: CacheTraceSnapshot): string {
 		` toolReasoning(nonEmpty=${stats.nonEmptyToolReasoningMessages},empty=${stats.emptyToolReasoningMessages},missing=${stats.missingToolReasoningMessages})` +
 		` missingToolReasoning=${stats.missingToolReasoningMessages}` +
 		` assistantAfterToolResult=${stats.assistantAfterToolResultMessages}` +
+		` afterToolResult(toolCall=${stats.assistantAfterToolResultToolCallMessages},final=${stats.assistantAfterToolResultFinalMessages})` +
 		` postToolReasoning(nonEmpty=${stats.nonEmptyPostToolReasoningMessages},empty=${stats.emptyPostToolReasoningMessages},missing=${stats.missingPostToolReasoningMessages})` +
+		` postToolCallReasoning(nonEmpty=${stats.nonEmptyPostToolCallReasoningMessages},empty=${stats.emptyPostToolCallReasoningMessages},missing=${stats.missingPostToolCallReasoningMessages})` +
+		` postToolFinalReasoning(nonEmpty=${stats.nonEmptyPostToolFinalReasoningMessages},empty=${stats.emptyPostToolFinalReasoningMessages},missing=${stats.missingPostToolFinalReasoningMessages})` +
 		` missingPostToolReasoning=${stats.missingPostToolReasoningMessages}` +
 		` imageDescriptions=${stats.imageDescriptionMessages}` +
 		` toolNames=${formatToolNames(snapshot.toolNames)}`
@@ -731,13 +827,18 @@ export function getCacheTraceWarnings(
 			`${snapshot.stats.missingToolReasoningMessages} assistant tool-call message(s) are missing cached reasoning_content; DeepSeek requires this in thinking tool-call histories and cache prefixes may drift.`,
 		);
 	}
-	if (snapshot.stats.missingPostToolReasoningMessages > 0) {
+	if (snapshot.stats.missingPostToolCallReasoningMessages > 0) {
 		warnings.push(
-			`${snapshot.stats.missingPostToolReasoningMessages} assistant message(s) after tool results are missing cached reasoning_content; DeepSeek requires final tool-call-turn reasoning in subsequent requests.`,
+			`${snapshot.stats.missingPostToolCallReasoningMessages} assistant tool-call message(s) after tool results are missing cached reasoning_content; these should replay via tool:<id> keys.`,
+		);
+	}
+	if (snapshot.stats.missingPostToolFinalReasoningMessages > 0) {
+		warnings.push(
+			`${snapshot.stats.missingPostToolFinalReasoningMessages} final assistant message(s) after tool results are missing cached reasoning_content; these should replay via post-tool:<ids> keys.`,
 		);
 	}
 	const emptyReasoningMessages =
-		snapshot.stats.emptyToolReasoningMessages + snapshot.stats.emptyPostToolReasoningMessages;
+		snapshot.stats.emptyToolReasoningMessages + snapshot.stats.emptyPostToolFinalReasoningMessages;
 	if (emptyReasoningMessages > 0) {
 		warnings.push(
 			`${emptyReasoningMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; this is protocol-safe but may indicate the original reasoning cache was unavailable after extension restart/reload.`,
@@ -794,7 +895,7 @@ function summarizeMessages(messages: DeepSeekMessage[]): CacheTraceMessageSummar
 		summaries.push(summarizeMessage(message, index, followsToolResult));
 		if (message.role === 'tool') {
 			followsToolResult = true;
-		} else if (message.role === 'assistant') {
+		} else {
 			followsToolResult = false;
 		}
 	}
@@ -811,6 +912,11 @@ function summarizeMessage(
 	const reasoningChars = message.reasoning_content?.length ?? 0;
 	const toolCalls = message.tool_calls?.length ?? 0;
 	const assistantAfterToolResult = message.role === 'assistant' && followsToolResult;
+	const afterToolResultKind = assistantAfterToolResult
+		? toolCalls > 0
+			? ('tool-call' as const)
+			: ('final' as const)
+		: ('none' as const);
 	const hasReasoningContent = message.reasoning_content !== undefined;
 	const hasEmptyReasoningContent = hasReasoningContent && reasoningChars === 0;
 	const imageDescriptionCount = countLiteral(message.content, '[Image Description:');
@@ -839,7 +945,10 @@ function summarizeMessage(
 		emptyReasoning: hasEmptyReasoningContent,
 		missingToolReasoning: message.role === 'assistant' && toolCalls > 0 && !hasReasoningContent,
 		followsToolResult: assistantAfterToolResult,
+		afterToolResultKind,
 		missingPostToolReasoning: assistantAfterToolResult && !hasReasoningContent,
+		missingPostToolCallReasoning: afterToolResultKind === 'tool-call' && !hasReasoningContent,
+		missingPostToolFinalReasoning: afterToolResultKind === 'final' && !hasReasoningContent,
 	};
 }
 
@@ -867,9 +976,17 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 	let emptyToolReasoningMessages = 0;
 	let missingToolReasoningMessages = 0;
 	let assistantAfterToolResultMessages = 0;
+	let assistantAfterToolResultToolCallMessages = 0;
+	let assistantAfterToolResultFinalMessages = 0;
 	let nonEmptyPostToolReasoningMessages = 0;
 	let emptyPostToolReasoningMessages = 0;
 	let missingPostToolReasoningMessages = 0;
+	let nonEmptyPostToolCallReasoningMessages = 0;
+	let emptyPostToolCallReasoningMessages = 0;
+	let missingPostToolCallReasoningMessages = 0;
+	let nonEmptyPostToolFinalReasoningMessages = 0;
+	let emptyPostToolFinalReasoningMessages = 0;
+	let missingPostToolFinalReasoningMessages = 0;
 	let imageDescriptionMessages = 0;
 	let imageDescriptionParts = 0;
 	let unableImageMessages = 0;
@@ -928,12 +1045,33 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 		const messageReasoningChars = message.reasoning_content?.length ?? 0;
 		if (message.role === 'assistant' && followsToolResult) {
 			assistantAfterToolResultMessages += 1;
+			const isToolCallAfterToolResult = toolCalls > 0;
+			if (isToolCallAfterToolResult) {
+				assistantAfterToolResultToolCallMessages += 1;
+			} else {
+				assistantAfterToolResultFinalMessages += 1;
+			}
 			if (message.reasoning_content === undefined) {
 				missingPostToolReasoningMessages += 1;
+				if (isToolCallAfterToolResult) {
+					missingPostToolCallReasoningMessages += 1;
+				} else {
+					missingPostToolFinalReasoningMessages += 1;
+				}
 			} else if (messageReasoningChars === 0) {
 				emptyPostToolReasoningMessages += 1;
+				if (isToolCallAfterToolResult) {
+					emptyPostToolCallReasoningMessages += 1;
+				} else {
+					emptyPostToolFinalReasoningMessages += 1;
+				}
 			} else {
 				nonEmptyPostToolReasoningMessages += 1;
+				if (isToolCallAfterToolResult) {
+					nonEmptyPostToolCallReasoningMessages += 1;
+				} else {
+					nonEmptyPostToolFinalReasoningMessages += 1;
+				}
 			}
 		}
 
@@ -955,7 +1093,7 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 
 		if (message.role === 'tool') {
 			followsToolResult = true;
-		} else if (message.role === 'assistant') {
+		} else {
 			followsToolResult = false;
 		}
 	}
@@ -976,9 +1114,17 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 		emptyToolReasoningMessages,
 		missingToolReasoningMessages,
 		assistantAfterToolResultMessages,
+		assistantAfterToolResultToolCallMessages,
+		assistantAfterToolResultFinalMessages,
 		nonEmptyPostToolReasoningMessages,
 		emptyPostToolReasoningMessages,
 		missingPostToolReasoningMessages,
+		nonEmptyPostToolCallReasoningMessages,
+		emptyPostToolCallReasoningMessages,
+		missingPostToolCallReasoningMessages,
+		nonEmptyPostToolFinalReasoningMessages,
+		emptyPostToolFinalReasoningMessages,
+		missingPostToolFinalReasoningMessages,
 		imageDescriptionMessages,
 		imageDescriptionParts,
 		unableImageMessages,
@@ -1006,7 +1152,8 @@ function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): st
 		` reasoning=${summary.reasoningChars}` +
 		` emptyReasoning=${summary.emptyReasoning}` +
 		` markers=${formatMarkerSummary(summary)}` +
-		` followsToolResult=${summary.followsToolResult}`
+		` followsToolResult=${summary.followsToolResult}` +
+		` afterToolResultKind=${summary.afterToolResultKind}`
 	);
 }
 

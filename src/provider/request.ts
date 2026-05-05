@@ -4,7 +4,7 @@ import { DeepSeekClient } from '../client';
 import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
-import type { DeepSeekRequest } from '../types';
+import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { pruneReasoningCache, type ReasoningEntry } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
@@ -16,7 +16,7 @@ export interface PreparedChatRequest {
 	request: DeepSeekRequest;
 	isThinkingModel: boolean;
 	totalRequestChars: number;
-	trailingToolResults: number;
+	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
 }
 
@@ -95,25 +95,21 @@ export async function prepareChatRequest({
 		request,
 		isThinkingModel,
 		totalRequestChars,
-		trailingToolResults: countTrailingToolResults(messages),
+		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
 	};
 }
 
-function countTrailingToolResults(
-	messages: readonly vscode.LanguageModelChatRequestMessage[],
-): number {
-	let trailingToolResults = 0;
+function collectTrailingToolResultIds(messages: readonly DeepSeekMessage[]): string[] {
+	const trailingToolResultIds: string[] = [];
 	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const toolResults = messages[index].content.filter(
-			(part) => part instanceof vscode.LanguageModelToolResultPart,
-		).length;
-		if (toolResults === 0) {
+		const message = messages[index];
+		if (message.role !== 'tool' || !message.tool_call_id) {
 			break;
 		}
-		trailingToolResults += toolResults;
+		trailingToolResultIds.push(message.tool_call_id);
 	}
-	return trailingToolResults;
+	return trailingToolResultIds.reverse();
 }
 
 function clearStaleReasoningCache(

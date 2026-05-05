@@ -5,15 +5,25 @@ import { MAX_CACHE_SIZE } from '../consts';
  * can inject reasoning_content back into prior assistant messages.
  *
  * Key strategy (per DeepSeek docs):
- *  - Non-tool-call turns: reasoning_content does NOT need to be passed back.
- *  - Tool-call turns: reasoning_content MUST be in ALL subsequent requests.
+ *  - Plain non-tool turns: reasoning_content does NOT need to be passed back.
+ *  - Tool-call turns and their post-tool final turns: reasoning_content MUST be
+ *    in ALL subsequent requests.
  *
- * We cache by tool_call IDs so we can look up which reasoning goes with which
- * tool-call-bearing assistant message when reconstructing the message history.
+ * We cache by stable history keys so we can look up which reasoning goes with
+ * tool-call-bearing assistant messages and final post-tool assistant messages
+ * when reconstructing the message history.
  */
 export interface ReasoningEntry {
 	text: string;
 	timestamp: number;
+}
+
+export function createToolReasoningKey(toolCallId: string): string {
+	return `tool:${toolCallId}`;
+}
+
+export function createPostToolReasoningKey(toolCallIds: readonly string[]): string {
+	return `post-tool:${toolCallIds.join(',')}`;
 }
 
 export function pruneReasoningCache(cache: Map<string, ReasoningEntry>, clearAll: boolean): void {

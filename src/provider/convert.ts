@@ -1,11 +1,11 @@
 import vscode from 'vscode';
 import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
-import type { ReasoningEntry } from './cache';
+import { createPostToolReasoningKey, createToolReasoningKey, type ReasoningEntry } from './cache';
 
 /**
  * Convert VS Code chat messages to DeepSeek format.
- * Injects cached reasoning_content for assistant messages that had tool calls
- * in prior turns.
+ * Injects cached reasoning_content for assistant tool-call messages and final
+ * assistant messages after tool results.
  */
 export function convertMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
@@ -13,6 +13,7 @@ export function convertMessages(
 	reasoningCache: Map<string, ReasoningEntry>,
 ): DeepSeekMessage[] {
 	const result: DeepSeekMessage[] = [];
+	let recentToolResultIds: string[] = [];
 
 	for (const message of messages) {
 		const role = mapRole(message.role);
@@ -53,12 +54,19 @@ export function convertMessages(
 			let reasoningContent: string | undefined;
 			if (isThinkingModel && toolCalls.length > 0) {
 				for (const tc of toolCalls) {
-					const cached = reasoningCache.get(tc.id);
+					// Prefer new `tool:<callId>` key; fallback to bare `callId` for entries written
+					// before the stable-key change (read-only compat, no new bare-key writes).
+					const cached =
+						reasoningCache.get(createToolReasoningKey(tc.id)) ?? reasoningCache.get(tc.id);
 					if (cached) {
 						reasoningContent = cached.text;
 						break;
 					}
 				}
+			} else if (isThinkingModel && recentToolResultIds.length > 0) {
+				reasoningContent = reasoningCache.get(
+					createPostToolReasoningKey(recentToolResultIds),
+				)?.text;
 			}
 
 			if (content || toolCalls.length > 0) {
@@ -76,12 +84,18 @@ export function convertMessages(
 				}
 
 				result.push(msg);
+				recentToolResultIds = [];
 			}
-		} else if (content) {
-			result.push({
-				role: role as 'user' | 'assistant',
-				content: content,
-			});
+		} else {
+			if (content) {
+				recentToolResultIds = [];
+				result.push({
+					role: role as 'user' | 'assistant',
+					content: content,
+				});
+			} else if (toolResults.length === 0) {
+				recentToolResultIds = [];
+			}
 		}
 
 		// Tool result messages follow their associated assistant message
@@ -91,6 +105,7 @@ export function convertMessages(
 				content: tr.content,
 				tool_call_id: tr.callId,
 			});
+			recentToolResultIds.push(tr.callId);
 		}
 	}
 

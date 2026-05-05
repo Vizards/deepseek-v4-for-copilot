@@ -27,10 +27,12 @@ export class DeepSeekClient {
 		cancellationToken?: CancellationToken,
 	): Promise<void> {
 		const controller = new AbortController();
-
 		const cancelListener = cancellationToken?.onCancellationRequested(() => {
 			controller.abort();
 		});
+		if (cancellationToken?.isCancellationRequested) {
+			controller.abort();
+		}
 
 		try {
 			// Request usage stats in streaming responses so we can calibrate token counting.
@@ -75,7 +77,7 @@ export class DeepSeekClient {
 			while (true) {
 				if (cancellationToken?.isCancellationRequested) {
 					controller.abort();
-					break;
+					return;
 				}
 
 				const { done, value } = await reader.read();
@@ -172,8 +174,7 @@ export class DeepSeekClient {
 
 			callbacks.onDone();
 		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
-				callbacks.onDone();
+			if (isAbortError(error) && cancellationToken?.isCancellationRequested) {
 				return;
 			}
 			callbacks.onError(error instanceof Error ? error : new Error(String(error)));
@@ -181,4 +182,8 @@ export class DeepSeekClient {
 			cancelListener?.dispose();
 		}
 	}
+}
+
+function isAbortError(error: unknown): boolean {
+	return error instanceof Error && error.name === 'AbortError';
 }

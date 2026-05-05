@@ -1,7 +1,12 @@
 import vscode from 'vscode';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
-import { pruneReasoningCache, type ReasoningEntry } from './cache';
-import type { CacheDiagnosticsRun } from './diagnostics';
+import {
+	createPostToolReasoningKey,
+	createToolReasoningKey,
+	pruneReasoningCache,
+	type ReasoningEntry,
+} from './cache';
+import { observeCancellationToken, type CacheDiagnosticsRun } from './diagnostics';
 import type { PreparedChatRequest } from './request';
 
 interface ResponseStreamState {
@@ -30,9 +35,12 @@ export function streamChatCompletion({
 		accumulatedReasoning: '',
 		emittedToolCallIds: [],
 	};
+	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics, () => {
+		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningCache);
+	});
 
-	return new Promise<void>((resolve, reject) => {
-		prepared.client.streamChatCompletion(
+	return prepared.client
+		.streamChatCompletion(
 			prepared.request,
 			{
 				onContent: (content: string) => {
@@ -44,22 +52,21 @@ export function streamChatCompletion({
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
-					handleToolCall(toolCall, prepared.isThinkingModel, state, progress, reasoningCache);
+					handleToolCall(toolCall, state, progress);
 				},
 
 				onError: (error: Error) => {
-					reject(error);
+					throw error;
 				},
 
 				onDone: () => {
 					finalizeReasoningCache(
 						prepared.isThinkingModel,
-						prepared.trailingToolResults,
+						prepared.trailingToolResultIds,
 						state,
 						reasoningCache,
 						prepared.cacheDiagnostics,
 					);
-					resolve();
 				},
 
 				onUsage: (usage) => {
@@ -73,8 +80,10 @@ export function streamChatCompletion({
 				},
 			},
 			token,
-		);
-	});
+		)
+		.finally(() => {
+			cancelListener.dispose();
+		});
 }
 
 function handleThinking(
@@ -92,19 +101,10 @@ function handleThinking(
 
 function handleToolCall(
 	toolCall: DeepSeekToolCall,
-	isThinkingModel: boolean,
 	state: ResponseStreamState,
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
-	reasoningCache: Map<string, ReasoningEntry>,
 ): void {
 	state.emittedToolCallIds.push(toolCall.id);
-
-	if (isThinkingModel && state.accumulatedReasoning) {
-		reasoningCache.set(toolCall.id, {
-			text: state.accumulatedReasoning,
-			timestamp: Date.now(),
-		});
-	}
 
 	try {
 		const args = JSON.parse(toolCall.function.arguments);
@@ -118,17 +118,23 @@ function handleToolCall(
 
 function finalizeReasoningCache(
 	isThinkingModel: boolean,
-	trailingToolResults: number,
+	trailingToolResultIds: readonly string[],
 	state: ResponseStreamState,
 	reasoningCache: Map<string, ReasoningEntry>,
 	cacheDiagnostics: CacheDiagnosticsRun,
 ): void {
-	if (isThinkingModel && state.accumulatedReasoning && state.emittedToolCallIds.length === 0) {
-		const responseMessageId = `resp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-		reasoningCache.set(responseMessageId, {
+	if (isThinkingModel && state.accumulatedReasoning) {
+		const entry: ReasoningEntry = {
 			text: state.accumulatedReasoning,
 			timestamp: Date.now(),
-		});
+		};
+		if (state.emittedToolCallIds.length > 0) {
+			for (const toolCallId of state.emittedToolCallIds) {
+				reasoningCache.set(createToolReasoningKey(toolCallId), entry);
+			}
+		} else if (trailingToolResultIds.length > 0) {
+			reasoningCache.set(createPostToolReasoningKey(trailingToolResultIds), entry);
+		}
 	}
 
 	const cacheSizeBeforePrune = reasoningCache.size;
@@ -138,8 +144,27 @@ function finalizeReasoningCache(
 		reasoningCacheSize: reasoningCache.size,
 		evictedReasoningEntries,
 		emittedToolCalls: state.emittedToolCallIds.length,
-		trailingToolResults,
+		trailingToolResults: trailingToolResultIds.length,
 	});
+}
+
+function cacheEmittedToolCallReasoningOnCancellation(
+	isThinkingModel: boolean,
+	state: ResponseStreamState,
+	reasoningCache: Map<string, ReasoningEntry>,
+): void {
+	if (!isThinkingModel || !state.accumulatedReasoning || state.emittedToolCallIds.length === 0) {
+		return;
+	}
+
+	const entry: ReasoningEntry = {
+		text: state.accumulatedReasoning,
+		timestamp: Date.now(),
+	};
+	for (const toolCallId of state.emittedToolCallIds) {
+		reasoningCache.set(createToolReasoningKey(toolCallId), entry);
+	}
+	pruneReasoningCache(reasoningCache, false);
 }
 
 function updateCharsPerToken(

@@ -102,6 +102,9 @@ async function resolveImageDescription(
 		stats.hits += 1;
 		return createImageDescriptionText(cachedDescription);
 	}
+	if (token.isCancellationRequested) {
+		return IMAGE_DESCRIPTION_UNAVAILABLE;
+	}
 	const pendingDescription = getPendingDescription(cacheKey);
 	if (pendingDescription) {
 		stats.deduplicatedDescriptions += 1;

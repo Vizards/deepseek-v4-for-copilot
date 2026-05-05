@@ -432,6 +432,7 @@ function formatVisionCacheStats(
 	const hasCacheActivity =
 		cacheStats.hits > 0 ||
 		cacheStats.misses > 0 ||
+		cacheStats.deduplicatedDescriptions > 0 ||
 		cacheStats.generatedDescriptions > 0 ||
 		cacheStats.failedDescriptions > 0 ||
 		cacheStats.droppedImageParts > 0;
@@ -443,6 +444,7 @@ function formatVisionCacheStats(
 		` cache(enabled=${cacheStats.enabled}` +
 		`,hits=${cacheStats.hits}` +
 		`,misses=${cacheStats.misses}` +
+		`,deduped=${cacheStats.deduplicatedDescriptions}` +
 		`,entries=${cacheStats.entries}` +
 		`,generated=${cacheStats.generatedDescriptions}` +
 		`,failed=${cacheStats.failedDescriptions})`

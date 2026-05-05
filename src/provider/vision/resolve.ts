@@ -12,6 +12,7 @@ import {
 	rememberPendingDescription,
 } from './cache';
 import { getVisionPrompt } from './model';
+import { PendingVisionDescription } from './pending';
 import type { VisionDescriptionCacheStats, VisionResolutionResult } from './types';
 
 /**
@@ -103,109 +104,101 @@ async function resolveImageDescription(
 	}
 	const pendingDescription = getPendingDescription(cacheKey);
 	if (pendingDescription) {
-		stats.hits += 1;
-		const description = await resolveDescription(pendingDescription, stats, false, token);
+		stats.deduplicatedDescriptions += 1;
+		const description = await resolvePendingDescription(pendingDescription, stats, false, token);
 		return description === undefined
 			? IMAGE_DESCRIPTION_UNAVAILABLE
 			: createImageDescriptionText(description);
 	}
 
 	stats.misses += 1;
-	const pendingDescriptionRequest = describeImagePart(part, visionModel, visionPrompt).then(
-		(description) => {
-			if (description.length > 0) {
-				rememberDescription(cacheKey, description);
-			}
-			return description;
-		},
+	const pendingDescriptionRequest = createPendingDescriptionRequest(
+		cacheKey,
+		part,
+		visionModel,
+		visionPrompt,
 	);
 	rememberPendingDescription(cacheKey, pendingDescriptionRequest);
-	const description = await resolveDescription(pendingDescriptionRequest, stats, true, token);
+	const description = await resolvePendingDescription(
+		pendingDescriptionRequest,
+		stats,
+		true,
+		token,
+	);
 	if (description !== undefined) {
-		stats.generatedDescriptions += 1;
 		return createImageDescriptionText(description);
 	}
 	return IMAGE_DESCRIPTION_UNAVAILABLE;
 }
 
-async function resolveDescription(
-	description: Promise<string>,
+function createPendingDescriptionRequest(
+	cacheKey: string,
+	part: vscode.LanguageModelDataPart,
+	visionModel: vscode.LanguageModelChat,
+	visionPrompt: string,
+): PendingVisionDescription {
+	return new PendingVisionDescription({
+		start: (token) => describeImagePart(part, visionModel, visionPrompt, token),
+		onDescription: (description) => {
+			if (description.length > 0) {
+				rememberDescription(cacheKey, description);
+			}
+		},
+		onError: (err) => {
+			logger.error(t('vision.proxyError'), err);
+		},
+	});
+}
+
+async function resolvePendingDescription(
+	pending: PendingVisionDescription,
 	stats: VisionDescriptionCacheStats,
-	logError: boolean,
+	countProxyResult: boolean,
 	token: vscode.CancellationToken,
 ): Promise<string | undefined> {
 	try {
-		const resolvedDescription = await waitForDescription(description, token);
-		if (resolvedDescription === undefined) {
-			stats.failedDescriptions += 1;
+		const result = await pending.wait(token);
+		if (result.cancelled) {
 			return undefined;
 		}
-		if (resolvedDescription.length === 0) {
-			stats.failedDescriptions += 1;
+		if (result.description.length === 0) {
+			if (countProxyResult) {
+				stats.failedDescriptions += 1;
+			}
 			return undefined;
 		}
-		return resolvedDescription;
-	} catch (err) {
-		stats.failedDescriptions += 1;
-		if (logError) {
-			logger.error(t('vision.proxyError'), err);
+		if (countProxyResult) {
+			stats.generatedDescriptions += 1;
+		}
+		return result.description;
+	} catch {
+		if (countProxyResult) {
+			stats.failedDescriptions += 1;
 		}
 		return undefined;
 	}
-}
-
-function waitForDescription(
-	description: Promise<string>,
-	token: vscode.CancellationToken,
-): Promise<string | undefined> {
-	if (token.isCancellationRequested) {
-		return Promise.resolve(undefined);
-	}
-
-	return new Promise((resolve, reject) => {
-		let cancellation: vscode.Disposable | undefined;
-		const cleanup = () => cancellation?.dispose();
-		cancellation = token.onCancellationRequested(() => {
-			cleanup();
-			resolve(undefined);
-		});
-		description.then(
-			(value) => {
-				cleanup();
-				resolve(value);
-			},
-			(err: unknown) => {
-				cleanup();
-				reject(err);
-			},
-		);
-	});
 }
 
 async function describeImagePart(
 	part: vscode.LanguageModelDataPart,
 	visionModel: vscode.LanguageModelChat,
 	visionPrompt: string,
+	token: vscode.CancellationToken,
 ): Promise<string> {
 	const visionMsg = vscode.LanguageModelChatMessage.User([
 		part,
 		new vscode.LanguageModelTextPart(visionPrompt),
 	] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
 
-	const tokenSource = new vscode.CancellationTokenSource();
-	try {
-		const response = await visionModel.sendRequest([visionMsg], {}, tokenSource.token);
-		let description = '';
-		for await (const chunk of response.stream) {
-			if (chunk instanceof vscode.LanguageModelTextPart) {
-				description += chunk.value;
-			}
+	const response = await visionModel.sendRequest([visionMsg], {}, token);
+	let description = '';
+	for await (const chunk of response.stream) {
+		if (chunk instanceof vscode.LanguageModelTextPart) {
+			description += chunk.value;
 		}
-
-		return description.trim();
-	} finally {
-		tokenSource.dispose();
 	}
+
+	return description.trim();
 }
 
 function createImageDescriptionText(description: string): string {

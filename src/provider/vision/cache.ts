@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import type vscode from 'vscode';
+import type { PendingVisionDescription } from './pending';
 import type { VisionDescriptionCacheStats } from './types';
 
 const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 100;
@@ -9,13 +10,14 @@ interface VisionDescriptionCacheEntry {
 }
 
 const visionDescriptionCache = new Map<string, VisionDescriptionCacheEntry>();
-const pendingVisionDescriptions = new Map<string, Promise<string>>();
+const pendingVisionDescriptions = new Map<string, PendingVisionDescription>();
 
 export function createVisionDescriptionCacheStats(): VisionDescriptionCacheStats {
 	return {
 		enabled: true,
 		hits: 0,
 		misses: 0,
+		deduplicatedDescriptions: 0,
 		entries: visionDescriptionCache.size,
 		generatedDescriptions: 0,
 		failedDescriptions: 0,
@@ -65,15 +67,16 @@ export function rememberDescription(key: string, description: string): void {
 	}
 }
 
-export function getPendingDescription(key: string): Promise<string> | undefined {
-	return pendingVisionDescriptions.get(key);
+export function getPendingDescription(key: string): PendingVisionDescription | undefined {
+	const pending = pendingVisionDescriptions.get(key);
+	return pending?.cancelledWhenUnused ? undefined : pending;
 }
 
-export function rememberPendingDescription(key: string, description: Promise<string>): void {
-	pendingVisionDescriptions.set(key, description);
-	void description
+export function rememberPendingDescription(key: string, pending: PendingVisionDescription): void {
+	pendingVisionDescriptions.set(key, pending);
+	void pending.promise
 		.finally(() => {
-			if (pendingVisionDescriptions.get(key) === description) {
+			if (pendingVisionDescriptions.get(key) === pending) {
 				pendingVisionDescriptions.delete(key);
 			}
 		})

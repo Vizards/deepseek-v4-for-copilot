@@ -4,6 +4,7 @@ export interface VisionDescriptionCacheStats {
 	enabled: boolean;
 	hits: number;
 	misses: number;
+	deduplicatedDescriptions: number;
 	entries: number;
 	generatedDescriptions: number;
 	failedDescriptions: number;

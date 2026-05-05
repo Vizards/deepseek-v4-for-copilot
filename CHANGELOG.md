@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.3.1...v0.4.0) (2026-05-05)
+
+
+### Features
+
+* Chinese (zh-cn) i18n support ([#16](https://github.com/Vizards/deepseek-v4-for-copilot/issues/16)) ([72a8a69](https://github.com/Vizards/deepseek-v4-for-copilot/commit/72a8a696419d85aa5f82d1142abbc42ec4b50e9b))
+* **diagnostics:** add opt-in cache trace diagnostics ([#35](https://github.com/Vizards/deepseek-v4-for-copilot/issues/35)) ([fa11e5b](https://github.com/Vizards/deepseek-v4-for-copilot/commit/fa11e5bea0ccf4023b9947bba5ab4c333abb3ccb))
+
+
+### Bug Fixes
+
+* add in-memory LRU cache for vision image descriptions ([#36](https://github.com/Vizards/deepseek-v4-for-copilot/issues/36)) ([05fac93](https://github.com/Vizards/deepseek-v4-for-copilot/commit/05fac9392270e5d58a51769b76f4c5378457b1bc))
+* **auth:** allow compatible provider API tokens ([#34](https://github.com/Vizards/deepseek-v4-for-copilot/issues/34)) ([e06c550](https://github.com/Vizards/deepseek-v4-for-copilot/commit/e06c550e2183ec1c143dcaee28c4b4b32f89a3a1))
+* **json:** sanitize lone surrogates before serialization ([#40](https://github.com/Vizards/deepseek-v4-for-copilot/issues/40)) ([40a21a4](https://github.com/Vizards/deepseek-v4-for-copilot/commit/40a21a4719edc8c2fe0d2e9d25953244917af8b3))
+* **provider:** stabilize reasoning replay across tool turns ([#39](https://github.com/Vizards/deepseek-v4-for-copilot/issues/39)) ([e283bc0](https://github.com/Vizards/deepseek-v4-for-copilot/commit/e283bc014bf8c2e2b4e0ebfd0869be6819a35d46))
+
 ## [0.3.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.3.0...v0.3.1) (2026-05-02)
 
 

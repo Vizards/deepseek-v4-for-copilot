@@ -72,7 +72,7 @@ export interface CacheTraceToolSummary {
 export interface CacheTraceSnapshot {
 	fingerprint: string;
 	conversationKey: string;
-	serializedInput: string;
+	redactedComparisonInput: string;
 	toolsHash: string;
 	toolNames: string[];
 	toolSummaries: CacheTraceToolSummary[];
@@ -81,8 +81,8 @@ export interface CacheTraceSnapshot {
 }
 
 export interface CacheTraceComparison {
-	commonPrefixChars: number;
-	commonPrefixPercent: number;
+	commonPrefixSummaryChars: number;
+	commonPrefixSummaryPercent: number;
 	previousMessageCount: number;
 	currentMessageCount: number;
 	firstChangedMessageIndex: number | undefined;
@@ -136,10 +136,6 @@ interface VisionResolutionStats {
 	describedImageMessages: number;
 	failedImageMessages: number;
 	droppedImageParts: number;
-	descriptionCacheEnabled: boolean;
-	descriptionCacheHits: number;
-	descriptionCacheMisses: number;
-	descriptionCacheEntries: number;
 	visionModelId?: string;
 }
 
@@ -160,6 +156,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 
 	beginRequest(options: BeginCacheDiagnosticsOptions): CacheDiagnosticsRun {
 		if (!this.isEnabled()) {
+			this.clearCacheTraces();
 			return new NoopCacheDiagnosticsRun();
 		}
 
@@ -186,8 +183,14 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				` thinking=${options.isThinkingModel}` +
 				` thinkingEffort=${options.thinkingEffort}` +
 				` maxTokens=${options.maxTokens ?? 'api-default'}` +
-				` reasoningCache(size=${options.reasoningCacheSize},max=${MAX_CACHE_SIZE})`,
+				` reasoningCache(size=${options.reasoningCacheSize},max=${MAX_CACHE_SIZE})` +
+				` inputMessages=${options.inputMessages.length}` +
+				` deepseekMessages=${options.request.messages.length}`,
 		);
+		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
+		if (vscodeMessageTrace) {
+			logger.info(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
+		}
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
 			logger.info(`[cache-trace #${requestId}] ${detailLine}`);
 		}
@@ -235,8 +238,13 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			requestId,
 			cacheTrace,
 			cacheTraceComparison ?? conversationChangeComparison,
-			cacheTraceComparison ? 'prefixVsPrevious' : 'fallbackPrefixVsPrevious',
+			cacheTraceComparison ? 'summaryPrefixVsPrevious' : 'fallbackSummaryPrefixVsPrevious',
 		);
+	}
+
+	private clearCacheTraces(): void {
+		this.lastCacheTrace = undefined;
+		this.previousCacheTraces.clear();
 	}
 
 	rememberCacheTrace(snapshot: CacheTraceSnapshot): void {
@@ -280,8 +288,8 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			const hitRate = getCacheHitRate(usage);
 			logger.info(
 				`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
-					` ${this.prefixLabel}=${this.resultComparison.commonPrefixChars}` +
-					` chars (${this.resultComparison.commonPrefixPercent.toFixed(1)}%)`,
+					` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
+					` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
 			);
 		}
 	}
@@ -323,10 +331,6 @@ function summarizeVisionResolution(
 		describedImageMessages: 0,
 		failedImageMessages: 0,
 		droppedImageParts: 0,
-		descriptionCacheEnabled: false,
-		descriptionCacheHits: 0,
-		descriptionCacheMisses: 0,
-		descriptionCacheEntries: 0,
 		visionModelId,
 	};
 
@@ -353,7 +357,6 @@ function summarizeVisionResolution(
 
 			if (newDescriptions > 0) {
 				stats.describedImageMessages += 1;
-				stats.descriptionCacheMisses += 1;
 			}
 			if (newFailures > 0) {
 				stats.failedImageMessages += 1;
@@ -402,7 +405,6 @@ function formatVisionTrace(
 		` newDescriptionMessages=${stats.describedImageMessages}` +
 		` failedDescriptionMessages=${stats.failedImageMessages}` +
 		` droppedImageParts=${stats.droppedImageParts}` +
-		` descriptionCache(enabled=${stats.descriptionCacheEnabled},hits=${stats.descriptionCacheHits},misses=${stats.descriptionCacheMisses},entries=${stats.descriptionCacheEntries})` +
 		` visionModel=${visionModel}` +
 		` historyDescriptionMessages=${historyDescriptionMessages}` +
 		note
@@ -426,31 +428,95 @@ function formatVisionModel(stats: VisionResolutionStats): string {
 	return 'unknown';
 }
 
+function formatVscodeMessageTrace(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+): string | undefined {
+	if (messages.length === 0) {
+		return undefined;
+	}
+
+	return messages
+		.map((msg, index) => {
+			const role =
+				msg.role === vscode.LanguageModelChatMessageRole.User
+					? 'user'
+					: msg.role === vscode.LanguageModelChatMessageRole.Assistant
+						? 'assistant'
+						: 'unknown';
+			let textChars = 0;
+			let imageParts = 0;
+			let toolCallParts = 0;
+			let toolResultParts = 0;
+
+			for (const part of msg.content) {
+				if (part instanceof vscode.LanguageModelTextPart) {
+					textChars += part.value.length;
+				} else if (
+					part instanceof vscode.LanguageModelDataPart &&
+					part.mimeType.startsWith('image/')
+				) {
+					imageParts += 1;
+				} else if (part instanceof vscode.LanguageModelToolCallPart) {
+					toolCallParts += 1;
+				} else if (part instanceof vscode.LanguageModelToolResultPart) {
+					toolResultParts += 1;
+				}
+			}
+
+			const parts: string[] = [];
+			if (imageParts) {
+				parts.push(`image=${imageParts}`);
+			}
+			if (toolCallParts) {
+				parts.push(`toolCalls=${toolCallParts}`);
+			}
+			if (toolResultParts) {
+				parts.push(`toolResults=${toolResultParts}`);
+			}
+
+			const suffix = parts.length > 0 ? ` (${parts.join(',')})` : '';
+
+			return `${role}#${index}:chars=${textChars}${suffix}`;
+		})
+		.join(' | ');
+}
+
 export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSnapshot {
-	const cacheInput = {
-		model: request.model,
-		tools: request.tools ?? null,
-		tool_choice: request.tool_choice ?? null,
-		thinking: request.thinking ?? null,
-		reasoning_effort: request.reasoning_effort ?? null,
-		messages: request.messages,
-	};
-	const serializedInput = stableStringify(cacheInput);
 	const toolsSerialized = stableStringify(request.tools ?? []);
 	const messageSummaries = summarizeMessages(request.messages);
 	const toolSummaries = summarizeTools(request.tools ?? []);
 	const firstMessage = messageSummaries[0];
+	const redactedComparisonInput = createRedactedComparisonInput(
+		request,
+		messageSummaries,
+		toolSummaries,
+	);
 
 	return {
-		fingerprint: hashString(serializedInput),
+		fingerprint: hashString(redactedComparisonInput),
 		conversationKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
-		serializedInput,
+		redactedComparisonInput,
 		toolsHash: hashString(toolsSerialized),
 		toolNames: request.tools?.map((tool) => tool.function.name) ?? [],
 		toolSummaries,
 		messageSummaries,
 		stats: summarizeStats(request.messages, request.tools?.length ?? 0),
 	};
+}
+
+function createRedactedComparisonInput(
+	request: DeepSeekRequest,
+	messageSummaries: CacheTraceMessageSummary[],
+	toolSummaries: CacheTraceToolSummary[],
+): string {
+	return stableStringify({
+		model: request.model,
+		tool_choice: request.tool_choice ?? null,
+		thinking: request.thinking ?? null,
+		reasoning_effort: request.reasoning_effort ?? null,
+		tools: toolSummaries,
+		messages: messageSummaries,
+	});
 }
 
 export function compareCacheTraceSnapshots(
@@ -461,9 +527,9 @@ export function compareCacheTraceSnapshots(
 		return undefined;
 	}
 
-	const commonPrefixChars = countCommonPrefixChars(
-		previous.serializedInput,
-		current.serializedInput,
+	const commonPrefixSummaryChars = countCommonPrefixChars(
+		previous.redactedComparisonInput,
+		current.redactedComparisonInput,
 	);
 	const firstChangedMessageIndex = findFirstChangedMessageIndex(
 		previous.messageSummaries,
@@ -475,10 +541,10 @@ export function compareCacheTraceSnapshots(
 	);
 
 	return {
-		commonPrefixChars,
-		commonPrefixPercent:
-			current.serializedInput.length > 0
-				? (commonPrefixChars / current.serializedInput.length) * 100
+		commonPrefixSummaryChars,
+		commonPrefixSummaryPercent:
+			current.redactedComparisonInput.length > 0
+				? (commonPrefixSummaryChars / current.redactedComparisonInput.length) * 100
 				: 100,
 		previousMessageCount: previous.messageSummaries.length,
 		currentMessageCount: current.messageSummaries.length,
@@ -553,8 +619,8 @@ export function formatCacheTraceComparison(comparison: CacheTraceComparison): st
 		: '';
 
 	return (
-		`prefixVsPrevious chars=${comparison.commonPrefixChars}` +
-		` percent=${comparison.commonPrefixPercent.toFixed(1)}%` +
+		`summaryPrefixVsPrevious chars=${comparison.commonPrefixSummaryChars}` +
+		` percent=${comparison.commonPrefixSummaryPercent.toFixed(1)}%` +
 		` toolsChanged=${comparison.toolsChanged}` +
 		` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
 		changedTool +
@@ -579,8 +645,8 @@ export function formatCacheTraceConversationChangeComparison(
 
 	return (
 		`conversationChanged=true prev=${previousConversationKey} curr=${currentConversationKey}` +
-		` fallbackPrefixVsPrevious chars=${comparison.commonPrefixChars}` +
-		` percent=${comparison.commonPrefixPercent.toFixed(1)}%` +
+		` fallbackSummaryPrefixVsPrevious chars=${comparison.commonPrefixSummaryChars}` +
+		` percent=${comparison.commonPrefixSummaryPercent.toFixed(1)}%` +
 		` toolsChanged=${comparison.toolsChanged}` +
 		` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
 		changedTool +
@@ -653,7 +719,7 @@ export function getCacheTraceComparisonWarnings(comparison: CacheTraceComparison
 			comparison.previousMessageCount - comparison.firstChangedMessageIndex - 1;
 		if (previousMessagesAfterChange > 2) {
 			warnings.push(
-				`retained history changed before the append boundary at message #${comparison.firstChangedMessageIndex}; ${previousMessagesAfterChange} previous message(s) after it cannot share an identical serialized prefix.`,
+				`retained history changed before the append boundary at message #${comparison.firstChangedMessageIndex}; ${previousMessagesAfterChange} previous message(s) after it cannot share an identical request prefix.`,
 			);
 		}
 		if (

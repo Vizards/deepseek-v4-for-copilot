@@ -6,12 +6,10 @@ const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 100;
 
 interface VisionDescriptionCacheEntry {
 	description: string;
-	createdAt: number;
-	lastAccessedAt: number;
-	hits: number;
 }
 
 const visionDescriptionCache = new Map<string, VisionDescriptionCacheEntry>();
+const pendingVisionDescriptions = new Map<string, Promise<string>>();
 
 export function createVisionDescriptionCacheStats(): VisionDescriptionCacheStats {
 	return {
@@ -48,20 +46,14 @@ export function getCachedDescription(key: string): string | undefined {
 		return undefined;
 	}
 
-	entry.hits += 1;
-	entry.lastAccessedAt = Date.now();
 	visionDescriptionCache.delete(key);
 	visionDescriptionCache.set(key, entry);
 	return entry.description;
 }
 
 export function rememberDescription(key: string, description: string): void {
-	const now = Date.now();
 	visionDescriptionCache.set(key, {
 		description,
-		createdAt: now,
-		lastAccessedAt: now,
-		hits: 0,
 	});
 
 	while (visionDescriptionCache.size > MAX_VISION_DESCRIPTION_CACHE_ENTRIES) {
@@ -71,6 +63,21 @@ export function rememberDescription(key: string, description: string): void {
 		}
 		visionDescriptionCache.delete(oldestKey);
 	}
+}
+
+export function getPendingDescription(key: string): Promise<string> | undefined {
+	return pendingVisionDescriptions.get(key);
+}
+
+export function rememberPendingDescription(key: string, description: Promise<string>): void {
+	pendingVisionDescriptions.set(key, description);
+	void description
+		.finally(() => {
+			if (pendingVisionDescriptions.get(key) === description) {
+				pendingVisionDescriptions.delete(key);
+			}
+		})
+		.catch(() => undefined);
 }
 
 function hashBytes(value: Uint8Array): string {

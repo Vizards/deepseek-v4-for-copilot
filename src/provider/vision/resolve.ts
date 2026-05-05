@@ -7,7 +7,9 @@ import {
 	createVisionDescriptionCacheStats,
 	finalizeVisionDescriptionCacheStats,
 	getCachedDescription,
+	getPendingDescription,
 	rememberDescription,
+	rememberPendingDescription,
 } from './cache';
 import { getVisionPrompt } from './model';
 import type { VisionDescriptionCacheStats, VisionResolutionResult } from './types';
@@ -99,23 +101,45 @@ async function resolveImageDescription(
 		stats.hits += 1;
 		return createImageDescriptionText(cachedDescription);
 	}
+	const pendingDescription = getPendingDescription(cacheKey);
+	if (pendingDescription) {
+		stats.hits += 1;
+		const description = await resolveDescription(pendingDescription, stats, false);
+		return description === undefined
+			? IMAGE_DESCRIPTION_UNAVAILABLE
+			: createImageDescriptionText(description);
+	}
 
 	stats.misses += 1;
-
-	try {
-		const description = await describeImagePart(part, visionModel, visionPrompt, token);
-		if (description.length === 0) {
-			stats.failedDescriptions += 1;
-			return IMAGE_DESCRIPTION_UNAVAILABLE;
-		}
-
+	const pendingDescriptionRequest = describeImagePart(part, visionModel, visionPrompt, token);
+	rememberPendingDescription(cacheKey, pendingDescriptionRequest);
+	const description = await resolveDescription(pendingDescriptionRequest, stats, true);
+	if (description !== undefined) {
 		rememberDescription(cacheKey, description);
 		stats.generatedDescriptions += 1;
 		return createImageDescriptionText(description);
+	}
+	return IMAGE_DESCRIPTION_UNAVAILABLE;
+}
+
+async function resolveDescription(
+	description: Promise<string>,
+	stats: VisionDescriptionCacheStats,
+	logError: boolean,
+): Promise<string | undefined> {
+	try {
+		const resolvedDescription = await description;
+		if (resolvedDescription.length === 0) {
+			stats.failedDescriptions += 1;
+			return undefined;
+		}
+		return resolvedDescription;
 	} catch (err) {
 		stats.failedDescriptions += 1;
-		logger.error(t('vision.proxyError'), err);
-		return IMAGE_DESCRIPTION_UNAVAILABLE;
+		if (logError) {
+			logger.error(t('vision.proxyError'), err);
+		}
+		return undefined;
 	}
 }
 

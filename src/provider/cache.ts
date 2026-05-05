@@ -23,7 +23,7 @@ export function createToolReasoningKey(toolCallId: string): string {
 }
 
 export function createPostToolReasoningKey(toolCallIds: readonly string[]): string {
-	return `post-tool:${toolCallIds.join(',')}`;
+	return `post-tool:${JSON.stringify(toolCallIds)}`;
 }
 
 export function pruneReasoningCache(cache: Map<string, ReasoningEntry>, clearAll: boolean): void {

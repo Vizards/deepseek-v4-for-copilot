@@ -36,18 +36,18 @@ const PRICING: Record<string, ModelPricing> = {
 	'deepseek-v4-flash': {
 		cacheHitUsd: 0.028,
 		cacheHitCny: 0.1022,
-		cacheMissUsd: 0.140,
-		cacheMissCny: 0.5110,
-		outputUsd: 0.280,
-		outputCny: 1.0220,
+		cacheMissUsd: 0.14,
+		cacheMissCny: 0.511,
+		outputUsd: 0.28,
+		outputCny: 1.022,
 	},
 	'deepseek-v4-pro': {
 		cacheHitUsd: 0.145,
 		cacheHitCny: 0.5293,
-		cacheMissUsd: 1.740,
-		cacheMissCny: 6.3510,
-		outputUsd: 3.480,
-		outputCny: 12.7020,
+		cacheMissUsd: 1.74,
+		cacheMissCny: 6.351,
+		outputUsd: 3.48,
+		outputCny: 12.702,
 	},
 };
 
@@ -511,7 +511,7 @@ export function createStatusBarItem(
 		const pct = s.lastPromptTokens / s.contextLimit;
 		if (pct >= 0.95 || exceeded) {
 			item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
-		} else if (pct >= 0.80) {
+		} else if (pct >= 0.8) {
 			item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
 		} else {
 			item.backgroundColor = undefined;

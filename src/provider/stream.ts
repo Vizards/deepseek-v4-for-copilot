@@ -2,10 +2,10 @@ import vscode from 'vscode';
 import type { TokenUsageTracker } from '../tokenUsage';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
-	createPostToolReasoningKey,
-	createToolReasoningKey,
-	pruneReasoningCache,
-	type ReasoningEntry,
+    createPostToolReasoningKey,
+    createToolReasoningKey,
+    pruneReasoningCache,
+    type ReasoningEntry,
 } from './cache';
 import { observeCancellationToken, type CacheDiagnosticsRun } from './diagnostics';
 import type { PreparedChatRequest } from './request';

@@ -1,7 +1,4 @@
 {
-  "deepseek-copilot.displayName": "DeepSeek V4 for Copilot Chat",
-  "deepseek-copilot.description": "Pick DeepSeek V4 Pro & Flash from the Copilot Chat model picker. Vision, thinking mode, agent tools — zero config, BYOK.",
-  "deepseek-copilot.providerDisplayName": "DeepSeek",
   "deepseek-copilot.command.setApiKey": "DeepSeek: Set API Key",
   "deepseek-copilot.command.getApiKey": "DeepSeek: Get API Key",
   "deepseek-copilot.command.clearApiKey": "DeepSeek: Clear API Key",

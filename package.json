@@ -1,7 +1,7 @@
 {
   "name": "deepseek-v4-for-copilot",
-  "displayName": "%deepseek-copilot.displayName%",
-  "description": "%deepseek-copilot.description%",
+  "displayName": "DeepSeek V4 for Copilot Chat",
+  "description": "Pick DeepSeek V4 Pro & Flash from the Copilot Chat model picker. Vision, thinking mode, agent tools — zero config, BYOK.",
   "icon": "resources/icon.png",
   "version": "0.4.0",
   "publisher": "Vizards",
@@ -49,7 +49,7 @@
     "languageModelChatProviders": [
       {
         "vendor": "deepseek",
-        "displayName": "%deepseek-copilot.providerDisplayName%"
+        "displayName": "DeepSeek"
       }
     ],
     "commands": [

@@ -14,9 +14,6 @@
     "vscode": "^1.116.0",
     "node": ">=24"
   },
-  "extensionDependencies": [
-    "github.copilot-chat"
-  ],
   "extensionKind": [
     "workspace"
   ],

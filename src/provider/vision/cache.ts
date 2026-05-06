@@ -41,9 +41,11 @@ export function createVisionDescriptionCacheKey(
 	part: vscode.LanguageModelDataPart,
 	visionModelId: string,
 	visionPrompt: string,
+	dataHash?: string,
 ): string {
+	const dh = dataHash ?? hashBytes(part.data);
 	return hashString(
-		['v1', part.mimeType, hashBytes(part.data), visionModelId, hashString(visionPrompt)].join('\0'),
+		['v1', part.mimeType, dh, visionModelId, hashString(visionPrompt)].join('\0'),
 	);
 }
 
@@ -74,10 +76,22 @@ export function rememberDescription(key: string, description: string, dataHash?:
 			break;
 		}
 		const evicted = visionDescriptionCache.get(oldestKey);
-		if (evicted?.dataHash) {
-			dataHashToDescription.delete(evicted.dataHash);
-		}
 		visionDescriptionCache.delete(oldestKey);
+		if (evicted?.dataHash) {
+			// Only delete the secondary index mapping if no other cached
+			// entry still references the same data hash (same image bytes
+			// may be cached under different vision model/prompt keys).
+			let stillReferenced = false;
+			for (const entry of visionDescriptionCache.values()) {
+				if (entry.dataHash === evicted.dataHash) {
+					stillReferenced = true;
+					break;
+				}
+			}
+			if (!stillReferenced) {
+				dataHashToDescription.delete(evicted.dataHash);
+			}
+		}
 	}
 }
 

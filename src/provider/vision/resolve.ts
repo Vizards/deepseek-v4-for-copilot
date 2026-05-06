@@ -96,7 +96,10 @@ async function resolveImageDescription(
 	stats: VisionDescriptionCacheStats,
 	token: vscode.CancellationToken,
 ): Promise<string> {
-	const cacheKey = createVisionDescriptionCacheKey(part, visionModel.id, visionPrompt);
+	// Compute dataHash once; reused for cache key construction and
+	// the secondary index to avoid double SHA-256 on the same bytes.
+	const dataHash = computeDataHash(part.data);
+	const cacheKey = createVisionDescriptionCacheKey(part, visionModel.id, visionPrompt, dataHash);
 	const cachedDescription = getCachedDescription(cacheKey);
 	if (cachedDescription !== undefined) {
 		stats.hits += 1;
@@ -121,6 +124,7 @@ async function resolveImageDescription(
 		part,
 		visionModel,
 		visionPrompt,
+		dataHash,
 	);
 	rememberPendingDescription(cacheKey, pendingDescriptionRequest);
 	const description = await resolvePendingDescription(
@@ -140,11 +144,12 @@ function createPendingDescriptionRequest(
 	part: vscode.LanguageModelDataPart,
 	visionModel: vscode.LanguageModelChat,
 	visionPrompt: string,
+	dataHash: string,
 ): Promise<string> {
 	return describeImagePart(part, visionModel, visionPrompt).then(
 		(description) => {
 			if (description.length > 0) {
-				rememberDescription(cacheKey, description, computeDataHash(part.data));
+				rememberDescription(cacheKey, description, dataHash);
 			}
 			return description;
 		},

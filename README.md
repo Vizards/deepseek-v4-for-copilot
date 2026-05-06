@@ -10,6 +10,11 @@
   <img src="https://vsmarketplacebadges.dev/installs-short/Vizards.deepseek-v4-for-copilot.svg?style=for-the-badge" alt="Installs" />
 </p>
 
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.zh-cn.md">简体中文</a>
+</p>
+
 **Pick DeepSeek V4 from the Copilot Chat model picker — and keep everything else Copilot already gives you.**
 
 <p align="center">

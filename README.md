@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh-cn.md">简体中文</a>
+  <a href="https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/README.md">English</a> |
+  <a href="https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/README.zh-cn.md">简体中文</a>
 </p>
 
 **Pick DeepSeek V4 from the Copilot Chat model picker — and keep everything else Copilot already gives you.**

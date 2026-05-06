@@ -3,6 +3,7 @@ import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../../consts';
 import { t } from '../../i18n';
 import { logger } from '../../logger';
 import {
+	computeDataHash,
 	createVisionDescriptionCacheKey,
 	createVisionDescriptionCacheStats,
 	finalizeVisionDescriptionCacheStats,
@@ -143,7 +144,7 @@ function createPendingDescriptionRequest(
 	return describeImagePart(part, visionModel, visionPrompt).then(
 		(description) => {
 			if (description.length > 0) {
-				rememberDescription(cacheKey, description);
+				rememberDescription(cacheKey, description, computeDataHash(part.data));
 			}
 			return description;
 		},

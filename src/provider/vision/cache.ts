@@ -6,11 +6,16 @@ const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 100;
 
 interface VisionDescriptionCacheEntry {
 	description: string;
+	/** SHA-256 of the original image bytes, for secondary index eviction. */
+	dataHash?: string;
 }
 
 const visionDescriptionCache = new Map<string, VisionDescriptionCacheEntry>();
 // Promise-only single-flight: caller cancellation does not abort shared vision work.
 const pendingVisionDescriptions = new Map<string, Promise<string>>();
+// Secondary index keyed by data hash, for lookup without knowing vision model/prompt.
+// Used by provideTokenCount to find cached descriptions for image DataParts.
+const dataHashToDescription = new Map<string, string>();
 
 export function createVisionDescriptionCacheStats(): VisionDescriptionCacheStats {
 	return {
@@ -53,15 +58,24 @@ export function getCachedDescription(key: string): string | undefined {
 	return entry.description;
 }
 
-export function rememberDescription(key: string, description: string): void {
+export function rememberDescription(key: string, description: string, dataHash?: string): void {
 	visionDescriptionCache.set(key, {
 		description,
+		dataHash,
 	});
+
+	if (dataHash) {
+		dataHashToDescription.set(dataHash, description);
+	}
 
 	while (visionDescriptionCache.size > MAX_VISION_DESCRIPTION_CACHE_ENTRIES) {
 		const oldestKey = visionDescriptionCache.keys().next().value;
 		if (!oldestKey) {
 			break;
+		}
+		const evicted = visionDescriptionCache.get(oldestKey);
+		if (evicted?.dataHash) {
+			dataHashToDescription.delete(evicted.dataHash);
 		}
 		visionDescriptionCache.delete(oldestKey);
 	}
@@ -80,6 +94,14 @@ export function rememberPendingDescription(key: string, description: Promise<str
 			}
 		})
 		.catch(() => undefined);
+}
+
+export function getCachedDescriptionByDataHash(dataHash: string): string | undefined {
+	return dataHashToDescription.get(dataHash);
+}
+
+export function computeDataHash(data: Uint8Array): string {
+	return hashBytes(data);
 }
 
 function hashBytes(value: Uint8Array): string {

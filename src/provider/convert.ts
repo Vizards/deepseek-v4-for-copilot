@@ -151,6 +151,7 @@ export function countMessageChars(messages: DeepSeekMessage[]): number {
 	let total = 0;
 	for (const msg of messages) {
 		total += msg.content?.length ?? 0;
+		total += msg.reasoning_content?.length ?? 0;
 		if (msg.tool_calls) {
 			for (const tc of msg.tool_calls) {
 				total += tc.function?.name?.length ?? 0;

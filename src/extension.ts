@@ -7,7 +7,7 @@ import { DeepSeekChatProvider } from './provider';
 
 let activeProvider: DeepSeekChatProvider | undefined;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 	logger.info(
 		`Activating extension version=${context.extension.packageJSON.version}` +
 			` debug=${getDebugLoggingEnabled()}`,
@@ -38,23 +38,25 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
 		);
 
-		// Fix(#12): configurationSchema (Thinking Effort dropdown) is a non-public
-		// field that Copilot Chat does not persist in its chatLanguageModels.json
-		// cache. On startup, Copilot Chat initialises the model picker from cache
-		// and silently drops configurationSchema, so the per-model config menu
-		// never appears on first launch.
+		// Fix(#12): Copilot Chat caches model info in chatLanguageModels.json
+		// but silently drops configurationSchema (Thinking Effort dropdown).
+		// Re-firing onDidChangeLanguageModelChatInformation forces Copilot Chat
+		// to re-query our provider through the full (non-cached) path.
 		//
-		// Re-firing onDidChangeLanguageModelChatInformation here forces Copilot
-		// Chat to re-query our provider through the full (non-cached) path, which
-		// correctly picks up configurationSchema.
+		// To avoid a race where our refresh event fires before Copilot Chat is
+		// listening, we programmatically activate Copilot Chat first. We do NOT
+		// use extensionDependencies because built-in extensions aren't enumerable
+		// in Remote-SSH hosts (#37), which causes the hard dependency to fail.
 		//
-		// This works because registerLanguageModelChatProvider() is synchronous,
-		// so the provider is fully registered before we fire the refresh and the
-		// host has already subscribed to receive the change. Copilot Chat can then
-		// re-query complete model information through the non-cached path. The
-		// extensionDependencies on github.copilot-chat in package.json
-		// additionally guarantees Copilot Chat is fully activated before this
-		// extension's activate() runs, eliminating any activation ordering race.
+		// If Copilot Chat is unavailable (e.g. Remote-SSH without built-in
+		// registration), we log a warning and proceed — Copilot Chat as a
+		// built-in typically initialises before onStartupFinished anyway.
+		try {
+			await vscode.extensions.getExtension('github.copilot-chat')?.activate();
+		} catch {
+			logger.warn('Copilot Chat activation unavailable; model picker refresh may be delayed');
+		}
+
 		provider.refreshModelPicker();
 
 		void showWelcomeIfNeeded(context, provider).catch((error) => {

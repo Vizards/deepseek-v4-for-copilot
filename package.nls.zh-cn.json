@@ -1,7 +1,4 @@
 {
-  "deepseek-copilot.displayName": "DeepSeek V4 for Copilot Chat",
-  "deepseek-copilot.description": "在 Copilot Chat 模型选择器中使用 DeepSeek V4 Pro & Flash。支持视觉识别、思考模式、智能体工具。需自行提供 API Key。",
-  "deepseek-copilot.providerDisplayName": "DeepSeek",
   "deepseek-copilot.command.setApiKey": "DeepSeek: 设置 API Key",
   "deepseek-copilot.command.getApiKey": "DeepSeek: 获取 API Key",
   "deepseek-copilot.command.clearApiKey": "DeepSeek: 清除 API Key",

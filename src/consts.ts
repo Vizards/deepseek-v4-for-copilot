@@ -42,6 +42,15 @@ export const IMAGE_DESCRIPTION_PROMPT =
  */
 export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
 
+/**
+ * Wrapper applied to vision model descriptions before they are inserted into
+ * the chat prompt. The full format is: `[Image Description: <description>]`.
+ * Keep these in English and out of i18n so cache keys and token estimates
+ * stay stable regardless of VS Code display language.
+ */
+export const IMAGE_DESCRIPTION_PREFIX = '[Image Description: ';
+export const IMAGE_DESCRIPTION_SUFFIX = ']';
+
 // ---- Cache ----
 
 /** Max entries in the reasoning-content cache before eviction kicks in. */

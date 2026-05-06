@@ -59,6 +59,9 @@ export function getCachedDescription(key: string): string | undefined {
 }
 
 export function rememberDescription(key: string, description: string, dataHash?: string): void {
+	// Delete before set to refresh LRU insertion order; Map.set on an
+	// existing key preserves the original insertion position.
+	visionDescriptionCache.delete(key);
 	visionDescriptionCache.set(key, {
 		description,
 		dataHash,
@@ -79,14 +82,20 @@ export function rememberDescription(key: string, description: string, dataHash?:
 			// Only delete the secondary index mapping if no other cached
 			// entry still references the same data hash (same image bytes
 			// may be cached under different vision model/prompt keys).
-			let stillReferenced = false;
+			let remainingEntry: typeof evicted | undefined;
 			for (const entry of visionDescriptionCache.values()) {
 				if (entry.dataHash === evicted.dataHash) {
-					stillReferenced = true;
+					remainingEntry = entry;
 					break;
 				}
 			}
-			if (!stillReferenced) {
+			if (remainingEntry) {
+				// Another entry still references this hash — update the
+				// index to the remaining entry's description (the evicted
+				// one may have had a different description from another
+				// vision model/prompt combination).
+				dataHashToDescription.set(evicted.dataHash, remainingEntry.description);
+			} else {
 				dataHashToDescription.delete(evicted.dataHash);
 			}
 		}

@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { IMAGE_DESCRIPTION_PREFIX, IMAGE_DESCRIPTION_SUFFIX } from '../consts';
 import { computeDataHash, getCachedDescriptionByDataHash } from './vision/cache';
 
 /**
@@ -49,7 +50,7 @@ function estimatePartChars(part: unknown): number {
 			if (part.data.byteLength <= 500_000) {
 				const cached = getCachedDescriptionByDataHash(computeDataHash(part.data));
 				if (cached !== undefined) {
-					return cached.length;
+					return IMAGE_DESCRIPTION_PREFIX.length + cached.length + IMAGE_DESCRIPTION_SUFFIX.length;
 				}
 			}
 			// Cold cache (or image too large to hash): use a conservative

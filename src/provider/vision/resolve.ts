@@ -1,5 +1,9 @@
 import vscode from 'vscode';
-import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../../consts';
+import {
+	IMAGE_DESCRIPTION_PREFIX,
+	IMAGE_DESCRIPTION_SUFFIX,
+	IMAGE_DESCRIPTION_UNAVAILABLE,
+} from '../../consts';
 import { t } from '../../i18n';
 import { logger } from '../../logger';
 import {
@@ -247,7 +251,7 @@ async function describeImagePart(
 }
 
 function createImageDescriptionText(description: string): string {
-	return `[Image Description: ${description}]`;
+	return IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX;
 }
 
 function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {

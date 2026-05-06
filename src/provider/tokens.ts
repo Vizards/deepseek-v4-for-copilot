@@ -82,7 +82,12 @@ function estimatePartChars(part: unknown): number {
 
 	// 6. LanguageModelPromptTsxPart — stringify the value if present
 	// Duck-type check since PromptTsxPart may not always be available
-	if (part && typeof part === 'object' && 'value' in part && part.constructor?.name === 'LanguageModelPromptTsxPart') {
+	if (
+		part &&
+		typeof part === 'object' &&
+		'value' in part &&
+		part.constructor?.name === 'LanguageModelPromptTsxPart'
+	) {
 		try {
 			return JSON.stringify((part as { value: unknown }).value).length;
 		} catch {

@@ -44,9 +44,7 @@ export function createVisionDescriptionCacheKey(
 	dataHash?: string,
 ): string {
 	const dh = dataHash ?? hashBytes(part.data);
-	return hashString(
-		['v1', part.mimeType, dh, visionModelId, hashString(visionPrompt)].join('\0'),
-	);
+	return hashString(['v1', part.mimeType, dh, visionModelId, hashString(visionPrompt)].join('\0'));
 }
 
 export function getCachedDescription(key: string): string | undefined {

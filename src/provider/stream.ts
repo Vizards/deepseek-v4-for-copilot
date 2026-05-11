@@ -14,6 +14,8 @@ interface ResponseStreamState {
 	emittedToolCallIds: string[];
 }
 
+const COPILOT_USAGE_DATA_PART_MIME = 'usage';
+
 export interface StreamChatCompletionOptions {
 	prepared: PreparedChatRequest;
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
@@ -77,6 +79,7 @@ export function streamChatCompletion({
 					);
 					setCharsPerToken(charsPerToken);
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
+					reportCopilotContextUsage(progress, usage);
 				},
 			},
 			token,
@@ -177,4 +180,25 @@ function updateCharsPerToken(
 		return charsPerToken * 0.7 + observedRatio * 0.3;
 	}
 	return charsPerToken;
+}
+
+function reportCopilotContextUsage(
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+	usage: DeepSeekUsage,
+): void {
+	const data = {
+		prompt_tokens: usage.prompt_tokens,
+		completion_tokens: usage.completion_tokens,
+		total_tokens: usage.total_tokens,
+		prompt_tokens_details: {
+			cached_tokens: usage.prompt_cache_hit_tokens ?? 0,
+		},
+	};
+
+	progress.report(
+		new vscode.LanguageModelDataPart(
+			new TextEncoder().encode(JSON.stringify(data)),
+			COPILOT_USAGE_DATA_PART_MIME,
+		),
+	);
 }

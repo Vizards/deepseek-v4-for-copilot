@@ -6,6 +6,10 @@
   <a href="https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot"><img src="https://img.shields.io/open-vsx/dt/Vizards/deepseek-v4-for-copilot?style=for-the-badge&label=Downloads" alt="Open VSX Downloads"></a>
 </p>
 
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=Vizards.deepseek-v4-for-copilot">VS Code Marketplace</a> is currently unavailable. Follow <a href="https://github.com/Vizards/deepseek-v4-for-copilot/issues/54">issue #54</a> for updates.
+</p>
+
 **Pick DeepSeek V4 from the Copilot Chat model picker — and keep everything else Copilot already gives you.**
 
 <p align="center">
@@ -65,7 +69,7 @@ Pure VS Code API + Node.js built-ins. No Python, no Docker, no local proxy serve
 
 ### Usage
 
-1. Install from [Open VSX](https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot)
+1. Install from [Open VSX](https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot). If your VS Code build does not use Open VSX, follow the [Open VSX in VS Code guide](https://github.com/eclipse-openvsx/openvsx/wiki/Using-Open-VSX-in-VS-Code) to configure the registry, or download the `.vsix` from Open VSX and run **Extensions: Install from VSIX...**
 2. Run **DeepSeek: Set API Key** from the Command Palette (`Cmd+Shift+P`)
 3. Paste your key or compatible provider token (official DeepSeek keys usually start with `sk-`)
 4. Open Copilot Chat, click the model picker, pick **DeepSeek V4 Pro** or **DeepSeek V4 Flash**

@@ -1,6 +1,8 @@
 import vscode from 'vscode';
 import { CONFIG_SECTION } from './consts';
 
+export type DebugMode = 'off' | 'metadata' | 'requestDump';
+
 /**
  * Get DeepSeek API base URL from settings.
  * Falls back to the official endpoint when not configured.
@@ -35,9 +37,113 @@ export function getMaxTokens(): number | undefined {
 }
 
 /**
+ * Diagnostic mode. `requestDump` also enables metadata logs.
+ *
+ * The legacy boolean `debug` setting is still read as a fallback so old
+ * settings keep working even if migration cannot update every scope.
+ */
+export function getDebugMode(): DebugMode {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const mode = getConfiguredDebugMode(config);
+	if (mode) return mode;
+
+	return config.get<boolean>('debug', false) ? 'metadata' : 'off';
+}
+
+/**
  * Whether to log privacy-preserving diagnostic debug information.
  */
 export function getDebugLoggingEnabled(): boolean {
+	return getDebugMode() !== 'off';
+}
+
+/**
+ * Whether to write full DeepSeek request payloads to disk.
+ */
+export function getRequestDumpEnabled(): boolean {
+	return getDebugMode() === 'requestDump';
+}
+
+/**
+ * Optional directory for full request dumps. Empty means extension global storage.
+ */
+export function getRequestDumpDirectory(): string | undefined {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	return config.get<boolean>('debug', false);
+	const directory = config.get<string>('requestDumpDirectory', '').trim();
+	return directory || undefined;
+}
+
+/**
+ * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
+ *
+ * `debug: true` maps to `debugMode: metadata`; `debug: false` maps to the
+ * default `off`, so it only needs cleanup.
+ */
+export async function migrateLegacyDebugSetting(): Promise<void> {
+	await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.Global);
+	if (vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length) {
+		await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.Workspace);
+	}
+
+	for (const folder of vscode.workspace.workspaceFolders ?? []) {
+		await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.WorkspaceFolder, folder.uri);
+	}
+}
+
+function getConfiguredDebugMode(config: vscode.WorkspaceConfiguration): DebugMode | undefined {
+	const mode = config.inspect<unknown>('debugMode');
+	return (
+		normalizeDebugMode(mode?.workspaceFolderValue) ??
+		normalizeDebugMode(mode?.workspaceValue) ??
+		normalizeDebugMode(mode?.globalValue)
+	);
+}
+
+function normalizeDebugMode(value: unknown): DebugMode | undefined {
+	if (value === 'off' || value === 'metadata' || value === 'requestDump') {
+		return value;
+	}
+	return undefined;
+}
+
+async function migrateLegacyDebugSettingAtScope(
+	target: vscode.ConfigurationTarget,
+	resource?: vscode.Uri,
+): Promise<void> {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION, resource);
+	const legacy = config.inspect<boolean>('debug');
+	const mode = config.inspect<DebugMode>('debugMode');
+	const legacyValue = getScopedValue(legacy, target);
+
+	if (legacyValue === undefined) {
+		return;
+	}
+
+	if (legacyValue === true && getScopedValue(mode, target) === undefined) {
+		await config.update('debugMode', 'metadata', target);
+	}
+	await config.update('debug', undefined, target);
+}
+
+function getScopedValue<T>(
+	inspection:
+		| {
+				globalValue?: T;
+				workspaceValue?: T;
+				workspaceFolderValue?: T;
+		  }
+		| undefined,
+	target: vscode.ConfigurationTarget,
+): T | undefined {
+	if (!inspection) {
+		return undefined;
+	}
+
+	if (target === vscode.ConfigurationTarget.Global) {
+		return inspection.globalValue;
+	}
+	if (target === vscode.ConfigurationTarget.Workspace) {
+		return inspection.workspaceValue;
+	}
+	return inspection.workspaceFolderValue;
 }

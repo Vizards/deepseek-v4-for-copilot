@@ -1,20 +1,30 @@
 import vscode from 'vscode';
-import { getDebugLoggingEnabled } from './config';
+import { getDebugMode, migrateLegacyDebugSetting } from './config';
 import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
+import { ensureRequestDumpRoot } from './provider/dump';
 
 let activeProvider: DeepSeekChatProvider | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
+	try {
+		await migrateLegacyDebugSetting();
+	} catch (error) {
+		logger.warn('Failed to migrate legacy debug setting', error);
+	}
+
 	logger.info(
 		`Activating extension version=${context.extension.packageJSON.version}` +
-			` debug=${getDebugLoggingEnabled()}`,
+			` debugMode=${getDebugMode()}`,
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('deepseek-copilot.showLogs', () => logger.show()),
+		vscode.commands.registerCommand('deepseek-copilot.openRequestDumpsFolder', () =>
+			openRequestDumpsFolder(context),
+		),
 		vscode.commands.registerCommand('deepseek-copilot.getApiKey', () =>
 			vscode.env.openExternal(vscode.Uri.parse('https://platform.deepseek.com/api_keys')),
 		),
@@ -69,6 +79,20 @@ export async function activate(context: vscode.ExtensionContext) {
 		logger.error('Failed to activate DeepSeek extension', error);
 		void vscode.window.showErrorMessage(t('extension.activateFailed'));
 		throw error;
+	}
+}
+
+async function openRequestDumpsFolder(context: vscode.ExtensionContext): Promise<void> {
+	try {
+		const root = ensureRequestDumpRoot(context.globalStorageUri);
+		logger.info(`Opening request dumps folder: ${root}`);
+		const opened = await vscode.env.openExternal(vscode.Uri.file(root));
+		if (!opened) {
+			throw new Error(`VS Code refused to open ${root}`);
+		}
+	} catch (error) {
+		logger.warn('Failed to open request dumps folder', error);
+		void vscode.window.showErrorMessage(t('extension.openRequestDumpsFolderFailed'));
 	}
 }
 

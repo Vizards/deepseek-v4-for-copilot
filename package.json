@@ -73,6 +73,10 @@
       {
         "command": "deepseek-copilot.showLogs",
         "title": "%deepseek-copilot.command.showLogs%"
+      },
+      {
+        "command": "deepseek-copilot.openRequestDumpsFolder",
+        "title": "%deepseek-copilot.command.openRequestDumpsFolder%"
       }
     ],
     "walkthroughs": [
@@ -117,10 +121,25 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
-        "deepseek-copilot.debug": {
-          "type": "boolean",
-          "default": false,
-          "description": "%deepseek-copilot.config.debug.description%"
+        "deepseek-copilot.debugMode": {
+          "type": "string",
+          "default": "off",
+          "enum": [
+            "off",
+            "metadata",
+            "requestDump"
+          ],
+          "enumDescriptions": [
+            "%deepseek-copilot.config.debugMode.off.description%",
+            "%deepseek-copilot.config.debugMode.metadata.description%",
+            "%deepseek-copilot.config.debugMode.requestDump.description%"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
+        },
+        "deepseek-copilot.requestDumpDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%deepseek-copilot.config.requestDumpDirectory.description%"
         },
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",

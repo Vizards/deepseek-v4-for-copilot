@@ -8,6 +8,7 @@ import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { pruneReasoningCache, type ReasoningEntry } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
+import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import { resolveImageMessages } from './vision/index';
 
@@ -22,6 +23,7 @@ export interface PreparedChatRequest {
 
 export interface PrepareChatRequestOptions {
 	authManager: AuthManager;
+	globalStorageUri: vscode.Uri;
 	modelInfo: vscode.LanguageModelChatInformation;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	options: vscode.ProvideLanguageModelChatResponseOptions;
@@ -33,6 +35,7 @@ export interface PrepareChatRequestOptions {
 
 export async function prepareChatRequest({
 	authManager,
+	globalStorageUri,
 	modelInfo,
 	messages,
 	options,
@@ -77,6 +80,19 @@ export async function prepareChatRequest({
 				}
 			: {}),
 	};
+	dumpDeepSeekRequest(request, {
+		globalStorageUri,
+		vscodeModelId: modelInfo.id,
+		isThinkingModel,
+		thinkingEffort,
+		maxTokens,
+		inputMessages: messages,
+		resolvedMessages,
+		requestOptions: options,
+		visionModelId: visionResolution.visionModelId,
+		visionCacheStats: visionResolution.stats,
+	});
+
 	const diagnosticsRun = cacheDiagnostics.beginRequest({
 		request,
 		vscodeModelId: modelInfo.id,

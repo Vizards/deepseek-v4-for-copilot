@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { logger } from '../logger';
 import type { ReasoningEntry } from './cache';
 import { createCacheDiagnosticsRecorder } from './diagnostics';
+import { dumpProviderInput } from './dump';
 import { toChatInfo } from './models';
 import { prepareChatRequest } from './request';
 import { streamChatCompletion } from './stream';
@@ -17,6 +18,7 @@ import { createVisionModelGetter, setVisionProxyModel } from './vision/index';
  */
 export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly authManager: AuthManager;
+	private readonly globalStorageUri: vscode.Uri;
 	private readonly onDidChangeLanguageModelChatInformationEmitter = new vscode.EventEmitter<void>();
 	private isActive = true;
 
@@ -38,6 +40,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
+		this.globalStorageUri = context.globalStorageUri;
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
@@ -128,8 +131,16 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
+		dumpProviderInput({
+			globalStorageUri: this.globalStorageUri,
+			modelInfo,
+			messages,
+			requestOptions: options,
+		});
+
 		const prepared = await prepareChatRequest({
 			authManager: this.authManager,
+			globalStorageUri: this.globalStorageUri,
 			modelInfo,
 			messages,
 			options,

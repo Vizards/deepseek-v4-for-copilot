@@ -1,9 +1,9 @@
 <h1 align="center">DeepSeek V4 for Copilot Chat</h1>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=Vizards.deepseek-v4-for-copilot"><img src="https://img.shields.io/badge/VS%20Code-Install%20Extension-blue?logo=visualstudiocode&style=for-the-badge" alt="Install in VS Code"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=Vizards.deepseek-v4-for-copilot"><img src="https://vsmarketplacebadges.dev/version-short/Vizards.deepseek-v4-for-copilot.svg?style=for-the-badge" alt="Version"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=Vizards.deepseek-v4-for-copilot"><img src="https://vsmarketplacebadges.dev/installs-short/Vizards.deepseek-v4-for-copilot.svg?style=for-the-badge" alt="Installs"></a>
+  <a href="https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot"><img src="https://img.shields.io/badge/Open%20VSX-Install%20Extension-6A4FB6?style=for-the-badge" alt="Install from Open VSX"></a>
+  <a href="https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot"><img src="https://img.shields.io/open-vsx/v/Vizards/deepseek-v4-for-copilot?style=for-the-badge&label=Version" alt="Open VSX Version"></a>
+  <a href="https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot"><img src="https://img.shields.io/open-vsx/dt/Vizards/deepseek-v4-for-copilot?style=for-the-badge&label=Downloads" alt="Open VSX Downloads"></a>
 </p>
 
 **Pick DeepSeek V4 from the Copilot Chat model picker — and keep everything else Copilot already gives you.**
@@ -65,7 +65,7 @@ Pure VS Code API + Node.js built-ins. No Python, no Docker, no local proxy serve
 
 ### Usage
 
-1. Install from the VS Code Marketplace
+1. Install from [Open VSX](https://open-vsx.org/extension/Vizards/deepseek-v4-for-copilot)
 2. Run **DeepSeek: Set API Key** from the Command Palette (`Cmd+Shift+P`)
 3. Paste your key or compatible provider token (official DeepSeek keys usually start with `sk-`)
 4. Open Copilot Chat, click the model picker, pick **DeepSeek V4 Pro** or **DeepSeek V4 Flash**

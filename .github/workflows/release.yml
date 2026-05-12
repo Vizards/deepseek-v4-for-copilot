@@ -71,7 +71,7 @@ jobs:
 
       - name: Publish to Open VSX
         if: vars.PUBLISH_OPEN_VSX != 'false'
-        run: npx --yes ovsx publish --skip-duplicate "${{ steps.vsix.outputs.path }}"
+        run: npm exec -- ovsx publish --skip-duplicate "${{ steps.vsix.outputs.path }}"
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
 

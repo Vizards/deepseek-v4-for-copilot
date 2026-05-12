@@ -78,19 +78,19 @@ jobs:
           echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Publish to VS Code Marketplace
-        if: inputs.publish_vscode_marketplace
+        if: inputs.publish_vscode_marketplace == true
         run: npm exec -- vsce publish --packagePath "${{ steps.vsix.outputs.path }}" --skip-duplicate
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Publish to Open VSX
-        if: inputs.publish_open_vsx
-        run: npx --yes ovsx publish --skip-duplicate "${{ steps.vsix.outputs.path }}"
+        if: inputs.publish_open_vsx == true
+        run: npm exec -- ovsx publish --skip-duplicate "${{ steps.vsix.outputs.path }}"
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
       - name: Attach VSIX to GitHub Release
-        if: inputs.attach_github_release
+        if: inputs.attach_github_release == true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name }}

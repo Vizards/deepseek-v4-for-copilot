@@ -11,7 +11,7 @@ on:
         description: Publish this tag to the VS Code Marketplace.
         required: false
         type: boolean
-        default: false
+        default: true
       publish_open_vsx:
         description: Publish this tag to Open VSX.
         required: false

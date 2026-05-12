@@ -157,14 +157,13 @@
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true, maxRetries: process.platform === 'win32' ? 10 : 0 })\"",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "bash .github/scripts/prepare-marketplace-readme.sh && npm run compile",
     "compile": "npm run clean && tsc -p ./",
     "watch": "npm run clean && tsc -watch -p ./",
     "lint": "oxlint",
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/",
-    "package": "vsce package -o dist/",
-    "publish": "vsce publish",
+    "package": "vsce package --readme-path dist/README.marketplace.md -o dist/",
     "login": "vsce login Vizards"
   },
   "devDependencies": {

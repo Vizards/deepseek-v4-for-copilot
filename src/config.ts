@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { CONFIG_SECTION } from './consts';
 
-export type DebugMode = 'off' | 'metadata' | 'requestDump';
+export type DebugMode = 'minimal' | 'metadata' | 'verbose';
 
 /**
  * Get DeepSeek API base URL from settings.
@@ -37,7 +37,7 @@ export function getMaxTokens(): number | undefined {
 }
 
 /**
- * Diagnostic mode. `requestDump` also enables metadata logs.
+ * Diagnostic mode. `verbose` also enables metadata logs.
  *
  * The legacy boolean `debug` setting is still read as a fallback so old
  * settings keep working even if migration cannot update every scope.
@@ -47,37 +47,28 @@ export function getDebugMode(): DebugMode {
 	const mode = getConfiguredDebugMode(config);
 	if (mode) return mode;
 
-	return config.get<boolean>('debug', false) ? 'metadata' : 'off';
+	return config.get<boolean>('debug', false) ? 'metadata' : 'minimal';
 }
 
 /**
  * Whether to log privacy-preserving diagnostic debug information.
  */
 export function getDebugLoggingEnabled(): boolean {
-	return getDebugMode() !== 'off';
+	return getDebugMode() !== 'minimal';
 }
 
 /**
  * Whether to write full DeepSeek request payloads to disk.
  */
 export function getRequestDumpEnabled(): boolean {
-	return getDebugMode() === 'requestDump';
-}
-
-/**
- * Optional directory for full request dumps. Empty means extension global storage.
- */
-export function getRequestDumpDirectory(): string | undefined {
-	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	const directory = config.get<string>('requestDumpDirectory', '').trim();
-	return directory || undefined;
+	return getDebugMode() === 'verbose';
 }
 
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *
  * `debug: true` maps to `debugMode: metadata`; `debug: false` maps to the
- * default `off`, so it only needs cleanup.
+ * default `minimal`, so it only needs cleanup.
  */
 export async function migrateLegacyDebugSetting(): Promise<void> {
 	await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.Global);
@@ -100,7 +91,7 @@ function getConfiguredDebugMode(config: vscode.WorkspaceConfiguration): DebugMod
 }
 
 function normalizeDebugMode(value: unknown): DebugMode | undefined {
-	if (value === 'off' || value === 'metadata' || value === 'requestDump') {
+	if (value === 'minimal' || value === 'metadata' || value === 'verbose') {
 		return value;
 	}
 	return undefined;

@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { getDebugMode, migrateLegacyDebugSetting } from './config';
-import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
+import { CONFIG_SECTION, WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
@@ -18,6 +18,18 @@ export async function activate(context: vscode.ExtensionContext) {
 	logger.info(
 		`Activating extension version=${context.extension.packageJSON.version}` +
 			` debugMode=${getDebugMode()}`,
+	);
+
+	// Log debugMode changes so users can trace when verbosity was toggled
+	let currentDebugMode = getDebugMode();
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration((e) => {
+			if (e.affectsConfiguration(`${CONFIG_SECTION}.debugMode`)) {
+				const previous = currentDebugMode;
+				currentDebugMode = getDebugMode();
+				logger.info(`debugMode changed: ${previous} -> ${currentDebugMode}`);
+			}
+		}),
 	);
 
 	context.subscriptions.push(

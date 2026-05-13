@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
 	createPostToolReasoningKey,
@@ -8,6 +9,7 @@ import {
 } from './cache';
 import { observeCancellationToken, type CacheDiagnosticsRun } from './diagnostics';
 import type { PreparedChatRequest } from './request';
+import { createSegmentMarkerPart } from './segment';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
@@ -84,9 +86,41 @@ export function streamChatCompletion({
 			},
 			token,
 		)
+		.then(undefined, (error) => {
+			prepared.cacheDiagnostics.onSegmentMarkerReport({
+				segment: prepared.segment,
+				status: 'skipped',
+				reason: token.isCancellationRequested ? 'cancelled' : 'stream-error',
+				error,
+			});
+			throw error;
+		})
+		.then(() => {
+			reportConversationSegmentMarker(prepared, progress);
+		})
 		.finally(() => {
 			cancelListener.dispose();
 		});
+}
+
+function reportConversationSegmentMarker(
+	prepared: PreparedChatRequest,
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+): void {
+	try {
+		progress.report(createSegmentMarkerPart(prepared.segment.segmentId));
+		prepared.cacheDiagnostics.onSegmentMarkerReport({
+			segment: prepared.segment,
+			status: 'reported',
+		});
+	} catch (error) {
+		prepared.cacheDiagnostics.onSegmentMarkerReport({
+			segment: prepared.segment,
+			status: 'failed',
+			error,
+		});
+		logger.warn('Failed to report conversation segment marker', error);
+	}
 }
 
 function handleThinking(

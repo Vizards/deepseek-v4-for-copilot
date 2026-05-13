@@ -102,8 +102,7 @@ Both support optional thinking mode, tool calling, and 1M token context.
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = no limit). Useful for cost control |
 | `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
-| `deepseek-copilot.debugMode` | `off` | Diagnostic mode: `off`, `metadata` for privacy-preserving logs, or `requestDump` for full request dumps and pipeline snapshots grouped by Copilot Chat session when available. Use `DeepSeek: Open Request Dumps Folder` to open the active dump location |
-| `deepseek-copilot.requestDumpDirectory` | *(global storage)* | Directory for full request dumps and pipeline snapshots when `debugMode` is `requestDump`. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the active dump location |
+| `deepseek-copilot.debugMode` | `minimal` | Diagnostic mode: `minimal` for token usage only, `metadata` for privacy-preserving logs, or `verbose` for full request dumps and pipeline snapshots under extension global storage. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the dump location |
 | `deepseek-copilot.visionModel` | *(auto)* | Which Copilot model to proxy images through |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |
 

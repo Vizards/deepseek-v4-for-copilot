@@ -4,6 +4,7 @@ import { getDebugLoggingEnabled } from '../config';
 import { IMAGE_DESCRIPTION_UNAVAILABLE, MAX_CACHE_SIZE } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
+import type { ConversationSegment } from './segment';
 import type { VisionDescriptionCacheStats } from './vision/index';
 
 const LARGE_MESSAGE_CHARS = 10_000;
@@ -83,7 +84,7 @@ export interface CacheTraceToolSummary {
 
 export interface CacheTraceSnapshot {
 	fingerprint: string;
-	conversationKey: string;
+	cacheTraceKey: string;
 	redactedComparisonInput: string;
 	toolsHash: string;
 	toolNames: string[];
@@ -110,6 +111,7 @@ export interface CacheTraceComparison {
 
 export interface BeginCacheDiagnosticsOptions {
 	request: DeepSeekRequest;
+	segment: ConversationSegment;
 	vscodeModelId: string;
 	isThinkingModel: boolean;
 	thinkingEffort: string;
@@ -131,7 +133,17 @@ export interface CacheDiagnosticsDoneInfo {
 export interface CacheDiagnosticsRun {
 	onDone(info: CacheDiagnosticsDoneInfo): void;
 	onCancellationTokenRequested(): void;
+	onSegmentMarkerReport(info: SegmentMarkerReportInfo): void;
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void;
+}
+
+export type SegmentMarkerReportStatus = 'reported' | 'failed' | 'skipped';
+
+export interface SegmentMarkerReportInfo {
+	segment: ConversationSegment;
+	status: SegmentMarkerReportStatus;
+	reason?: 'cancelled' | 'stream-error';
+	error?: unknown;
 }
 
 export function observeCancellationToken(
@@ -186,7 +198,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 
 	logReasoningCacheCleared(removed: number): void {
 		if (removed > 0 && this.isEnabled()) {
-			logger.info(`reasoning-cache cleared entries=${removed} reason=conversation-start`);
+			logger.info(`reasoning-cache cleared entries=${removed} reason=short-history`);
 		}
 	}
 
@@ -198,12 +210,12 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 
 		const requestId = (this.requestId += 1);
 		const cacheTrace = createCacheTraceSnapshot(options.request);
-		const previousCacheTrace = this.previousCacheTraces.get(cacheTrace.conversationKey);
+		const previousCacheTrace = this.previousCacheTraces.get(cacheTrace.cacheTraceKey);
 		const previousImmediateCacheTrace = this.lastCacheTrace;
 		const cacheTraceComparison = compareCacheTraceSnapshots(previousCacheTrace, cacheTrace);
-		const conversationChangeComparison =
+		const traceKeyChangeComparison =
 			previousImmediateCacheTrace &&
-			previousImmediateCacheTrace.conversationKey !== cacheTrace.conversationKey
+			previousImmediateCacheTrace.cacheTraceKey !== cacheTrace.cacheTraceKey
 				? compareCacheTraceSnapshots(previousImmediateCacheTrace, cacheTrace)
 				: undefined;
 		const visionResolution = summarizeVisionResolution(
@@ -215,6 +227,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		logger.info(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
 		logger.info(
 			`[cache-trace #${requestId}] request vscodeModel=${options.vscodeModelId}` +
+				formatSegmentTrace(options.segment) +
 				` apiModel=${options.request.model}` +
 				` thinking=${options.isThinkingModel}` +
 				` thinkingEffort=${options.thinkingEffort}` +
@@ -245,21 +258,19 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				logger.warn(`[cache-trace #${requestId}] ${warning}`);
 			}
 		}
-		if (conversationChangeComparison && previousImmediateCacheTrace) {
+		if (traceKeyChangeComparison && previousImmediateCacheTrace) {
 			logger.info(
-				`[cache-trace #${requestId}] ${formatCacheTraceConversationChangeComparison(
-					previousImmediateCacheTrace.conversationKey,
-					cacheTrace.conversationKey,
-					conversationChangeComparison,
+				`[cache-trace #${requestId}] ${formatCacheTraceKeyChangeComparison(
+					previousImmediateCacheTrace.cacheTraceKey,
+					cacheTrace.cacheTraceKey,
+					traceKeyChangeComparison,
 				)}`,
 			);
-			for (const detailLine of formatCacheTraceComparisonDetailLines(
-				conversationChangeComparison,
-			)) {
-				logger.info(`[cache-trace #${requestId}] conversationChanged ${detailLine}`);
+			for (const detailLine of formatCacheTraceComparisonDetailLines(traceKeyChangeComparison)) {
+				logger.info(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
 			}
-			for (const warning of getCacheTraceComparisonWarnings(conversationChangeComparison)) {
-				logger.warn(`[cache-trace #${requestId}] conversationChanged fallback diff: ${warning}`);
+			for (const warning of getCacheTraceComparisonWarnings(traceKeyChangeComparison)) {
+				logger.warn(`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`);
 			}
 		}
 		for (const warning of getCacheTraceWarnings(
@@ -273,7 +284,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			this,
 			requestId,
 			cacheTrace,
-			cacheTraceComparison ?? conversationChangeComparison,
+			cacheTraceComparison ?? traceKeyChangeComparison,
 			cacheTraceComparison ? 'summaryPrefixVsPrevious' : 'fallbackSummaryPrefixVsPrevious',
 		);
 	}
@@ -285,8 +296,8 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 
 	rememberCacheTrace(snapshot: CacheTraceSnapshot): void {
 		this.lastCacheTrace = snapshot;
-		this.previousCacheTraces.delete(snapshot.conversationKey);
-		this.previousCacheTraces.set(snapshot.conversationKey, snapshot);
+		this.previousCacheTraces.delete(snapshot.cacheTraceKey);
+		this.previousCacheTraces.set(snapshot.cacheTraceKey, snapshot);
 
 		while (this.previousCacheTraces.size > 50) {
 			const oldestKey = this.previousCacheTraces.keys().next().value;
@@ -339,6 +350,10 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 		this.cancellationLogged = true;
 		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
 	}
+
+	onSegmentMarkerReport(info: SegmentMarkerReportInfo): void {
+		logger.info(`[cache-trace #${this.requestId}] ${formatSegmentMarkerReport(info)}`);
+	}
 }
 
 class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
@@ -346,9 +361,46 @@ class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
 
 	onCancellationTokenRequested(): void {}
 
+	onSegmentMarkerReport(_info: SegmentMarkerReportInfo): void {}
+
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void {
 		logUsage(usage, charsPerToken);
 	}
+}
+
+function formatSegmentTrace(segment: ConversationSegment): string {
+	const markerLocation =
+		segment.markerMessageIndex === undefined || segment.markerPartIndex === undefined
+			? ''
+			: ` segmentMarkerAt=message#${segment.markerMessageIndex}:part#${segment.markerPartIndex}`;
+	const markerError = segment.markerError ? ` segmentMarkerError=${segment.markerError}` : '';
+	return ` segment=${segment.segmentId} segmentReason=${segment.reason}${markerLocation}${markerError}`;
+}
+
+function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
+	const reason = info.reason ? ` reason=${info.reason}` : '';
+	const error = info.error ? ` error=${formatError(info.error)}` : '';
+	return (
+		`segmentMarker status=${info.status}` +
+		` segment=${info.segment.segmentId}` +
+		` segmentReason=${info.segment.reason}` +
+		reason +
+		error
+	);
+}
+
+function formatError(error: unknown): string {
+	if (error instanceof Error) {
+		return sanitizeLogValue(error.message || error.name);
+	}
+	if (typeof error === 'string') {
+		return sanitizeLogValue(error);
+	}
+	return sanitizeLogValue(String(error));
+}
+
+function sanitizeLogValue(value: string): string {
+	return value.replace(/\s+/g, ' ').slice(0, 200);
 }
 
 function logUsage(usage: DeepSeekUsage, charsPerToken: number, requestId?: number): void {
@@ -627,7 +679,7 @@ export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSn
 
 	return {
 		fingerprint: hashString(redactedComparisonInput),
-		conversationKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
+		cacheTraceKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
 		redactedComparisonInput,
 		toolsHash: hashString(toolsSerialized),
 		toolNames: request.tools?.map((tool) => tool.function.name) ?? [],
@@ -708,7 +760,7 @@ export function compareCacheTraceSnapshots(
 export function formatCacheTraceSnapshot(snapshot: CacheTraceSnapshot): string {
 	const stats = snapshot.stats;
 	return (
-		`fingerprint=${snapshot.fingerprint} conversation=${snapshot.conversationKey}` +
+		`fingerprint=${snapshot.fingerprint} cacheTraceKey=${snapshot.cacheTraceKey}` +
 		` messages=${stats.messageCount} tools=${stats.toolCount}` +
 		` chars(content=${stats.totalContentChars},toolArgs=${stats.toolCallArgumentChars},reasoning=${stats.reasoningChars})` +
 		` assistantToolMessages=${stats.assistantToolCallMessages}` +
@@ -764,9 +816,9 @@ export function formatCacheTraceComparison(comparison: CacheTraceComparison): st
 	);
 }
 
-export function formatCacheTraceConversationChangeComparison(
-	previousConversationKey: string,
-	currentConversationKey: string,
+export function formatCacheTraceKeyChangeComparison(
+	previousCacheTraceKey: string,
+	currentCacheTraceKey: string,
 	comparison: CacheTraceComparison,
 ): string {
 	const changedMessage =
@@ -780,7 +832,7 @@ export function formatCacheTraceConversationChangeComparison(
 		: '';
 
 	return (
-		`conversationChanged=true prev=${previousConversationKey} curr=${currentConversationKey}` +
+		`cacheTraceKeyChanged=true prev=${previousCacheTraceKey} curr=${currentCacheTraceKey}` +
 		` fallbackSummaryPrefixVsPrevious chars=${comparison.commonPrefixSummaryChars}` +
 		` percent=${comparison.commonPrefixSummaryPercent.toFixed(1)}%` +
 		` toolsChanged=${comparison.toolsChanged}` +

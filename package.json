@@ -121,26 +121,6 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
-        "deepseek-copilot.debugMode": {
-          "type": "string",
-          "default": "off",
-          "enum": [
-            "off",
-            "metadata",
-            "requestDump"
-          ],
-          "enumDescriptions": [
-            "%deepseek-copilot.config.debugMode.off.description%",
-            "%deepseek-copilot.config.debugMode.metadata.description%",
-            "%deepseek-copilot.config.debugMode.requestDump.description%"
-          ],
-          "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
-        },
-        "deepseek-copilot.requestDumpDirectory": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "%deepseek-copilot.config.requestDumpDirectory.description%"
-        },
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
@@ -170,6 +150,26 @@
           "editPresentation": "multilineText",
           "default": "Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.",
           "description": "%deepseek-copilot.config.visionPrompt.description%"
+        },
+        "deepseek-copilot.debugMode": {
+          "type": "string",
+          "default": "minimal",
+          "enum": [
+            "minimal",
+            "metadata",
+            "verbose"
+          ],
+          "enumItemLabels": [
+            "%deepseek-copilot.config.debugMode.minimal.label%",
+            "%deepseek-copilot.config.debugMode.metadata.label%",
+            "%deepseek-copilot.config.debugMode.verbose.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%deepseek-copilot.config.debugMode.minimal.description%",
+            "%deepseek-copilot.config.debugMode.metadata.description%",
+            "%deepseek-copilot.config.debugMode.verbose.description%"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
         }
       }
     }

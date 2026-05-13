@@ -4,6 +4,7 @@ import { WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
+import { TokenUsageTracker, createStatusBarItem } from './tokenUsage';
 
 let activeProvider: DeepSeekChatProvider | undefined;
 
@@ -24,7 +25,13 @@ export async function activate(context: vscode.ExtensionContext) {
 	);
 
 	try {
-		const provider = new DeepSeekChatProvider(context);
+		// Create session-scoped token usage tracker.
+		const tokenUsageTracker = new TokenUsageTracker();
+
+		// Create and register the status bar item (pushed into subscriptions).
+		createStatusBarItem(context, tokenUsageTracker);
+
+		const provider = new DeepSeekChatProvider(context, tokenUsageTracker);
 		activeProvider = provider;
 
 		context.subscriptions.push(

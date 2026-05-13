@@ -1,10 +1,11 @@
 import vscode from 'vscode';
+import type { TokenUsageTracker } from '../tokenUsage';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
-	createPostToolReasoningKey,
-	createToolReasoningKey,
-	pruneReasoningCache,
-	type ReasoningEntry,
+    createPostToolReasoningKey,
+    createToolReasoningKey,
+    pruneReasoningCache,
+    type ReasoningEntry,
 } from './cache';
 import { observeCancellationToken, type CacheDiagnosticsRun } from './diagnostics';
 import type { PreparedChatRequest } from './request';
@@ -23,6 +24,7 @@ export interface StreamChatCompletionOptions {
 	reasoningCache: Map<string, ReasoningEntry>;
 	getCharsPerToken: () => number;
 	setCharsPerToken: (charsPerToken: number) => void;
+	tokenUsageTracker?: TokenUsageTracker;
 }
 
 export function streamChatCompletion({
@@ -32,6 +34,7 @@ export function streamChatCompletion({
 	reasoningCache,
 	getCharsPerToken,
 	setCharsPerToken,
+	tokenUsageTracker,
 }: StreamChatCompletionOptions): Promise<void> {
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
@@ -72,6 +75,7 @@ export function streamChatCompletion({
 				},
 
 				onUsage: (usage) => {
+					tokenUsageTracker?.add(usage);
 					const charsPerToken = updateCharsPerToken(
 						prepared.totalRequestChars,
 						usage,

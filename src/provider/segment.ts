@@ -1,9 +1,14 @@
 import { randomUUID } from 'crypto';
 import vscode from 'vscode';
+import { MODELS } from '../consts';
 
 export const SEGMENT_MARKER_MIME = 'stateful_marker';
 
 const SEGMENT_MARKER_MODEL_ID = 'deepseek-copilot';
+const SEGMENT_MARKER_PREFIXES = new Set([
+	SEGMENT_MARKER_MODEL_ID,
+	...MODELS.map((model) => model.id),
+]);
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -83,7 +88,7 @@ export function parseSegmentMarkerData(data: Uint8Array): SegmentMarkerParseResu
 	}
 
 	const markerPrefix = decoded.slice(0, separatorIndex);
-	if (markerPrefix !== SEGMENT_MARKER_MODEL_ID) {
+	if (!SEGMENT_MARKER_PREFIXES.has(markerPrefix)) {
 		return { valid: false, error: 'marker-prefix-mismatch' };
 	}
 

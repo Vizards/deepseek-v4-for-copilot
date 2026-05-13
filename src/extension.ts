@@ -96,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 async function openRequestDumpsFolder(context: vscode.ExtensionContext): Promise<void> {
 	try {
-		const root = ensureRequestDumpRoot(context.globalStorageUri);
+		const root = await ensureRequestDumpRoot(context.globalStorageUri);
 		logger.info(`Opening request dumps folder: ${root}`);
 		const opened = await vscode.env.openExternal(vscode.Uri.file(root));
 		if (!opened) {

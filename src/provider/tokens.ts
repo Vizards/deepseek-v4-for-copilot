@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { IMAGE_DESCRIPTION_PREFIX, IMAGE_DESCRIPTION_SUFFIX } from '../consts';
+import { SEGMENT_MARKER_MIME } from './segment';
 import { computeDataHash, getCachedDescriptionByDataHash } from './vision/cache';
 
 /**
@@ -40,6 +41,10 @@ function estimatePartChars(part: unknown): number {
 	//    by the vision pipeline; raw byteLength would massively overestimate.
 	if (part instanceof vscode.LanguageModelDataPart) {
 		const mime = part.mimeType;
+		if (mime === SEGMENT_MARKER_MIME) {
+			return 0;
+		}
+
 		// Images: try the vision description cache first. If this image was
 		// already resolved, the cached description length is the most accurate
 		// estimate of what the model will actually receive.

@@ -1,7 +1,11 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { getDebugLoggingEnabled } from '../config';
-import { IMAGE_DESCRIPTION_UNAVAILABLE, MAX_CACHE_SIZE } from '../consts';
+import {
+	IMAGE_DESCRIPTION_UNAVAILABLE,
+	LANGUAGE_MODEL_CHAT_SYSTEM_ROLE,
+	MAX_CACHE_SIZE,
+} from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
 import type { ConversationSegment } from './segment';
@@ -574,12 +578,7 @@ function formatVscodeMessageTrace(
 
 	return messages
 		.map((msg, index) => {
-			const role =
-				msg.role === vscode.LanguageModelChatMessageRole.User
-					? 'user'
-					: msg.role === vscode.LanguageModelChatMessageRole.Assistant
-						? 'assistant'
-						: 'unknown';
+			const role = formatVscodeMessageRole(msg.role);
 			let textChars = 0;
 			let imageParts = 0;
 			let toolCallParts = 0;
@@ -643,6 +642,13 @@ function formatVscodeMessageTrace(
 			return `${role}#${index}:chars=${textChars}${suffix}`;
 		})
 		.join(' | ');
+}
+
+function formatVscodeMessageRole(role: vscode.LanguageModelChatMessageRole): string {
+	if (role === vscode.LanguageModelChatMessageRole.User) return 'user';
+	if (role === vscode.LanguageModelChatMessageRole.Assistant) return 'assistant';
+	if (role === LANGUAGE_MODEL_CHAT_SYSTEM_ROLE) return 'system';
+	return 'unknown';
 }
 
 function isLanguageModelThinkingPart(part: unknown): part is vscode.LanguageModelThinkingPart {

@@ -1,9 +1,10 @@
 import { createHash } from 'crypto';
-import { appendFileSync, mkdirSync, writeFileSync } from 'fs';
+import { appendFile, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import vscode from 'vscode';
 import { getRequestDumpEnabled } from '../config';
+import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
 import { safeStringify, toWellFormedString } from '../json';
 import { logger } from '../logger';
 import type { DeepSeekRequest } from '../types';
@@ -12,9 +13,39 @@ import type { VisionDescriptionCacheStats } from './vision/index';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
+let dumpWriteQueue: Promise<void> = Promise.resolve();
 
 const ACTIVATE_TOOL_PREFIX = 'activate_';
 const REQUEST_OBSERVATIONS_FILE = '_request-observations.jsonl';
+
+type DumpEvent = 'provider-input' | 'deepseek-request';
+type DumpStage = 'provider-input' | 'input' | 'resolved';
+
+interface DumpContext {
+	root: string;
+	timestamp: string;
+	basename: string;
+}
+
+interface ProviderInputDumpPaths {
+	directory: string;
+	providerInput: string;
+}
+
+interface RequestDumpPaths {
+	directory: string;
+	input: string;
+	resolved: string;
+	request: string;
+	msg0?: string;
+}
+
+interface ToolSummary {
+	toolCount: number;
+	toolNames: string[];
+	activateToolCount: number;
+	activateToolNames: string[];
+}
 
 export interface DumpDeepSeekRequestOptions {
 	globalStorageUri: vscode.Uri;
@@ -46,46 +77,36 @@ export interface DumpProviderInputOptions {
 export function dumpProviderInput(options: DumpProviderInputOptions): void {
 	if (!getRequestDumpEnabled()) return;
 
-	const root = getRequestDumpRoot(options.globalStorageUri, options.segment);
+	const context = createDumpContext(
+		options.globalStorageUri,
+		options.segment,
+		'deepseek-provider-input',
+		(providerInputDumpCounter += 1),
+	);
+	const paths = createProviderInputDumpPaths(context);
+	const toolSummary = summarizeTools(options.requestOptions.tools);
 
-	try {
-		const seq = (providerInputDumpCounter += 1);
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-		const basename = `deepseek-provider-input-${timestamp}-${String(seq).padStart(4, '0')}`;
-		mkdirSync(root, { recursive: true });
+	enqueueDumpWrite('providerInputDump', async () => {
+		await mkdir(context.root, { recursive: true });
+		await writeJsonFile(paths.providerInput, createProviderInputSnapshot(options, context));
 
-		const inputPath = join(root, `${basename}.json`);
-		const snapshot = createProviderInputSnapshot(options, timestamp, basename);
-		writeFileSync(inputPath, safeStringify(snapshot), 'utf-8');
-
-		const toolNames = getToolNames(options.requestOptions.tools);
-		const activateToolNames = getActivateToolNames(toolNames);
-		writeDumpObservation(options.globalStorageUri, {
-			event: 'provider-input',
-			timestamp,
-			basename,
-			segment: options.segment,
-			paths: {
-				directory: root,
-				providerInput: inputPath,
-			},
-			model: {
-				vscodeModelId: options.modelInfo.id,
-			},
-			options: summarizeRequestOptions(options.requestOptions),
-			messageStats: summarizeMessagesFromInput(options.messages),
-			toolStats: summarizeTools(options.requestOptions.tools),
-		});
-		logger.info(
-			`providerInputDump written: segment=${options.segment.segmentId}` +
-				` reason=${options.segment.reason} input=${inputPath} ` +
-				`(${options.messages.length} msgs, ${toolNames.length} tools, ` +
-				`activateTools=${activateToolNames.length}${formatActivateToolNames(activateToolNames)})`,
+		await writeDumpObservation(
+			options.globalStorageUri,
+			createDumpObservation({
+				event: 'provider-input',
+				context,
+				segment: options.segment,
+				paths,
+				model: {
+					vscodeModelId: options.modelInfo.id,
+				},
+				requestOptions: options.requestOptions,
+				messages: options.messages,
+				toolSummary,
+			}),
 		);
-	} catch (err) {
-		// best-effort; never let a dump write break the request pipeline
-		logger.warn('providerInputDump write failed', err);
-	}
+		logProviderInputDump(options, paths, toolSummary);
+	});
 }
 
 /**
@@ -106,98 +127,122 @@ export function dumpDeepSeekRequest(
 ): void {
 	if (!getRequestDumpEnabled()) return;
 
-	const root = getRequestDumpRoot(options.globalStorageUri, options.segment);
+	const context = createDumpContext(
+		options.globalStorageUri,
+		options.segment,
+		'deepseek-request',
+		(dumpCounter += 1),
+	);
+	const msg0 = request.messages[0];
+	const paths = createRequestDumpPaths(context, Boolean(msg0));
+	const toolSummary = summarizeTools(options.requestOptions.tools);
 
-	try {
-		const seq = (dumpCounter += 1);
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-		const basename = `deepseek-request-${timestamp}-${String(seq).padStart(4, '0')}`;
-		mkdirSync(root, { recursive: true });
-
-		const inputPath = join(root, `${basename}.input.json`);
-		const inputSnapshot = createPipelineSnapshot(
-			'input',
-			timestamp,
-			basename,
-			request,
-			options.inputMessages,
-			options,
+	enqueueDumpWrite('requestDump', async () => {
+		await mkdir(context.root, { recursive: true });
+		await writeJsonFile(
+			paths.input,
+			createPipelineSnapshot('input', request, options.inputMessages, options, context),
 		);
-		writeFileSync(inputPath, safeStringify(inputSnapshot), 'utf-8');
-
-		const resolvedPath = join(root, `${basename}.resolved.json`);
-		const resolvedSnapshot = createPipelineSnapshot(
-			'resolved',
-			timestamp,
-			basename,
-			request,
-			options.resolvedMessages,
-			options,
+		await writeJsonFile(
+			paths.resolved,
+			createPipelineSnapshot('resolved', request, options.resolvedMessages, options, context),
 		);
-		writeFileSync(resolvedPath, safeStringify(resolvedSnapshot), 'utf-8');
 
-		// Full request JSON
-		const jsonPath = join(root, `${basename}.json`);
-		writeFileSync(jsonPath, JSON.stringify(request, null, 2), 'utf-8');
+		const requestJson = await writeJsonFile(paths.request, request, (value) =>
+			JSON.stringify(value, null, 2),
+		);
 
-		// messages[0] sidecar — so you can check whether the system prompt changed
-		const msg0 = request.messages[0];
-		if (msg0) {
-			const msg0Path = join(root, `${basename}.msg0.txt`);
-			writeFileSync(msg0Path, msg0.content, 'utf-8');
+		if (msg0 && paths.msg0) {
+			await writeTextFile(paths.msg0, msg0.content);
 		}
 
-		writeDumpObservation(options.globalStorageUri, {
-			event: 'deepseek-request',
-			timestamp,
-			basename,
-			segment: options.segment,
-			paths: {
-				directory: root,
-				input: inputPath,
-				resolved: resolvedPath,
-				request: jsonPath,
-				msg0: msg0 ? join(root, `${basename}.msg0.txt`) : undefined,
-			},
-			model: {
-				vscodeModelId: options.vscodeModelId,
-				apiModelId: request.model,
-			},
-			options: summarizeRequestOptions(options.requestOptions),
-			messageStats: summarizeMessagesFromInput(options.inputMessages),
-			toolStats: summarizeTools(options.requestOptions.tools),
-		});
-		logger.info(
-			`requestDump written: segment=${options.segment.segmentId}` +
-				` reason=${options.segment.reason} request=${jsonPath} ` +
-				`input=${inputPath} resolved=${resolvedPath} ` +
-				`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
-				`~${(JSON.stringify(request).length / 1024).toFixed(0)} KB)`,
+		await writeDumpObservation(
+			options.globalStorageUri,
+			createDumpObservation({
+				event: 'deepseek-request',
+				context,
+				segment: options.segment,
+				paths,
+				model: {
+					vscodeModelId: options.vscodeModelId,
+					apiModelId: request.model,
+				},
+				requestOptions: options.requestOptions,
+				messages: options.inputMessages,
+				toolSummary,
+			}),
 		);
-	} catch (err) {
-		// best-effort; never let a dump write break the request pipeline
-		logger.warn('requestDump write failed', err);
-	}
+		logRequestDump(request, options, paths, requestJson.length);
+	});
 }
 
-export function ensureRequestDumpRoot(globalStorageUri: vscode.Uri): string {
+export async function ensureRequestDumpRoot(globalStorageUri: vscode.Uri): Promise<string> {
 	const root = getRequestDumpRoot(globalStorageUri);
-	mkdirSync(root, { recursive: true });
+	await mkdir(root, { recursive: true });
 	return root;
+}
+
+function createDumpContext(
+	globalStorageUri: vscode.Uri,
+	segment: ConversationSegment,
+	prefix: string,
+	seq: number,
+): DumpContext {
+	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+	return {
+		root: getRequestDumpRoot(globalStorageUri, segment),
+		timestamp,
+		basename: `${prefix}-${timestamp}-${String(seq).padStart(4, '0')}`,
+	};
+}
+
+function createProviderInputDumpPaths(context: DumpContext): ProviderInputDumpPaths {
+	return {
+		directory: context.root,
+		providerInput: join(context.root, `${context.basename}.json`),
+	};
+}
+
+function createRequestDumpPaths(context: DumpContext, hasMsg0: boolean): RequestDumpPaths {
+	return {
+		directory: context.root,
+		input: join(context.root, `${context.basename}.input.json`),
+		resolved: join(context.root, `${context.basename}.resolved.json`),
+		request: join(context.root, `${context.basename}.json`),
+		msg0: hasMsg0 ? join(context.root, `${context.basename}.msg0.txt`) : undefined,
+	};
+}
+
+function createDumpObservation(options: {
+	event: DumpEvent;
+	context: DumpContext;
+	segment: ConversationSegment;
+	paths: ProviderInputDumpPaths | RequestDumpPaths;
+	model: object;
+	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
+	messages: readonly vscode.LanguageModelChatRequestMessage[];
+	toolSummary: ToolSummary;
+}): object {
+	return {
+		event: options.event,
+		timestamp: options.context.timestamp,
+		basename: options.context.basename,
+		segment: options.segment,
+		paths: options.paths,
+		model: options.model,
+		options: summarizeRequestOptions(options.requestOptions),
+		messageStats: summarizeMessagesFromInput(options.messages),
+		toolStats: options.toolSummary,
+	};
 }
 
 function createProviderInputSnapshot(
 	options: DumpProviderInputOptions,
-	timestamp: string,
-	basename: string,
+	context: DumpContext,
 ): object {
-	const serializedMessages = options.messages.map((message, index) =>
-		serializeMessage(message, index),
-	);
-	return {
+	return createDumpSnapshot({
 		stage: 'provider-input',
-		timestamp,
-		basename,
+		context,
 		segment: options.segment,
 		model: {
 			vscodeModelId: options.modelInfo.id,
@@ -208,27 +253,21 @@ function createProviderInputSnapshot(
 			maxOutputTokens: options.modelInfo.maxOutputTokens,
 			capabilities: sanitizeJsonValue(options.modelInfo.capabilities),
 		},
-		options: summarizeRequestOptions(options.requestOptions),
-		messageStats: summarizeMessages(serializedMessages),
-		messages: serializedMessages,
-		toolStats: summarizeTools(options.requestOptions.tools),
-		tools: serializeTools(options.requestOptions.tools),
-	};
+		messages: options.messages,
+		requestOptions: options.requestOptions,
+	});
 }
 
 function createPipelineSnapshot(
 	stage: 'input' | 'resolved',
-	timestamp: string,
-	basename: string,
 	request: DeepSeekRequest,
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	options: DumpDeepSeekRequestOptions,
+	context: DumpContext,
 ): object {
-	const serializedMessages = messages.map((message, index) => serializeMessage(message, index));
-	return {
+	return createDumpSnapshot({
 		stage,
-		timestamp,
-		basename,
+		context,
 		segment: options.segment,
 		model: {
 			vscodeModelId: options.vscodeModelId,
@@ -237,7 +276,6 @@ function createPipelineSnapshot(
 			thinkingEffort: options.thinkingEffort,
 			maxTokens: options.maxTokens ?? null,
 		},
-		options: summarizeRequestOptions(options.requestOptions),
 		vision:
 			stage === 'resolved'
 				? {
@@ -245,6 +283,31 @@ function createPipelineSnapshot(
 						stats: options.visionCacheStats ?? null,
 					}
 				: undefined,
+		messages,
+		requestOptions: options.requestOptions,
+	});
+}
+
+function createDumpSnapshot(options: {
+	stage: DumpStage;
+	context: DumpContext;
+	segment: ConversationSegment;
+	model: object;
+	vision?: object;
+	messages: readonly vscode.LanguageModelChatRequestMessage[];
+	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
+}): object {
+	const serializedMessages = options.messages.map((message, index) =>
+		serializeMessage(message, index),
+	);
+	return {
+		stage: options.stage,
+		timestamp: options.context.timestamp,
+		basename: options.context.basename,
+		segment: options.segment,
+		model: options.model,
+		options: summarizeRequestOptions(options.requestOptions),
+		vision: options.vision,
 		messageStats: summarizeMessages(serializedMessages),
 		messages: serializedMessages,
 		toolStats: summarizeTools(options.requestOptions.tools),
@@ -464,7 +527,7 @@ function summarizeMessagesFromInput(
 	return summarizeMessages(messages.map((message, index) => serializeMessage(message, index)));
 }
 
-function summarizeTools(tools: readonly vscode.LanguageModelChatTool[] | undefined): object {
+function summarizeTools(tools: readonly vscode.LanguageModelChatTool[] | undefined): ToolSummary {
 	const toolNames = getToolNames(tools);
 	const activateToolNames = getActivateToolNames(toolNames);
 	return {
@@ -539,6 +602,7 @@ function flattenContentParts(parts: readonly SerializedContentPart[]): Serialize
 function formatRole(role: vscode.LanguageModelChatMessageRole): string {
 	if (role === vscode.LanguageModelChatMessageRole.User) return 'user';
 	if (role === vscode.LanguageModelChatMessageRole.Assistant) return 'assistant';
+	if (role === LANGUAGE_MODEL_CHAT_SYSTEM_ROLE) return 'system';
 	return String(role);
 }
 
@@ -592,13 +656,66 @@ function hashBytes(value: Uint8Array): string {
 	return createHash('sha256').update(value).digest('hex');
 }
 
-function writeDumpObservation(globalStorageUri: vscode.Uri, observation: object): void {
+async function writeJsonFile<T>(
+	filePath: string,
+	value: T,
+	stringify: (value: T) => string = safeStringify,
+): Promise<string> {
+	const content = stringify(value);
+	await writeFile(filePath, content, 'utf-8');
+	return content;
+}
+
+async function writeTextFile(filePath: string, content: string): Promise<void> {
+	await writeFile(filePath, content, 'utf-8');
+}
+
+async function writeDumpObservation(
+	globalStorageUri: vscode.Uri,
+	observation: object,
+): Promise<void> {
 	const baseRoot = getRequestDumpBaseRoot(globalStorageUri);
-	mkdirSync(baseRoot, { recursive: true });
-	appendFileSync(
+	await mkdir(baseRoot, { recursive: true });
+	await appendFile(
 		join(baseRoot, REQUEST_OBSERVATIONS_FILE),
 		`${safeStringify(observation)}\n`,
 		'utf-8',
+	);
+}
+
+function enqueueDumpWrite(label: string, write: () => Promise<void>): void {
+	dumpWriteQueue = dumpWriteQueue.then(write, write).catch((err) => {
+		logger.warn(`${label} write failed`, err);
+	});
+}
+
+function logProviderInputDump(
+	options: DumpProviderInputOptions,
+	paths: ProviderInputDumpPaths,
+	toolSummary: ToolSummary,
+): void {
+	logger.info(
+		`providerInputDump written: segment=${options.segment.segmentId}` +
+			` reason=${options.segment.reason} input=${paths.providerInput} ` +
+			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
+			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
+				toolSummary.activateToolNames,
+			)})`,
+	);
+}
+
+function logRequestDump(
+	request: DeepSeekRequest,
+	options: DumpDeepSeekRequestOptions,
+	paths: RequestDumpPaths,
+	requestJsonLength: number,
+): void {
+	logger.info(
+		`requestDump written: segment=${options.segment.segmentId}` +
+			` reason=${options.segment.reason} request=${paths.request} ` +
+			`input=${paths.input} resolved=${paths.resolved} ` +
+			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
+			`~${(requestJsonLength / 1024).toFixed(0)} KB)`,
 	);
 }
 

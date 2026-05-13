@@ -75,19 +75,11 @@ export async function migrateLegacyDebugSetting(): Promise<void> {
 	if (vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length) {
 		await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.Workspace);
 	}
-
-	for (const folder of vscode.workspace.workspaceFolders ?? []) {
-		await migrateLegacyDebugSettingAtScope(vscode.ConfigurationTarget.WorkspaceFolder, folder.uri);
-	}
 }
 
 function getConfiguredDebugMode(config: vscode.WorkspaceConfiguration): DebugMode | undefined {
 	const mode = config.inspect<unknown>('debugMode');
-	return (
-		normalizeDebugMode(mode?.workspaceFolderValue) ??
-		normalizeDebugMode(mode?.workspaceValue) ??
-		normalizeDebugMode(mode?.globalValue)
-	);
+	return normalizeDebugMode(mode?.workspaceValue) ?? normalizeDebugMode(mode?.globalValue);
 }
 
 function normalizeDebugMode(value: unknown): DebugMode | undefined {
@@ -136,5 +128,5 @@ function getScopedValue<T>(
 	if (target === vscode.ConfigurationTarget.Workspace) {
 		return inspection.workspaceValue;
 	}
-	return inspection.workspaceFolderValue;
+	return undefined;
 }

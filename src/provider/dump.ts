@@ -398,12 +398,13 @@ function serializeMessage(
 
 function serializeContentPart(part: unknown, index: number): SerializedContentPart {
 	if (part instanceof vscode.LanguageModelTextPart) {
+		const value = toWellFormedString(part.value);
 		return {
 			index,
 			type: 'text',
-			value: toWellFormedString(part.value),
-			chars: part.value.length,
-			hash: hashString(part.value),
+			value,
+			chars: value.length,
+			hash: hashString(value),
 		};
 	}
 

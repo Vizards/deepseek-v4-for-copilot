@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.4.1...v0.5.0) (2026-05-13)
+
+
+### Features
+
+* **provider:** add segment-aware request diagnostics ([#66](https://github.com/Vizards/deepseek-v4-for-copilot/issues/66)) ([c20565a](https://github.com/Vizards/deepseek-v4-for-copilot/commit/c20565a5b9555efc5535fbb7897e69e361af7906))
+* report token usage to Copilot context via LanguageModelDataPart ([#60](https://github.com/Vizards/deepseek-v4-for-copilot/issues/60)) ([01ef9e5](https://github.com/Vizards/deepseek-v4-for-copilot/commit/01ef9e5f4134fbb5981a5f2c3dbd75ff6bd8162e))
+
+
+### Bug Fixes
+
+* **provider:** recursively count all part types in provideTokenCount ([#51](https://github.com/Vizards/deepseek-v4-for-copilot/issues/51)) ([1bd8636](https://github.com/Vizards/deepseek-v4-for-copilot/commit/1bd8636d04e98036b76e74d44abd8ac39ee7af1c))
+* remove extensionDependencies on github.copilot-chat for SSH-Remote compatibility ([#45](https://github.com/Vizards/deepseek-v4-for-copilot/issues/45)) ([11d020e](https://github.com/Vizards/deepseek-v4-for-copilot/commit/11d020e196fac5f80b48ae1e2f2314680191f2aa))
+
+
+### Documentation
+
+* add Simplified Chinese README (zh-cn) ([#46](https://github.com/Vizards/deepseek-v4-for-copilot/issues/46)) ([a477c1e](https://github.com/Vizards/deepseek-v4-for-copilot/commit/a477c1ecc6ea1fde1060d685dfce8dfdb97c8996))
+
 ## [0.4.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.4.0...v0.4.1) (2026-05-05)
 
 

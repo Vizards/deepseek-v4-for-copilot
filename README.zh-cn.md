@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/README.md">English</a> |
-  <a href="https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/README.zh-cn.md">简体中文</a>
+  简体中文
 </p>
 
 **在 Copilot Chat 模型选择器中直接使用 DeepSeek V4——无需离开你熟悉的 Copilot 工作流。**

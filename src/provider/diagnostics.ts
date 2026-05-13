@@ -143,9 +143,12 @@ export interface CacheDiagnosticsRun {
 
 export type SegmentMarkerReportStatus = 'reported' | 'failed' | 'skipped';
 
+export type SegmentMarkerReportTrigger = 'first-assistant-part' | 'done';
+
 export interface SegmentMarkerReportInfo {
 	segment: ConversationSegment;
 	status: SegmentMarkerReportStatus;
+	trigger?: SegmentMarkerReportTrigger;
 	reason?: 'cancelled' | 'stream-error';
 	error?: unknown;
 }
@@ -382,12 +385,14 @@ function formatSegmentTrace(segment: ConversationSegment): string {
 }
 
 function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
+	const trigger = info.trigger ? ` trigger=${info.trigger}` : '';
 	const reason = info.reason ? ` reason=${info.reason}` : '';
 	const error = info.error ? ` error=${formatError(info.error)}` : '';
 	return (
 		`segmentMarker status=${info.status}` +
 		` segment=${info.segment.segmentId}` +
 		` segmentReason=${info.segment.reason}` +
+		trigger +
 		reason +
 		error
 	);

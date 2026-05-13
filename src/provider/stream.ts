@@ -7,13 +7,18 @@ import {
 	pruneReasoningCache,
 	type ReasoningEntry,
 } from './cache';
-import { observeCancellationToken, type CacheDiagnosticsRun } from './diagnostics';
+import {
+	observeCancellationToken,
+	type CacheDiagnosticsRun,
+	type SegmentMarkerReportTrigger,
+} from './diagnostics';
 import type { PreparedChatRequest } from './request';
 import { createSegmentMarkerPart } from './segment';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
 	emittedToolCallIds: string[];
+	segmentMarkerReported: boolean;
 }
 
 const COPILOT_USAGE_DATA_PART_MIME = 'usage';
@@ -38,6 +43,7 @@ export function streamChatCompletion({
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
 		emittedToolCallIds: [],
+		segmentMarkerReported: false,
 	};
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics, () => {
 		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningCache);
@@ -48,14 +54,17 @@ export function streamChatCompletion({
 			prepared.request,
 			{
 				onContent: (content: string) => {
+					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
 
 				onThinking: (text: string) => {
+					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleThinking(text, state, progress);
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
+					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleToolCall(toolCall, state, progress);
 				},
 
@@ -64,6 +73,7 @@ export function streamChatCompletion({
 				},
 
 				onDone: () => {
+					reportConversationSegmentMarkerOnce(prepared, progress, state, 'done');
 					finalizeReasoningCache(
 						prepared.isThinkingModel,
 						prepared.trailingToolResultIds,
@@ -87,44 +97,72 @@ export function streamChatCompletion({
 			token,
 		)
 		.then(undefined, (error) => {
-			prepared.cacheDiagnostics.onSegmentMarkerReport({
-				segment: prepared.segment,
-				status: 'skipped',
-				reason: token.isCancellationRequested ? 'cancelled' : 'stream-error',
+			reportSkippedSegmentMarkerIfNeeded(
+				prepared,
+				state,
+				token.isCancellationRequested ? 'cancelled' : 'stream-error',
 				error,
-			});
+			);
 			throw error;
 		})
 		.then(() => {
 			if (token.isCancellationRequested) {
-				prepared.cacheDiagnostics.onSegmentMarkerReport({
-					segment: prepared.segment,
-					status: 'skipped',
-					reason: 'cancelled',
-				});
-				return;
+				reportSkippedSegmentMarkerIfNeeded(prepared, state, 'cancelled');
 			}
-			reportConversationSegmentMarker(prepared, progress);
 		})
 		.finally(() => {
 			cancelListener.dispose();
 		});
 }
 
+function reportConversationSegmentMarkerOnce(
+	prepared: PreparedChatRequest,
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+	state: ResponseStreamState,
+	trigger: SegmentMarkerReportTrigger,
+): void {
+	if (state.segmentMarkerReported) {
+		return;
+	}
+	state.segmentMarkerReported = true;
+	reportConversationSegmentMarker(prepared, progress, trigger);
+}
+
+function reportSkippedSegmentMarkerIfNeeded(
+	prepared: PreparedChatRequest,
+	state: ResponseStreamState,
+	reason: 'cancelled' | 'stream-error',
+	error?: unknown,
+): void {
+	if (state.segmentMarkerReported) {
+		return;
+	}
+	state.segmentMarkerReported = true;
+	prepared.cacheDiagnostics.onSegmentMarkerReport({
+		segment: prepared.segment,
+		status: 'skipped',
+		reason,
+		error,
+	});
+}
+
 function reportConversationSegmentMarker(
 	prepared: PreparedChatRequest,
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+	trigger: SegmentMarkerReportTrigger,
 ): void {
 	try {
 		progress.report(createSegmentMarkerPart(prepared.segment.segmentId));
 		prepared.cacheDiagnostics.onSegmentMarkerReport({
 			segment: prepared.segment,
 			status: 'reported',
+			trigger,
 		});
 	} catch (error) {
 		prepared.cacheDiagnostics.onSegmentMarkerReport({
 			segment: prepared.segment,
 			status: 'failed',
+			trigger,
 			error,
 		});
 		logger.warn('Failed to report conversation segment marker', error);

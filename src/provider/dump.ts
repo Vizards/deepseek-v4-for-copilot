@@ -176,9 +176,9 @@ export function dumpDeepSeekRequest(
 	});
 }
 
-export async function ensureRequestDumpRoot(globalStorageUri: vscode.Uri): Promise<string> {
-	const root = getRequestDumpRoot(globalStorageUri);
-	await mkdir(root, { recursive: true });
+export async function ensureRequestDumpRoot(globalStorageUri: vscode.Uri): Promise<vscode.Uri> {
+	const root = getRequestDumpBaseRootUri(globalStorageUri);
+	await mkdir(root.fsPath, { recursive: true });
 	return root;
 }
 
@@ -725,9 +725,13 @@ function getRequestDumpRoot(globalStorageUri: vscode.Uri, segment?: Conversation
 }
 
 function getRequestDumpBaseRoot(globalStorageUri: vscode.Uri): string {
+	return getRequestDumpBaseRootUri(globalStorageUri).fsPath;
+}
+
+function getRequestDumpBaseRootUri(globalStorageUri: vscode.Uri): vscode.Uri {
 	if (globalStorageUri.fsPath) {
-		return join(globalStorageUri.fsPath, 'request-dumps');
+		return vscode.Uri.joinPath(globalStorageUri, 'request-dumps');
 	}
 
-	return join(tmpdir(), 'deepseek-request-dumps');
+	return vscode.Uri.file(join(tmpdir(), 'deepseek-request-dumps'));
 }

@@ -96,6 +96,14 @@ export function streamChatCompletion({
 			throw error;
 		})
 		.then(() => {
+			if (token.isCancellationRequested) {
+				prepared.cacheDiagnostics.onSegmentMarkerReport({
+					segment: prepared.segment,
+					status: 'skipped',
+					reason: 'cancelled',
+				});
+				return;
+			}
 			reportConversationSegmentMarker(prepared, progress);
 		})
 		.finally(() => {

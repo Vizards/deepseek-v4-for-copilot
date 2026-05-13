@@ -98,10 +98,7 @@ async function openRequestDumpsFolder(context: vscode.ExtensionContext): Promise
 	try {
 		const root = await ensureRequestDumpRoot(context.globalStorageUri);
 		logger.info(`Opening request dumps folder: ${root}`);
-		const opened = await vscode.env.openExternal(vscode.Uri.file(root));
-		if (!opened) {
-			throw new Error(`VS Code refused to open ${root}`);
-		}
+		await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(root));
 	} catch (error) {
 		logger.warn('Failed to open request dumps folder', error);
 		void vscode.window.showErrorMessage(t('extension.openRequestDumpsFolderFailed'));

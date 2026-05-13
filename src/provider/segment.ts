@@ -78,7 +78,16 @@ export function createSegmentMarkerPart(segmentId: string): vscode.LanguageModel
 export function parseSegmentMarkerData(data: Uint8Array): SegmentMarkerParseResult {
 	const decoded = new TextDecoder().decode(data);
 	const separatorIndex = decoded.indexOf('\\');
-	const markerPayload = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : decoded;
+	if (separatorIndex < 0) {
+		return { valid: false, error: 'marker-prefix-missing' };
+	}
+
+	const markerPrefix = decoded.slice(0, separatorIndex);
+	if (markerPrefix !== SEGMENT_MARKER_MODEL_ID) {
+		return { valid: false, error: 'marker-prefix-mismatch' };
+	}
+
+	const markerPayload = decoded.slice(separatorIndex + 1);
 
 	if (isValidSegmentId(markerPayload)) {
 		return { valid: true, segmentId: markerPayload.toLowerCase() };

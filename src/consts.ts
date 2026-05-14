@@ -61,6 +61,20 @@ export const MAX_CACHE_SIZE = 200;
 
 // ---- Model registry ----
 
+/**
+ * Context window sizing: total = 1000K, output = 384K, input = remainder.
+ * MODIFY these constants to recalculate maxInputTokens / maxOutputTokens.
+ */
+
+const K_UNIT = 1024;
+const CONTEXT_SIZE_K = 1000;
+const CONTEXT_MAX_OUT_TOKEN_K = 384;
+const CONTEXT_MAX_IN_TOKEN_K = CONTEXT_SIZE_K - CONTEXT_MAX_OUT_TOKEN_K;
+
+// export const MODEL_CONTEXT_SIZE = CONTEXT_SIZE_K * K_UNIT;
+export const MODEL_MAX_INPUT_TOKEN = CONTEXT_MAX_IN_TOKEN_K * K_UNIT;
+export const MODEL_MAX_OUTPUT_TOKEN = CONTEXT_MAX_OUT_TOKEN_K * K_UNIT;
+
 /** Available DeepSeek models exposed through the language model provider. */
 export const MODELS: ModelDefinition[] = [
 	{
@@ -69,8 +83,8 @@ export const MODELS: ModelDefinition[] = [
 		family: 'deepseek',
 		version: 'v4',
 		detail: 'Fast, general-purpose model',
-		maxInputTokens: 1048576,
-		maxOutputTokens: 393216,
+		maxInputTokens: MODEL_MAX_INPUT_TOKEN,
+		maxOutputTokens: MODEL_MAX_OUTPUT_TOKEN,
 		capabilities: {
 			toolCalling: true,
 			imageInput: true,
@@ -84,8 +98,8 @@ export const MODELS: ModelDefinition[] = [
 		family: 'deepseek',
 		version: 'v4',
 		detail: 'Most capable reasoning model',
-		maxInputTokens: 1048576,
-		maxOutputTokens: 393216,
+		maxInputTokens: MODEL_MAX_INPUT_TOKEN,
+		maxOutputTokens: MODEL_MAX_OUTPUT_TOKEN,
 		capabilities: {
 			toolCalling: true,
 			imageInput: true,

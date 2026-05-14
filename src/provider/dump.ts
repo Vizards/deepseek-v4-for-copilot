@@ -7,7 +7,7 @@ import { getRequestDumpEnabled } from '../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
 import { safeStringify, toWellFormedString } from '../json';
 import { logger } from '../logger';
-import type { DeepSeekRequest } from '../types';
+import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { parseSegmentMarkerData, SEGMENT_MARKER_MIME, type ConversationSegment } from './segment';
 import type { VisionDescriptionCacheStats } from './vision/index';
 
@@ -17,6 +17,7 @@ let dumpWriteQueue: Promise<void> = Promise.resolve();
 
 const ACTIVATE_TOOL_PREFIX = 'activate_';
 const REQUEST_OBSERVATIONS_FILE = '_request-observations.jsonl';
+const HASH_WINDOW_CHARS = 2_048;
 
 type DumpEvent = 'provider-input' | 'deepseek-request';
 type DumpStage = 'provider-input' | 'input' | 'resolved';
@@ -45,6 +46,31 @@ interface ToolSummary {
 	toolNames: string[];
 	activateToolCount: number;
 	activateToolNames: string[];
+}
+
+interface CustomizationsSummary {
+	customizationsUpdateCountInHistory: number;
+	latestUserMessageIndex: number | null;
+	latestUserHasCustomizationsUpdate: boolean;
+}
+
+interface HostSettingsSummary {
+	copilotFreezeCustomizationsIndex: boolean | 'unknown';
+}
+
+interface SystemPromptSummary extends CustomizationsSummary {
+	messageIndex: number | null;
+	role: string | null;
+	chars: number;
+	lines: number;
+	hash: string | null;
+	headHash: string | null;
+	tailHash: string | null;
+	hasInstructionsTag: boolean;
+	hasSkillsTag: boolean;
+	hasAgentsTag: boolean;
+	skillTagCount: number;
+	agentTagCount: number;
 }
 
 export interface DumpDeepSeekRequestOptions {
@@ -231,6 +257,8 @@ function createDumpObservation(options: {
 		paths: options.paths,
 		model: options.model,
 		options: summarizeRequestOptions(options.requestOptions),
+		hostSettings: summarizeHostSettings(),
+		systemPromptSummary: summarizeVscodeSystemPrompt(options.messages),
 		messageStats: summarizeMessagesFromInput(options.messages),
 		toolStats: options.toolSummary,
 	};
@@ -283,6 +311,7 @@ function createPipelineSnapshot(
 						stats: options.visionCacheStats ?? null,
 					}
 				: undefined,
+		deepSeekPromptSummary: summarizeDeepSeekSystemPrompt(request.messages),
 		messages,
 		requestOptions: options.requestOptions,
 	});
@@ -294,6 +323,7 @@ function createDumpSnapshot(options: {
 	segment: ConversationSegment;
 	model: object;
 	vision?: object;
+	deepSeekPromptSummary?: SystemPromptSummary;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
 }): object {
@@ -307,7 +337,10 @@ function createDumpSnapshot(options: {
 		segment: options.segment,
 		model: options.model,
 		options: summarizeRequestOptions(options.requestOptions),
+		hostSettings: summarizeHostSettings(),
 		vision: options.vision,
+		systemPromptSummary: summarizeVscodeSystemPrompt(options.messages),
+		deepSeekPromptSummary: options.deepSeekPromptSummary,
 		messageStats: summarizeMessages(serializedMessages),
 		messages: serializedMessages,
 		toolStats: summarizeTools(options.requestOptions.tools),
@@ -528,6 +561,126 @@ function summarizeMessagesFromInput(
 	return summarizeMessages(messages.map((message, index) => serializeMessage(message, index)));
 }
 
+function summarizeVscodeSystemPrompt(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+): SystemPromptSummary {
+	const message = messages[0];
+	const customizations = summarizeVscodeCustomizations(messages);
+	if (!message) {
+		return createSystemPromptSummary(null, null, '', customizations);
+	}
+
+	return createSystemPromptSummary(
+		0,
+		formatRole(message.role),
+		getVscodeMessageText(message),
+		customizations,
+	);
+}
+
+function summarizeDeepSeekSystemPrompt(messages: readonly DeepSeekMessage[]): SystemPromptSummary {
+	const message = messages[0];
+	const customizations = summarizeDeepSeekCustomizations(messages);
+	if (!message) {
+		return createSystemPromptSummary(null, null, '', customizations);
+	}
+
+	return createSystemPromptSummary(0, message.role, message.content ?? '', customizations);
+}
+
+function createSystemPromptSummary(
+	messageIndex: number | null,
+	role: string | null,
+	text: string,
+	customizations: CustomizationsSummary,
+): SystemPromptSummary {
+	return {
+		messageIndex,
+		role,
+		chars: text.length,
+		lines: countLines(text),
+		hash: messageIndex === null ? null : hashString(text),
+		headHash: messageIndex === null ? null : hashString(text.slice(0, HASH_WINDOW_CHARS)),
+		tailHash: messageIndex === null ? null : hashString(text.slice(-HASH_WINDOW_CHARS)),
+		hasInstructionsTag: text.includes('<instructions>'),
+		hasSkillsTag: text.includes('<skills>'),
+		hasAgentsTag: text.includes('<agents>'),
+		skillTagCount: countLiteral(text, '<skill>'),
+		agentTagCount: countLiteral(text, '<agent>'),
+		...customizations,
+	};
+}
+
+function summarizeVscodeCustomizations(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+): CustomizationsSummary {
+	let customizationsUpdateCountInHistory = 0;
+	let latestUserMessageIndex: number | null = null;
+	let latestUserHasCustomizationsUpdate = false;
+
+	for (const [index, message] of messages.entries()) {
+		const text = getVscodeMessageText(message);
+		customizationsUpdateCountInHistory += countLiteral(text, '<customizationsUpdate>');
+		if (message.role === vscode.LanguageModelChatMessageRole.User) {
+			latestUserMessageIndex = index;
+			latestUserHasCustomizationsUpdate = text.includes('<customizationsUpdate>');
+		}
+	}
+
+	return {
+		customizationsUpdateCountInHistory,
+		latestUserMessageIndex,
+		latestUserHasCustomizationsUpdate,
+	};
+}
+
+function summarizeDeepSeekCustomizations(
+	messages: readonly DeepSeekMessage[],
+): CustomizationsSummary {
+	let customizationsUpdateCountInHistory = 0;
+	let latestUserMessageIndex: number | null = null;
+	let latestUserHasCustomizationsUpdate = false;
+
+	for (const [index, message] of messages.entries()) {
+		const text = message.content ?? '';
+		customizationsUpdateCountInHistory += countLiteral(text, '<customizationsUpdate>');
+		if (message.role === 'user') {
+			latestUserMessageIndex = index;
+			latestUserHasCustomizationsUpdate = text.includes('<customizationsUpdate>');
+		}
+	}
+
+	return {
+		customizationsUpdateCountInHistory,
+		latestUserMessageIndex,
+		latestUserHasCustomizationsUpdate,
+	};
+}
+
+function summarizeHostSettings(): HostSettingsSummary {
+	return {
+		copilotFreezeCustomizationsIndex: getBooleanSetting(
+			'github.copilot.chat',
+			'freezeCustomizationsIndex',
+		),
+	};
+}
+
+function getVscodeMessageText(message: vscode.LanguageModelChatRequestMessage): string {
+	let text = '';
+	for (const part of message.content) {
+		if (part instanceof vscode.LanguageModelTextPart) {
+			text += part.value;
+		}
+	}
+	return text;
+}
+
+function getBooleanSetting(section: string, key: string): boolean | 'unknown' {
+	const value = vscode.workspace.getConfiguration(section).get<unknown>(key);
+	return typeof value === 'boolean' ? value : 'unknown';
+}
+
 function summarizeTools(tools: readonly vscode.LanguageModelChatTool[] | undefined): ToolSummary {
 	const toolNames = getToolNames(tools);
 	const activateToolNames = getActivateToolNames(toolNames);
@@ -657,6 +810,31 @@ function hashBytes(value: Uint8Array): string {
 	return createHash('sha256').update(value).digest('hex');
 }
 
+function countLines(value: string): number {
+	if (!value) {
+		return 0;
+	}
+	return value.split('\n').length;
+}
+
+function countLiteral(value: string, literal: string): number {
+	if (!value || !literal) {
+		return 0;
+	}
+
+	let count = 0;
+	let index = 0;
+	while (true) {
+		index = value.indexOf(literal, index);
+		if (index < 0) {
+			break;
+		}
+		count += 1;
+		index += literal.length;
+	}
+	return count;
+}
+
 async function writeJsonFile<T>(
 	filePath: string,
 	value: T,
@@ -695,13 +873,16 @@ function logProviderInputDump(
 	paths: ProviderInputDumpPaths,
 	toolSummary: ToolSummary,
 ): void {
+	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
 	logger.info(
 		`providerInputDump written: segment=${options.segment.segmentId}` +
 			` reason=${options.segment.reason} input=${paths.providerInput} ` +
 			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
 			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
 				toolSummary.activateToolNames,
-			)})`,
+			)}) ` +
+			formatHostSettingsSummary(summarizeHostSettings()) +
+			` ${formatSystemPromptSummary(systemPromptSummary)}`,
 	);
 }
 
@@ -711,13 +892,46 @@ function logRequestDump(
 	paths: RequestDumpPaths,
 	requestJsonLength: number,
 ): void {
+	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
 	logger.info(
 		`requestDump written: segment=${options.segment.segmentId}` +
 			` reason=${options.segment.reason} request=${paths.request} ` +
 			`input=${paths.input} resolved=${paths.resolved} ` +
 			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
-			`~${(requestJsonLength / 1024).toFixed(0)} KB)`,
+			`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
+			formatHostSettingsSummary(summarizeHostSettings()) +
+			` ${formatSystemPromptSummary(systemPromptSummary)}`,
 	);
+}
+
+function formatHostSettingsSummary(settings: HostSettingsSummary): string {
+	return `hostFreezeCustomizationsIndex=${settings.copilotFreezeCustomizationsIndex}`;
+}
+
+function formatSystemPromptSummary(summary: SystemPromptSummary): string {
+	if (summary.messageIndex === null) {
+		return 'systemPrompt=none';
+	}
+
+	return (
+		`systemPrompt#${summary.messageIndex}:${summary.role}` +
+		`:chars=${summary.chars}` +
+		`:lines=${summary.lines}` +
+		`:hash=${formatShortHash(summary.hash)}` +
+		`:skills=${formatBoolean(summary.hasSkillsTag)}(${summary.skillTagCount})` +
+		`:agents=${formatBoolean(summary.hasAgentsTag)}(${summary.agentTagCount})` +
+		`:customizationsUpdate=${summary.customizationsUpdateCountInHistory}` +
+		`:latestUser#${summary.latestUserMessageIndex ?? 'none'}=` +
+		formatBoolean(summary.latestUserHasCustomizationsUpdate)
+	);
+}
+
+function formatShortHash(value: string | null): string {
+	return value ? value.slice(0, 12) : 'none';
+}
+
+function formatBoolean(value: boolean): 'yes' | 'no' {
+	return value ? 'yes' : 'no';
 }
 
 function getRequestDumpRoot(globalStorageUri: vscode.Uri, segment?: ConversationSegment): string {

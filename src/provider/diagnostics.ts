@@ -194,6 +194,22 @@ interface VisionResolutionStats {
 	visionModelId?: string;
 }
 
+interface HostPromptTrace {
+	hostFreezeCustomizationsIndex: boolean | 'unknown';
+	systemMessageIndex: number | null;
+	systemRole: string | null;
+	systemChars: number;
+	systemLines: number;
+	systemHash: string | null;
+	hasSkillsTag: boolean;
+	hasAgentsTag: boolean;
+	skillTagCount: number;
+	agentTagCount: number;
+	customizationsUpdateCount: number;
+	latestUserMessageIndex: number | null;
+	latestUserHasCustomizationsUpdate: boolean;
+}
+
 class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 	private readonly previousCacheTraces = new Map<string, CacheTraceSnapshot>();
 	private lastCacheTrace: CacheTraceSnapshot | undefined;
@@ -242,6 +258,11 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				` reasoningCache(size=${options.reasoningCacheSize},max=${MAX_CACHE_SIZE})` +
 				` inputMessages=${options.inputMessages.length}` +
 				` deepseekMessages=${options.request.messages.length}`,
+		);
+		logger.info(
+			`[cache-trace #${requestId}] ${formatHostPromptTrace(
+				summarizeHostPromptTrace(options.inputMessages),
+			)}`,
 		);
 		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
 		if (vscodeMessageTrace) {
@@ -396,6 +417,73 @@ function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
 		reason +
 		error
 	);
+}
+
+function summarizeHostPromptTrace(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+): HostPromptTrace {
+	let customizationsUpdateCount = 0;
+	let latestUserMessageIndex: number | null = null;
+	let latestUserHasCustomizationsUpdate = false;
+
+	for (const [index, message] of messages.entries()) {
+		const text = getMessageText(message);
+		customizationsUpdateCount += countLiteral(text, '<customizationsUpdate>');
+		if (message.role === vscode.LanguageModelChatMessageRole.User) {
+			latestUserMessageIndex = index;
+			latestUserHasCustomizationsUpdate = text.includes('<customizationsUpdate>');
+		}
+	}
+
+	const systemMessage = messages[0];
+	const systemText = systemMessage ? getMessageText(systemMessage) : '';
+
+	return {
+		hostFreezeCustomizationsIndex: getHostFreezeCustomizationsIndex(),
+		systemMessageIndex: systemMessage ? 0 : null,
+		systemRole: systemMessage ? formatVscodeMessageRole(systemMessage.role) : null,
+		systemChars: systemText.length,
+		systemLines: countLines(systemText),
+		systemHash: systemMessage ? hashString(systemText) : null,
+		hasSkillsTag: systemText.includes('<skills>'),
+		hasAgentsTag: systemText.includes('<agents>'),
+		skillTagCount: countLiteral(systemText, '<skill>'),
+		agentTagCount: countLiteral(systemText, '<agent>'),
+		customizationsUpdateCount,
+		latestUserMessageIndex,
+		latestUserHasCustomizationsUpdate,
+	};
+}
+
+function getHostFreezeCustomizationsIndex(): boolean | 'unknown' {
+	const value = vscode.workspace
+		.getConfiguration('github.copilot.chat')
+		.get<unknown>('freezeCustomizationsIndex');
+	return typeof value === 'boolean' ? value : 'unknown';
+}
+
+function formatHostPromptTrace(trace: HostPromptTrace): string {
+	const systemPrompt =
+		trace.systemMessageIndex === null
+			? 'systemPrompt=none'
+			: `systemPrompt#${trace.systemMessageIndex}:${trace.systemRole}` +
+				`:chars=${trace.systemChars}` +
+				`:lines=${trace.systemLines}` +
+				`:hash=${trace.systemHash ?? 'none'}` +
+				`:skills=${formatYesNo(trace.hasSkillsTag)}(${trace.skillTagCount})` +
+				`:agents=${formatYesNo(trace.hasAgentsTag)}(${trace.agentTagCount})`;
+
+	return (
+		`hostFreezeCustomizationsIndex=${trace.hostFreezeCustomizationsIndex}` +
+		` ${systemPrompt}` +
+		` customizationsUpdate=${trace.customizationsUpdateCount}` +
+		` latestUser#${trace.latestUserMessageIndex ?? 'none'}=` +
+		formatYesNo(trace.latestUserHasCustomizationsUpdate)
+	);
+}
+
+function formatYesNo(value: boolean): 'yes' | 'no' {
+	return value ? 'yes' : 'no';
 }
 
 function formatError(error: unknown): string {

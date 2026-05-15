@@ -107,7 +107,7 @@ const en: Translations = {
 	'request.preflightRoundLimitExceeded':
 		'Tool pre-expansion exceeded the {0}-round limit, so the request was stopped to avoid a loop.',
 	'notice.toolDrift':
-		"⚠️ Tools are unstable; DeepSeek cache hits may drop. [Details](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)",
+		'⚠️ Tools are unstable; DeepSeek cache hits may drop. [Details](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

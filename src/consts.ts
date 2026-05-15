@@ -54,10 +54,13 @@ export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
 export const IMAGE_DESCRIPTION_PREFIX = '[Image Description: ';
 export const IMAGE_DESCRIPTION_SUFFIX = ']';
 
-// ---- Cache ----
+// ---- Reasoning cache ----
 
-/** Max entries in the reasoning-content cache before eviction kicks in. */
-export const MAX_CACHE_SIZE = 200;
+/** Directory name under globalStorageUri for persisted DeepSeek reasoning_content. */
+export const REASONING_CACHE_DIR_NAME = 'reasoning-cache-v1';
+
+/** Keep persisted reasoning long enough to roughly match DeepSeek context cache lifetime. */
+export const REASONING_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
 
 // ---- Model registry ----
 

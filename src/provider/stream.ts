@@ -1,12 +1,7 @@
 import vscode from 'vscode';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
-import {
-	createPostToolReasoningKey,
-	createToolReasoningKey,
-	pruneReasoningCache,
-	type ReasoningEntry,
-} from './cache';
+import type { ReasoningRecorder } from './cache';
 import {
 	observeCancellationToken,
 	type CacheDiagnosticsRun,
@@ -27,7 +22,7 @@ export interface StreamChatCompletionOptions {
 	prepared: PreparedChatRequest;
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
 	token: vscode.CancellationToken;
-	reasoningCache: Map<string, ReasoningEntry>;
+	reasoningRecorder: ReasoningRecorder;
 	getCharsPerToken: () => number;
 	setCharsPerToken: (charsPerToken: number) => void;
 }
@@ -36,7 +31,7 @@ export function streamChatCompletion({
 	prepared,
 	progress,
 	token,
-	reasoningCache,
+	reasoningRecorder,
 	getCharsPerToken,
 	setCharsPerToken,
 }: StreamChatCompletionOptions): Promise<void> {
@@ -46,7 +41,7 @@ export function streamChatCompletion({
 		segmentMarkerReported: false,
 	};
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics, () => {
-		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningCache);
+		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningRecorder);
 	});
 
 	return prepared.client
@@ -78,7 +73,7 @@ export function streamChatCompletion({
 						prepared.isThinkingModel,
 						prepared.trailingToolResultIds,
 						state,
-						reasoningCache,
+						reasoningRecorder,
 						prepared.cacheDiagnostics,
 					);
 				},
@@ -203,29 +198,24 @@ function finalizeReasoningCache(
 	isThinkingModel: boolean,
 	trailingToolResultIds: readonly string[],
 	state: ResponseStreamState,
-	reasoningCache: Map<string, ReasoningEntry>,
+	reasoningRecorder: ReasoningRecorder,
 	cacheDiagnostics: CacheDiagnosticsRun,
 ): void {
 	if (isThinkingModel && state.accumulatedReasoning) {
-		const entry: ReasoningEntry = {
-			text: state.accumulatedReasoning,
-			timestamp: Date.now(),
-		};
 		if (state.emittedToolCallIds.length > 0) {
-			for (const toolCallId of state.emittedToolCallIds) {
-				reasoningCache.set(createToolReasoningKey(toolCallId), entry);
-			}
+			reasoningRecorder.recordToolCallReasoning(
+				state.emittedToolCallIds,
+				state.accumulatedReasoning,
+			);
 		} else if (trailingToolResultIds.length > 0) {
-			reasoningCache.set(createPostToolReasoningKey(trailingToolResultIds), entry);
+			reasoningRecorder.recordPostToolReasoning(trailingToolResultIds, state.accumulatedReasoning);
 		}
 	}
 
-	const cacheSizeBeforePrune = reasoningCache.size;
-	pruneReasoningCache(reasoningCache, false);
-	const evictedReasoningEntries = Math.max(0, cacheSizeBeforePrune - reasoningCache.size);
+	const pruneResult = reasoningRecorder.prune();
 	cacheDiagnostics.onDone({
-		reasoningCacheSize: reasoningCache.size,
-		evictedReasoningEntries,
+		reasoningCacheSize: reasoningRecorder.size,
+		evictedReasoningEntries: pruneResult.removed,
 		emittedToolCalls: state.emittedToolCallIds.length,
 		trailingToolResults: trailingToolResultIds.length,
 	});
@@ -234,20 +224,14 @@ function finalizeReasoningCache(
 function cacheEmittedToolCallReasoningOnCancellation(
 	isThinkingModel: boolean,
 	state: ResponseStreamState,
-	reasoningCache: Map<string, ReasoningEntry>,
+	reasoningRecorder: ReasoningRecorder,
 ): void {
 	if (!isThinkingModel || !state.accumulatedReasoning || state.emittedToolCallIds.length === 0) {
 		return;
 	}
 
-	const entry: ReasoningEntry = {
-		text: state.accumulatedReasoning,
-		timestamp: Date.now(),
-	};
-	for (const toolCallId of state.emittedToolCallIds) {
-		reasoningCache.set(createToolReasoningKey(toolCallId), entry);
-	}
-	pruneReasoningCache(reasoningCache, false);
+	reasoningRecorder.recordToolCallReasoning(state.emittedToolCallIds, state.accumulatedReasoning);
+	reasoningRecorder.prune();
 }
 
 function updateCharsPerToken(

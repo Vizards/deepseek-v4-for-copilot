@@ -5,7 +5,7 @@ import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import { pruneReasoningCache, type ReasoningEntry } from './cache';
+import type { ReasoningLookup } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { dumpDeepSeekRequest } from './dump';
@@ -31,7 +31,8 @@ export interface PrepareChatRequestOptions {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	options: vscode.ProvideLanguageModelChatResponseOptions;
 	token: vscode.CancellationToken;
-	reasoningCache: Map<string, ReasoningEntry>;
+	reasoningLookup: ReasoningLookup;
+	reasoningCacheSize: number;
 	cacheDiagnostics: CacheDiagnosticsRecorder;
 	getVisionModel: () => Promise<vscode.LanguageModelChat | undefined>;
 }
@@ -44,7 +45,8 @@ export async function prepareChatRequest({
 	messages,
 	options,
 	token,
-	reasoningCache,
+	reasoningLookup,
+	reasoningCacheSize,
 	cacheDiagnostics,
 	getVisionModel,
 }: PrepareChatRequestOptions): Promise<PreparedChatRequest> {
@@ -59,12 +61,9 @@ export async function prepareChatRequest({
 	const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 	const maxTokens = getMaxTokens();
 
-	clearStaleReasoningCache(messages, reasoningCache, cacheDiagnostics);
-	const reasoningCacheSize = reasoningCache.size;
-
 	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
 	const resolvedMessages = visionResolution.messages;
-	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningCache);
+	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningLookup);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
@@ -133,16 +132,4 @@ function collectTrailingToolResultIds(messages: readonly DeepSeekMessage[]): str
 		trailingToolResultIds.push(message.tool_call_id);
 	}
 	return trailingToolResultIds.reverse();
-}
-
-function clearStaleReasoningCache(
-	messages: readonly vscode.LanguageModelChatRequestMessage[],
-	reasoningCache: Map<string, ReasoningEntry>,
-	cacheDiagnostics: CacheDiagnosticsRecorder,
-): void {
-	if (messages.length <= 2) {
-		const removed = reasoningCache.size;
-		pruneReasoningCache(reasoningCache, true);
-		cacheDiagnostics.logReasoningCacheCleared(removed);
-	}
 }

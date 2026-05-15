@@ -3,7 +3,7 @@ import { AuthManager } from '../auth';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import type { ReasoningEntry } from './cache';
+import { ReasoningCacheStore } from './cache';
 import { createCacheDiagnosticsRecorder } from './diagnostics';
 import { dumpProviderInput } from './dump';
 import { toChatInfo } from './models';
@@ -26,8 +26,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	readonly onDidChangeLanguageModelChatInformation =
 		this.onDidChangeLanguageModelChatInformationEmitter.event;
 
-	/** reasoning text → tool_call IDs cache. */
-	private readonly reasoningCache = new Map<string, ReasoningEntry>();
+	/** Segment-scoped reasoning_content cache. */
+	private readonly reasoningCache: ReasoningCacheStore;
 	private readonly cacheDiagnostics = createCacheDiagnosticsRecorder();
 
 	/** Vision proxy: resolver + cached model. */
@@ -42,6 +42,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
 		this.globalStorageUri = context.globalStorageUri;
+		this.reasoningCache = new ReasoningCacheStore(context.globalStorageUri);
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
@@ -100,6 +101,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		// instead of leaving stale entries behind after deactivate. The returned
 		// model list itself is unused — we only call this for its side effect.
 		try {
+			await this.reasoningCache.flush();
 			await vscode.lm.selectChatModels({ vendor: 'deepseek' });
 		} catch (error) {
 			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
@@ -133,6 +135,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		token: vscode.CancellationToken,
 	): Promise<void> {
 		const segment = resolveConversationSegment(messages);
+		const reasoning = await this.reasoningCache.forSegment(segment.segmentId);
+		reasoning.prune();
 
 		dumpProviderInput({
 			globalStorageUri: this.globalStorageUri,
@@ -150,7 +154,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			messages,
 			options,
 			token,
-			reasoningCache: this.reasoningCache,
+			reasoningLookup: reasoning,
+			reasoningCacheSize: reasoning.size,
 			cacheDiagnostics: this.cacheDiagnostics,
 			getVisionModel: () => this.vision.get(),
 		});
@@ -159,7 +164,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			prepared,
 			progress,
 			token,
-			reasoningCache: this.reasoningCache,
+			reasoningRecorder: reasoning,
 			getCharsPerToken: () => this.charsPerToken,
 			setCharsPerToken: (charsPerToken) => {
 				this.charsPerToken = charsPerToken;

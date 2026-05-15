@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { safeStringify } from '../json';
 import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
-import { createPostToolReasoningKey, createToolReasoningKey, type ReasoningEntry } from './cache';
+import type { ReasoningLookup } from './cache';
 
 /**
  * Convert VS Code chat messages to DeepSeek format.
@@ -11,7 +11,7 @@ import { createPostToolReasoningKey, createToolReasoningKey, type ReasoningEntry
 export function convertMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	isThinkingModel: boolean,
-	reasoningCache: Map<string, ReasoningEntry>,
+	reasoningLookup: ReasoningLookup,
 ): DeepSeekMessage[] {
 	const result: DeepSeekMessage[] = [];
 	let recentToolResultIds: string[] = [];
@@ -55,19 +55,14 @@ export function convertMessages(
 			let reasoningContent: string | undefined;
 			if (isThinkingModel && toolCalls.length > 0) {
 				for (const tc of toolCalls) {
-					// Prefer new `tool:<callId>` key; fallback to bare `callId` for entries written
-					// before the stable-key change (read-only compat, no new bare-key writes).
-					const cached =
-						reasoningCache.get(createToolReasoningKey(tc.id)) ?? reasoningCache.get(tc.id);
+					const cached = reasoningLookup.getToolCallReasoning(tc.id);
 					if (cached) {
-						reasoningContent = cached.text;
+						reasoningContent = cached;
 						break;
 					}
 				}
 			} else if (isThinkingModel && recentToolResultIds.length > 0) {
-				reasoningContent = reasoningCache.get(
-					createPostToolReasoningKey(recentToolResultIds),
-				)?.text;
+				reasoningContent = reasoningLookup.getPostToolReasoning(recentToolResultIds);
 			}
 
 			if (content || toolCalls.length > 0) {

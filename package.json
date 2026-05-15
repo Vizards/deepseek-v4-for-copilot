@@ -15,6 +15,7 @@
     "node": ">=24"
   },
   "extensionKind": [
+    "ui",
     "workspace"
   ],
   "categories": [

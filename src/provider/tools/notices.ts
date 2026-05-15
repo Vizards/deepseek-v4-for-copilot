@@ -24,6 +24,11 @@ export function filterProviderNotices(
 	const filteredMessages: vscode.LanguageModelChatRequestMessage[] = [];
 
 	for (const message of messages) {
+		if (message.role !== vscode.LanguageModelChatMessageRole.Assistant) {
+			filteredMessages.push(message);
+			continue;
+		}
+
 		let messageChanged = false;
 		const filteredContent: LanguageModelChatRequestMessagePart[] = [];
 		for (const part of message.content) {

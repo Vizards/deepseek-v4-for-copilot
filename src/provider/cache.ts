@@ -246,11 +246,23 @@ export class ReasoningCacheStore {
 			snapshot = JSON.parse(textDecoder.decode(data)) as unknown;
 		} catch (error) {
 			logger.warn(`Ignoring invalid reasoning cache file segment=${state.segmentId}`, error);
+			await deleteFileIfExists(state.cacheUri).catch((deleteError) => {
+				logger.warn(
+					`Failed to delete invalid reasoning cache file segment=${state.segmentId}`,
+					deleteError,
+				);
+			});
 			return;
 		}
 
 		if (!Array.isArray(snapshot)) {
 			logger.warn(`Ignoring invalid reasoning cache snapshot segment=${state.segmentId}`);
+			await deleteFileIfExists(state.cacheUri).catch((deleteError) => {
+				logger.warn(
+					`Failed to delete invalid reasoning cache file segment=${state.segmentId}`,
+					deleteError,
+				);
+			});
 			return;
 		}
 

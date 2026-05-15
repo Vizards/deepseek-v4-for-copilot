@@ -101,10 +101,15 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		// instead of leaving stale entries behind after deactivate. The returned
 		// model list itself is unused — we only call this for its side effect.
 		try {
-			await this.reasoningCache.flush();
 			await vscode.lm.selectChatModels({ vendor: 'deepseek' });
 		} catch (error) {
 			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
+		}
+
+		try {
+			await this.reasoningCache.flush();
+		} catch (error) {
+			logger.warn('Failed to persist reasoning cache during deactivate', error);
 		}
 	}
 

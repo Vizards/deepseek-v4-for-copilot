@@ -30,6 +30,7 @@ interface SegmentCacheState {
 	saveTimer: NodeJS.Timeout | undefined;
 	saveInFlight: Promise<void> | undefined;
 	dirty: boolean;
+	lastAccessedAt: number;
 }
 
 interface ReasoningCacheCleanupResult {
@@ -94,6 +95,7 @@ export class ReasoningCacheStore {
 		await this.cleanupPromise;
 		const state = this.getOrCreateSegmentState(segmentId);
 		await state.readyPromise;
+		this.markAccessed(state);
 
 		const getSize = () => state.cache.size;
 		return {
@@ -126,6 +128,7 @@ export class ReasoningCacheStore {
 		}
 
 		const now = Date.now();
+		this.markAccessed(state, now);
 		if (now - entry.updatedAt >= REASONING_CACHE_TOUCH_INTERVAL_MS) {
 			entry.updatedAt = now;
 			this.scheduleSave(state);
@@ -139,8 +142,13 @@ export class ReasoningCacheStore {
 		text: string,
 		updatedAt = Date.now(),
 	): void {
+		this.markAccessed(state, updatedAt);
 		state.cache.set(reasoningKey, { text, updatedAt });
 		this.scheduleSave(state);
+	}
+
+	private markAccessed(state: SegmentCacheState, now = Date.now()): void {
+		state.lastAccessedAt = now;
 	}
 
 	private pruneSegment(state: SegmentCacheState, now = Date.now()): ReasoningCachePruneResult {
@@ -175,6 +183,7 @@ export class ReasoningCacheStore {
 			saveTimer: undefined,
 			saveInFlight: undefined,
 			dirty: false,
+			lastAccessedAt: Date.now(),
 		};
 		state.readyPromise = this.loadSegment(state);
 		this.segments.set(segmentId, state);
@@ -314,7 +323,12 @@ export class ReasoningCacheStore {
 
 				result.scanned += 1;
 				const segmentId = name.slice(0, -'.json'.length);
-				if (this.segments.has(segmentId)) {
+				const loadedState = this.segments.get(segmentId);
+				if (loadedState) {
+					const deleted = await this.pruneLoadedSegmentFile(loadedState, now);
+					if (deleted) {
+						result.deleted += 1;
+					}
 					return;
 				}
 
@@ -333,6 +347,7 @@ export class ReasoningCacheStore {
 				}
 			}),
 		);
+		await this.unloadInactiveEmptySegments(now);
 
 		if (shouldLogCleanupResult(trigger, result)) {
 			logger.info(
@@ -341,6 +356,45 @@ export class ReasoningCacheStore {
 					` ttlMs=${REASONING_CACHE_TTL_MS}`,
 			);
 		}
+	}
+
+	private async pruneLoadedSegmentFile(state: SegmentCacheState, now: number): Promise<boolean> {
+		await state.readyPromise;
+		this.pruneSegment(state, now);
+		return this.unloadInactiveEmptySegment(state, now, true);
+	}
+
+	private async unloadInactiveEmptySegments(now: number): Promise<void> {
+		await Promise.all(
+			[...this.segments.values()].map(async (state) => {
+				await state.readyPromise;
+				await this.unloadInactiveEmptySegment(state, now, false);
+			}),
+		);
+	}
+
+	private async unloadInactiveEmptySegment(
+		state: SegmentCacheState,
+		now: number,
+		deletePersistedFile: boolean,
+	): Promise<boolean> {
+		if (state.cache.size > 0 || now - state.lastAccessedAt <= REASONING_CACHE_TTL_MS) {
+			return false;
+		}
+
+		if (deletePersistedFile) {
+			this.scheduleSave(state);
+		}
+		if (state.dirty || state.saveTimer || state.saveInFlight) {
+			await this.flushSegment(state);
+		}
+
+		if (state.cache.size === 0 && !state.dirty) {
+			this.segments.delete(state.segmentId);
+			return deletePersistedFile;
+		}
+
+		return false;
 	}
 }
 

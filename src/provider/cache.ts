@@ -417,7 +417,7 @@ function shouldLogCleanupResult(
 	return trigger === 'startup' || result.deleted > 0 || result.errors > 0;
 }
 
-export function pruneReasoningCache(
+function pruneReasoningCache(
 	cache: Map<string, ReasoningEntry>,
 	now = Date.now(),
 ): ReasoningCachePruneResult {

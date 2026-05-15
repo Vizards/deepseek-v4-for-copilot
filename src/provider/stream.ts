@@ -19,6 +19,7 @@ interface ResponseStreamState {
 	accumulatedReasoning: string;
 	emittedToolCallIds: string[];
 	segmentMarkerReported: boolean;
+	initialResponseNoticeReported: boolean;
 }
 
 const COPILOT_USAGE_DATA_PART_MIME = 'usage';
@@ -28,6 +29,7 @@ export interface StreamChatCompletionOptions {
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
 	token: vscode.CancellationToken;
 	reasoningCache: Map<string, ReasoningEntry>;
+	initialResponseNotice?: string;
 	getCharsPerToken: () => number;
 	setCharsPerToken: (charsPerToken: number) => void;
 }
@@ -37,6 +39,7 @@ export function streamChatCompletion({
 	progress,
 	token,
 	reasoningCache,
+	initialResponseNotice,
 	getCharsPerToken,
 	setCharsPerToken,
 }: StreamChatCompletionOptions): Promise<void> {
@@ -44,6 +47,7 @@ export function streamChatCompletion({
 		accumulatedReasoning: '',
 		emittedToolCallIds: [],
 		segmentMarkerReported: false,
+		initialResponseNoticeReported: false,
 	};
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics, () => {
 		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningCache);
@@ -54,16 +58,19 @@ export function streamChatCompletion({
 			prepared.request,
 			{
 				onContent: (content: string) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
 
 				onThinking: (text: string) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleThinking(text, state, progress);
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleToolCall(toolCall, state, progress);
 				},
@@ -113,6 +120,18 @@ export function streamChatCompletion({
 		.finally(() => {
 			cancelListener.dispose();
 		});
+}
+
+function reportInitialResponseNoticeOnce(
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+	state: ResponseStreamState,
+	initialResponseNotice: string | undefined,
+): void {
+	if (!initialResponseNotice || state.initialResponseNoticeReported) {
+		return;
+	}
+	state.initialResponseNoticeReported = true;
+	progress.report(new vscode.LanguageModelTextPart(initialResponseNotice));
 }
 
 function reportConversationSegmentMarkerOnce(

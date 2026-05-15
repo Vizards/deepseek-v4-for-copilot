@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
+import { getPreExpandActivateToolsEnabled } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
@@ -11,6 +12,7 @@ import { prepareChatRequest } from './request';
 import { resolveConversationSegment } from './segment';
 import { streamChatCompletion } from './stream';
 import { estimateTokenCount } from './tokens';
+import { processToolFlow } from './tools/flow';
 import { createVisionModelGetter, setVisionProxyModel } from './vision/index';
 
 /**
@@ -142,12 +144,22 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			requestOptions: options,
 		});
 
+		const toolFlow = processToolFlow({
+			preExpandActivateTools: getPreExpandActivateToolsEnabled(),
+			messages,
+			tools: options.tools,
+			progress,
+		});
+		if (toolFlow.preflightHandled) {
+			return;
+		}
+
 		const prepared = await prepareChatRequest({
 			authManager: this.authManager,
 			globalStorageUri: this.globalStorageUri,
 			modelInfo,
 			segment,
-			messages,
+			messages: toolFlow.messages,
 			options,
 			token,
 			reasoningCache: this.reasoningCache,
@@ -160,6 +172,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			progress,
 			token,
 			reasoningCache: this.reasoningCache,
+			initialResponseNotice: toolFlow.initialResponseNotice,
 			getCharsPerToken: () => this.charsPerToken,
 			setCharsPerToken: (charsPerToken) => {
 				this.charsPerToken = charsPerToken;

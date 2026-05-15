@@ -105,6 +105,7 @@ Both support optional thinking mode, tool calling, and 1M token context.
 | `deepseek-copilot.debugMode` | `minimal` | Diagnostic mode: `minimal` for token usage only, `metadata` for privacy-preserving logs, or `verbose` for full request dumps and pipeline snapshots under extension global storage. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the dump location |
 | `deepseek-copilot.visionModel` | *(auto)* | Which Copilot model to proxy images through |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |
+| `deepseek-copilot.experimental.preExpandActivateTools` | `false` | Experimental. Tries to stabilize tool-calling and may improve DeepSeek context-cache hit rate for chats with many Tools or MCP servers. Keep it off if your current setup works well |
 
 Thinking Effort is configured from Copilot Chat's model picker for each DeepSeek model.
 

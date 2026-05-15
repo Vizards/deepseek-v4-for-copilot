@@ -50,6 +50,12 @@ const zh: Translations = {
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
 
+	// Request
+	'request.toolsLimitExceeded': 'DeepSeek 最多支持 {0} 个工具，当前请求包含 {1} 个。',
+	'request.preflightRoundLimitExceeded': '工具预展开轮次超过限制（{0} 轮），请求已停止以避免循环。',
+	'notice.toolDrift':
+		'⚠️ Tools 不稳定，DeepSeek 缓存命中率可能下降。[说明](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.zh.md)',
+
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
 	'extension.deactivateFailed': 'DeepSeek 停用异常',
@@ -94,6 +100,14 @@ const en: Translations = {
 	'vision.notFound': 'Vision model "{0}" not found',
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
+
+	// Request
+	'request.toolsLimitExceeded':
+		'DeepSeek supports at most {0} tools, but this request contains {1}.',
+	'request.preflightRoundLimitExceeded':
+		'Tool pre-expansion exceeded the {0}-round limit, so the request was stopped to avoid a loop.',
+	'notice.toolDrift':
+		"⚠️ Tools are unstable; DeepSeek cache hits may drop. [Details](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)",
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

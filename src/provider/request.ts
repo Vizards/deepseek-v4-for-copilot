@@ -11,6 +11,7 @@ import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostic
 import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ConversationSegment } from './segment';
+import { DEEPSEEK_TOOLS_LIMIT } from './tools/consts';
 import { resolveImageMessages } from './vision/index';
 
 export interface PreparedChatRequest {
@@ -66,6 +67,10 @@ export async function prepareChatRequest({
 	const resolvedMessages = visionResolution.messages;
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningCache);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
+	const toolsCount = tools?.length ?? 0;
+	if (toolsCount > DEEPSEEK_TOOLS_LIMIT) {
+		throw new Error(t('request.toolsLimitExceeded', DEEPSEEK_TOOLS_LIMIT, toolsCount));
+	}
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
 	const request: DeepSeekRequest = {

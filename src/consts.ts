@@ -1,4 +1,5 @@
 import type { ModelDefinition } from './types';
+import { DEEPSEEK_TOOLS_LIMIT } from './provider/tools/consts';
 
 /**
  * Compile-time constants shared across the extension.
@@ -72,7 +73,7 @@ export const MODELS: ModelDefinition[] = [
 		maxInputTokens: 1048576,
 		maxOutputTokens: 393216,
 		capabilities: {
-			toolCalling: true,
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
 			thinking: true,
 		},
@@ -87,7 +88,7 @@ export const MODELS: ModelDefinition[] = [
 		maxInputTokens: 1048576,
 		maxOutputTokens: 393216,
 		capabilities: {
-			toolCalling: true,
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
 			thinking: true,
 		},

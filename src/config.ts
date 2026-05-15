@@ -64,6 +64,11 @@ export function getRequestDumpEnabled(): boolean {
 	return getDebugMode() === 'verbose';
 }
 
+export function getPreExpandActivateToolsEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('experimental.preExpandActivateTools', false);
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

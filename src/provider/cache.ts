@@ -60,6 +60,7 @@ export interface ReasoningCachePruneResult {
 }
 
 const REASONING_CACHE_SAVE_DEBOUNCE_MS = 500;
+const REASONING_CACHE_TOUCH_INTERVAL_MS = REASONING_CACHE_TTL_MS / 2;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -124,8 +125,11 @@ export class ReasoningCacheStore {
 			return undefined;
 		}
 
-		entry.updatedAt = Date.now();
-		this.scheduleSave(state);
+		const now = Date.now();
+		if (now - entry.updatedAt >= REASONING_CACHE_TOUCH_INTERVAL_MS) {
+			entry.updatedAt = now;
+			this.scheduleSave(state);
+		}
 		return entry;
 	}
 

@@ -1,5 +1,5 @@
-import type { ModelDefinition } from './types';
 import { DEEPSEEK_TOOLS_LIMIT } from './provider/tools/consts';
+import type { ModelDefinition } from './types';
 
 /**
  * Compile-time constants shared across the extension.
@@ -55,10 +55,13 @@ export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
 export const IMAGE_DESCRIPTION_PREFIX = '[Image Description: ';
 export const IMAGE_DESCRIPTION_SUFFIX = ']';
 
-// ---- Cache ----
+// ---- Reasoning cache ----
 
-/** Max entries in the reasoning-content cache before eviction kicks in. */
-export const MAX_CACHE_SIZE = 200;
+/** Directory name under globalStorageUri for persisted DeepSeek reasoning_content. */
+export const REASONING_CACHE_DIR_NAME = 'reasoning-cache-v1';
+
+/** Keep persisted reasoning long enough to roughly match DeepSeek context cache lifetime. */
+export const REASONING_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
 
 // ---- Model registry ----
 
@@ -70,7 +73,7 @@ export const MODELS: ModelDefinition[] = [
 		family: 'deepseek',
 		version: 'v4',
 		detail: 'Fast, general-purpose model',
-		maxInputTokens: 1048576,
+		maxInputTokens: 655360,
 		maxOutputTokens: 393216,
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
@@ -85,7 +88,7 @@ export const MODELS: ModelDefinition[] = [
 		family: 'deepseek',
 		version: 'v4',
 		detail: 'Most capable reasoning model',
-		maxInputTokens: 1048576,
+		maxInputTokens: 655360,
 		maxOutputTokens: 393216,
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,

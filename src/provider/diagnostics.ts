@@ -4,7 +4,7 @@ import { getDebugLoggingEnabled } from '../config';
 import {
 	IMAGE_DESCRIPTION_UNAVAILABLE,
 	LANGUAGE_MODEL_CHAT_SYSTEM_ROLE,
-	MAX_CACHE_SIZE,
+	REASONING_CACHE_TTL_MS,
 } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
@@ -176,7 +176,6 @@ export function observeCancellationToken(
 
 export interface CacheDiagnosticsRecorder {
 	isEnabled(): boolean;
-	logReasoningCacheCleared(removed: number): void;
 	beginRequest(options: BeginCacheDiagnosticsOptions): CacheDiagnosticsRun;
 }
 
@@ -219,12 +218,6 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		return getDebugLoggingEnabled();
 	}
 
-	logReasoningCacheCleared(removed: number): void {
-		if (removed > 0 && this.isEnabled()) {
-			logger.info(`reasoning-cache cleared entries=${removed} reason=short-history`);
-		}
-	}
-
 	beginRequest(options: BeginCacheDiagnosticsOptions): CacheDiagnosticsRun {
 		if (!this.isEnabled()) {
 			this.clearCacheTraces();
@@ -255,7 +248,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				` thinking=${options.isThinkingModel}` +
 				` thinkingEffort=${options.thinkingEffort}` +
 				` maxTokens=${options.maxTokens ?? 'api-default'}` +
-				` reasoningCache(size=${options.reasoningCacheSize},max=${MAX_CACHE_SIZE})` +
+				` reasoningCache(size=${options.reasoningCacheSize},ttlHours=${formatReasoningCacheTtlHours()})` +
 				` inputMessages=${options.inputMessages.length}` +
 				` deepseekMessages=${options.request.messages.length}`,
 		);
@@ -351,7 +344,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onDone(info: CacheDiagnosticsDoneInfo): void {
 		logger.info(
 			`[cache-trace #${this.requestId}] reasoningCache afterDone size=${info.reasoningCacheSize}` +
-				` max=${MAX_CACHE_SIZE}` +
+				` ttlHours=${formatReasoningCacheTtlHours()}` +
 				` evicted=${info.evictedReasoningEntries}` +
 				` emittedToolCalls=${info.emittedToolCalls}` +
 				` trailingToolResults=${info.trailingToolResults}`,
@@ -382,6 +375,10 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onSegmentMarkerReport(info: SegmentMarkerReportInfo): void {
 		logger.info(`[cache-trace #${this.requestId}] ${formatSegmentMarkerReport(info)}`);
 	}
+}
+
+function formatReasoningCacheTtlHours(): number {
+	return REASONING_CACHE_TTL_MS / (60 * 60 * 1000);
 }
 
 class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {

@@ -65,6 +65,7 @@ export interface ReasoningCachePruneResult {
 
 const REASONING_CACHE_SAVE_DEBOUNCE_MS = 500;
 const REASONING_CACHE_TOUCH_INTERVAL_MS = REASONING_CACHE_TTL_MS / 2;
+const REASONING_CACHE_CLEANUP_CONCURRENCY = 8;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -329,35 +330,15 @@ export class ReasoningCacheStore {
 		}
 
 		const now = Date.now();
-		const fileResults = await Promise.all(
-			entries.map(async ([name, type]): Promise<ReasoningCacheCleanupResult> => {
-				if (type !== vscode.FileType.File || !name.endsWith('.json')) {
-					return emptyCleanupResult();
-				}
-
-				const segmentId = name.slice(0, -'.json'.length);
-				const loadedState = this.segments.get(segmentId);
-				if (loadedState) {
-					const deleted = await this.pruneLoadedSegmentFile(loadedState, now);
-					return { scanned: 1, deleted: deleted ? 1 : 0, errors: 0 };
-				}
-
-				const uri = vscode.Uri.joinPath(this.cacheRootUri, name);
-				try {
-					const stat = await vscode.workspace.fs.stat(uri);
-					if (now - stat.mtime > REASONING_CACHE_TTL_MS) {
-						await vscode.workspace.fs.delete(uri);
-						return { scanned: 1, deleted: 1, errors: 0 };
-					}
-				} catch (error) {
-					if (!isFileNotFoundError(error)) {
-						logger.warn(`Failed to prune reasoning cache file name=${name}`, error);
-						return { scanned: 1, deleted: 0, errors: 1 };
-					}
-				}
-				return { scanned: 1, deleted: 0, errors: 0 };
-			}),
-		);
+		const fileResults: ReasoningCacheCleanupResult[] = [];
+		for (let index = 0; index < entries.length; index += REASONING_CACHE_CLEANUP_CONCURRENCY) {
+			const batch = entries.slice(index, index + REASONING_CACHE_CLEANUP_CONCURRENCY);
+			fileResults.push(
+				...(await Promise.all(
+					batch.map(([name, type]) => this.pruneExpiredSegmentFile(name, type, now)),
+				)),
+			);
+		}
 		const result = fileResults.reduce(addCleanupResults, emptyCleanupResult());
 		await this.unloadInactiveEmptySegments(now);
 
@@ -368,6 +349,39 @@ export class ReasoningCacheStore {
 					` ttlMs=${REASONING_CACHE_TTL_MS}`,
 			);
 		}
+	}
+
+	private async pruneExpiredSegmentFile(
+		name: string,
+		type: vscode.FileType,
+		now: number,
+	): Promise<ReasoningCacheCleanupResult> {
+		if (type !== vscode.FileType.File || !name.endsWith('.json')) {
+			return emptyCleanupResult();
+		}
+
+		const segmentId = name.slice(0, -'.json'.length);
+		const loadedState = this.segments.get(segmentId);
+		if (loadedState) {
+			const deleted = await this.pruneLoadedSegmentFile(loadedState, now);
+			return { scanned: 1, deleted: deleted ? 1 : 0, errors: 0 };
+		}
+
+		const uri = vscode.Uri.joinPath(this.cacheRootUri, name);
+		try {
+			const stat = await vscode.workspace.fs.stat(uri);
+			if (now - stat.mtime > REASONING_CACHE_TTL_MS) {
+				await vscode.workspace.fs.delete(uri);
+				return { scanned: 1, deleted: 1, errors: 0 };
+			}
+		} catch (error) {
+			if (!isFileNotFoundError(error)) {
+				logger.warn(`Failed to prune reasoning cache file name=${name}`, error);
+				return { scanned: 1, deleted: 0, errors: 1 };
+			}
+		}
+
+		return { scanned: 1, deleted: 0, errors: 0 };
 	}
 
 	private async pruneLoadedSegmentFile(state: SegmentCacheState, now: number): Promise<boolean> {

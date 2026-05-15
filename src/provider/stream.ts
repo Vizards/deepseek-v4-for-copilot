@@ -3,9 +3,9 @@ import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import type { ReasoningRecorder } from './cache';
 import {
-    observeCancellationToken,
-    type CacheDiagnosticsRun,
-    type SegmentMarkerReportTrigger,
+	observeCancellationToken,
+	type CacheDiagnosticsRun,
+	type SegmentMarkerReportTrigger,
 } from './diagnostics';
 import type { PreparedChatRequest } from './request';
 import { createSegmentMarkerPart } from './segment';

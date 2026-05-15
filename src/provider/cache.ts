@@ -31,7 +31,6 @@ interface SegmentCacheState {
 	saveInFlight: Promise<void> | undefined;
 	dirty: boolean;
 	lastAccessedAt: number;
-	activeReferences: number;
 }
 
 interface ReasoningCacheCleanupResult {
@@ -54,9 +53,7 @@ export interface ReasoningRecorder {
 	prune(now?: number): ReasoningCachePruneResult;
 }
 
-export interface SegmentReasoningCache extends ReasoningLookup, ReasoningRecorder {
-	release(): Promise<void>;
-}
+export type SegmentReasoningCache = ReasoningLookup & ReasoningRecorder;
 
 export interface ReasoningCachePruneResult {
 	removed: number;
@@ -65,7 +62,6 @@ export interface ReasoningCachePruneResult {
 
 const REASONING_CACHE_SAVE_DEBOUNCE_MS = 500;
 const REASONING_CACHE_TOUCH_INTERVAL_MS = REASONING_CACHE_TTL_MS / 2;
-const REASONING_CACHE_CLEANUP_CONCURRENCY = 8;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -98,12 +94,10 @@ export class ReasoningCacheStore {
 	async forSegment(segmentId: string): Promise<SegmentReasoningCache> {
 		await this.cleanupPromise;
 		const state = this.getOrCreateSegmentState(segmentId);
-		state.activeReferences += 1;
 		await state.readyPromise;
 		this.markAccessed(state);
 
 		const getSize = () => state.cache.size;
-		let released = false;
 		return {
 			get size(): number {
 				return getSize();
@@ -124,13 +118,6 @@ export class ReasoningCacheStore {
 				void this.queueExpiredSegmentCleanup('record');
 			},
 			prune: (now) => this.pruneSegment(state, now),
-			release: async () => {
-				if (released) {
-					return;
-				}
-				released = true;
-				await this.releaseSegmentState(state);
-			},
 		};
 	}
 
@@ -162,12 +149,6 @@ export class ReasoningCacheStore {
 
 	private markAccessed(state: SegmentCacheState, now = Date.now()): void {
 		state.lastAccessedAt = now;
-	}
-
-	private async releaseSegmentState(state: SegmentCacheState): Promise<void> {
-		state.activeReferences = Math.max(0, state.activeReferences - 1);
-		this.markAccessed(state);
-		await this.unloadEmptySegment(state, false);
 	}
 
 	private pruneSegment(state: SegmentCacheState, now = Date.now()): ReasoningCachePruneResult {
@@ -203,7 +184,6 @@ export class ReasoningCacheStore {
 			saveInFlight: undefined,
 			dirty: false,
 			lastAccessedAt: Date.now(),
-			activeReferences: 0,
 		};
 		state.readyPromise = this.loadSegment(state);
 		this.segments.set(segmentId, state);
@@ -330,16 +310,43 @@ export class ReasoningCacheStore {
 		}
 
 		const now = Date.now();
-		const fileResults: ReasoningCacheCleanupResult[] = [];
-		for (let index = 0; index < entries.length; index += REASONING_CACHE_CLEANUP_CONCURRENCY) {
-			const batch = entries.slice(index, index + REASONING_CACHE_CLEANUP_CONCURRENCY);
-			fileResults.push(
-				...(await Promise.all(
-					batch.map(([name, type]) => this.pruneExpiredSegmentFile(name, type, now)),
-				)),
-			);
-		}
-		const result = fileResults.reduce(addCleanupResults, emptyCleanupResult());
+		const result: ReasoningCacheCleanupResult = {
+			scanned: 0,
+			deleted: 0,
+			errors: 0,
+		};
+		await Promise.all(
+			entries.map(async ([name, type]) => {
+				if (type !== vscode.FileType.File || !name.endsWith('.json')) {
+					return;
+				}
+
+				result.scanned += 1;
+				const segmentId = name.slice(0, -'.json'.length);
+				const loadedState = this.segments.get(segmentId);
+				if (loadedState) {
+					const deleted = await this.pruneLoadedSegmentFile(loadedState, now);
+					if (deleted) {
+						result.deleted += 1;
+					}
+					return;
+				}
+
+				const uri = vscode.Uri.joinPath(this.cacheRootUri, name);
+				try {
+					const stat = await vscode.workspace.fs.stat(uri);
+					if (now - stat.mtime > REASONING_CACHE_TTL_MS) {
+						await vscode.workspace.fs.delete(uri);
+						result.deleted += 1;
+					}
+				} catch (error) {
+					if (!isFileNotFoundError(error)) {
+						result.errors += 1;
+						logger.warn(`Failed to prune reasoning cache file name=${name}`, error);
+					}
+				}
+			}),
+		);
 		await this.unloadInactiveEmptySegments(now);
 
 		if (shouldLogCleanupResult(trigger, result)) {
@@ -349,39 +356,6 @@ export class ReasoningCacheStore {
 					` ttlMs=${REASONING_CACHE_TTL_MS}`,
 			);
 		}
-	}
-
-	private async pruneExpiredSegmentFile(
-		name: string,
-		type: vscode.FileType,
-		now: number,
-	): Promise<ReasoningCacheCleanupResult> {
-		if (type !== vscode.FileType.File || !name.endsWith('.json')) {
-			return emptyCleanupResult();
-		}
-
-		const segmentId = name.slice(0, -'.json'.length);
-		const loadedState = this.segments.get(segmentId);
-		if (loadedState) {
-			const deleted = await this.pruneLoadedSegmentFile(loadedState, now);
-			return { scanned: 1, deleted: deleted ? 1 : 0, errors: 0 };
-		}
-
-		const uri = vscode.Uri.joinPath(this.cacheRootUri, name);
-		try {
-			const stat = await vscode.workspace.fs.stat(uri);
-			if (now - stat.mtime > REASONING_CACHE_TTL_MS) {
-				await vscode.workspace.fs.delete(uri);
-				return { scanned: 1, deleted: 1, errors: 0 };
-			}
-		} catch (error) {
-			if (!isFileNotFoundError(error)) {
-				logger.warn(`Failed to prune reasoning cache file name=${name}`, error);
-				return { scanned: 1, deleted: 0, errors: 1 };
-			}
-		}
-
-		return { scanned: 1, deleted: 0, errors: 0 };
 	}
 
 	private async pruneLoadedSegmentFile(state: SegmentCacheState, now: number): Promise<boolean> {
@@ -404,17 +378,7 @@ export class ReasoningCacheStore {
 		now: number,
 		deletePersistedFile: boolean,
 	): Promise<boolean> {
-		if (now - state.lastAccessedAt <= REASONING_CACHE_TTL_MS) {
-			return false;
-		}
-		return this.unloadEmptySegment(state, deletePersistedFile);
-	}
-
-	private async unloadEmptySegment(
-		state: SegmentCacheState,
-		deletePersistedFile: boolean,
-	): Promise<boolean> {
-		if (state.activeReferences > 0 || state.cache.size > 0) {
+		if (state.cache.size > 0 || now - state.lastAccessedAt <= REASONING_CACHE_TTL_MS) {
 			return false;
 		}
 
@@ -425,7 +389,7 @@ export class ReasoningCacheStore {
 			await this.flushSegment(state);
 		}
 
-		if (state.activeReferences === 0 && state.cache.size === 0 && !state.dirty) {
+		if (state.cache.size === 0 && !state.dirty) {
 			this.segments.delete(state.segmentId);
 			return deletePersistedFile;
 		}
@@ -439,21 +403,6 @@ function shouldLogCleanupResult(
 	result: ReasoningCacheCleanupResult,
 ): boolean {
 	return trigger === 'startup' || result.deleted > 0 || result.errors > 0;
-}
-
-function emptyCleanupResult(): ReasoningCacheCleanupResult {
-	return { scanned: 0, deleted: 0, errors: 0 };
-}
-
-function addCleanupResults(
-	total: ReasoningCacheCleanupResult,
-	current: ReasoningCacheCleanupResult,
-): ReasoningCacheCleanupResult {
-	return {
-		scanned: total.scanned + current.scanned,
-		deleted: total.deleted + current.deleted,
-		errors: total.errors + current.errors,
-	};
 }
 
 export function pruneReasoningCache(

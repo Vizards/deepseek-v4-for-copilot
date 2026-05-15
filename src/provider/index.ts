@@ -143,42 +143,38 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		const reasoning = await this.reasoningCache.forSegment(segment.segmentId);
 		reasoning.prune();
 
-		try {
-			dumpProviderInput({
-				globalStorageUri: this.globalStorageUri,
-				segment,
-				modelInfo,
-				messages,
-				requestOptions: options,
-			});
+		dumpProviderInput({
+			globalStorageUri: this.globalStorageUri,
+			segment,
+			modelInfo,
+			messages,
+			requestOptions: options,
+		});
 
-			const prepared = await prepareChatRequest({
-				authManager: this.authManager,
-				globalStorageUri: this.globalStorageUri,
-				modelInfo,
-				segment,
-				messages,
-				options,
-				token,
-				reasoningLookup: reasoning,
-				reasoningCacheSize: reasoning.size,
-				cacheDiagnostics: this.cacheDiagnostics,
-				getVisionModel: () => this.vision.get(),
-			});
+		const prepared = await prepareChatRequest({
+			authManager: this.authManager,
+			globalStorageUri: this.globalStorageUri,
+			modelInfo,
+			segment,
+			messages,
+			options,
+			token,
+			reasoningLookup: reasoning,
+			reasoningCacheSize: reasoning.size,
+			cacheDiagnostics: this.cacheDiagnostics,
+			getVisionModel: () => this.vision.get(),
+		});
 
-			return streamChatCompletion({
-				prepared,
-				progress,
-				token,
-				reasoningRecorder: reasoning,
-				getCharsPerToken: () => this.charsPerToken,
-				setCharsPerToken: (charsPerToken) => {
-					this.charsPerToken = charsPerToken;
-				},
-			});
-		} finally {
-			await reasoning.release();
-		}
+		return streamChatCompletion({
+			prepared,
+			progress,
+			token,
+			reasoningRecorder: reasoning,
+			getCharsPerToken: () => this.charsPerToken,
+			setCharsPerToken: (charsPerToken) => {
+				this.charsPerToken = charsPerToken;
+			},
+		});
 	}
 
 	async provideTokenCount(

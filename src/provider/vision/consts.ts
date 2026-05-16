@@ -18,14 +18,14 @@ export const IMAGE_DESCRIPTION_PROMPT =
 /**
  * Stable fallback marker inserted into the chat prompt when the vision proxy
  * fails to describe an image. Keep this in English and out of i18n so prompt
- * shape and cache behaviour do not vary by VS Code display language.
+ * shape and marker replay text do not vary by VS Code display language.
  */
 export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
 
 /**
  * Wrapper applied to vision model descriptions before they are inserted into
  * the chat prompt. The full format is: `[Image Description: <description>]`.
- * Keep these in English and out of i18n so cache keys and token estimates
+ * Keep these in English and out of i18n so prompt shape and token estimates
  * stay stable regardless of VS Code display language.
  */
 export const IMAGE_DESCRIPTION_PREFIX = '[Image Description: ';

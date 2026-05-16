@@ -200,7 +200,9 @@ function findCurrentImageMessageIndex(
 		if (message.role !== vscode.LanguageModelChatMessageRole.User) {
 			continue;
 		}
-		return getImageParts(message).length > 0 ? index : undefined;
+		if (getImageParts(message).length > 0) {
+			return index;
+		}
 	}
 	return undefined;
 }

@@ -17,12 +17,15 @@ export function convertMessages(
 		const role = mapRole(message.role);
 
 		let content = '';
+		let thinkingContent = '';
 		const toolCalls: DeepSeekToolCall[] = [];
 		const toolResults: Array<{ callId: string; content: string }> = [];
 
 		for (const part of message.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				content += part.value;
+			} else if (isLanguageModelThinkingPart(part)) {
+				thinkingContent += normalizeThinkingPartText(part.value);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				toolCalls.push({
 					id: part.callId,
@@ -59,7 +62,7 @@ export function convertMessages(
 				}
 
 				if (isThinkingModel) {
-					msg.reasoning_content = replayMarker?.valid ? (replayMarker.reasoningText ?? '') : '';
+					msg.reasoning_content = getReasoningContent(replayMarker, thinkingContent);
 				}
 
 				result.push(msg);
@@ -84,6 +87,27 @@ export function convertMessages(
 	}
 
 	return result;
+}
+
+function getReasoningContent(
+	replayMarker: ReturnType<typeof parseFirstReplayMarker>,
+	thinkingContent: string,
+): string {
+	if (replayMarker?.valid && replayMarker.reasoningText) {
+		return replayMarker.reasoningText;
+	}
+	return thinkingContent;
+}
+
+function isLanguageModelThinkingPart(part: unknown): part is vscode.LanguageModelThinkingPart {
+	return (
+		typeof vscode.LanguageModelThinkingPart === 'function' &&
+		part instanceof vscode.LanguageModelThinkingPart
+	);
+}
+
+function normalizeThinkingPartText(value: string | string[]): string {
+	return Array.isArray(value) ? value.join('') : value;
 }
 
 function mapRole(role: vscode.LanguageModelChatMessageRole): 'user' | 'assistant' {

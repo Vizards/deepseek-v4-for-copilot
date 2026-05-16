@@ -16,7 +16,7 @@ const SEGMENT_MARKER_PREFIXES = new Set([
 	...MODELS.map((model) => model.id),
 ]);
 const ENCODED_JSON_MARKER_PREFIX = 'json:';
-const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+={0,2}$/;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

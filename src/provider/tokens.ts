@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { SEGMENT_MARKER_MIME } from './segment';
+import { REPLAY_MARKER_MIME } from './replay';
 
 const IMAGE_PART_ESTIMATED_CHARS = 1020;
 
@@ -41,7 +41,7 @@ function estimatePartChars(part: unknown): number {
 	//    by the vision pipeline; raw byteLength would massively overestimate.
 	if (part instanceof vscode.LanguageModelDataPart) {
 		const mime = part.mimeType;
-		if (mime === SEGMENT_MARKER_MIME) {
+		if (mime === REPLAY_MARKER_MIME) {
 			// Marker metadata is not sent as assistant content. Its vision text belongs
 			// logically to a previous user image message, but provideTokenCount only
 			// receives one message at a time and cannot safely bind history here.

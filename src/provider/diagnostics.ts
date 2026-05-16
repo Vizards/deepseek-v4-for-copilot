@@ -1,15 +1,17 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { getDebugLoggingEnabled } from '../config';
-import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE, REASONING_CACHE_TTL_MS } from '../consts';
+import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
+import { REPLAY_MARKER_MIME } from './replay';
 import type { ConversationSegment } from './segment';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from './vision/consts';
 import type { VisionResolutionStats as VisionPipelineStats } from './vision/index';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
+const HOST_CACHE_CONTROL_MIME = 'cache_control';
 
 export interface CacheTraceStats {
 	messageCount: number;
@@ -88,7 +90,6 @@ export interface CacheTraceSnapshot {
 	cacheTraceKey: string;
 	redactedComparisonInput: string;
 	toolsHash: string;
-	toolNames: string[];
 	toolSummaries: CacheTraceToolSummary[];
 	messageSummaries: CacheTraceMessageSummary[];
 	stats: CacheTraceStats;
@@ -117,7 +118,6 @@ export interface BeginCacheDiagnosticsOptions {
 	isThinkingModel: boolean;
 	thinkingEffort: string;
 	maxTokens: number | undefined;
-	reasoningCacheSize: number;
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	visionModelId?: string;
@@ -125,8 +125,7 @@ export interface BeginCacheDiagnosticsOptions {
 }
 
 export interface CacheDiagnosticsDoneInfo {
-	reasoningCacheSize: number;
-	evictedReasoningEntries: number;
+	reasoningTextChars: number;
 	emittedToolCalls: number;
 	trailingToolResults: number;
 }
@@ -134,21 +133,21 @@ export interface CacheDiagnosticsDoneInfo {
 export interface CacheDiagnosticsRun {
 	onDone(info: CacheDiagnosticsDoneInfo): void;
 	onCancellationTokenRequested(): void;
-	onSegmentMarkerReport(info: SegmentMarkerReportInfo): void;
+	onReplayMarkerReport(info: ReplayMarkerReportInfo): void;
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void;
 }
 
-export type SegmentMarkerReportStatus = 'reported' | 'failed' | 'skipped';
+export type ReplayMarkerReportStatus = 'reported' | 'failed' | 'skipped';
 
-export type SegmentMarkerReportTrigger = 'first-assistant-part' | 'done';
+export type ReplayMarkerReportTrigger = 'done';
 
-export interface SegmentMarkerReportInfo {
-	segment: ConversationSegment;
-	status: SegmentMarkerReportStatus;
-	trigger?: SegmentMarkerReportTrigger;
+export interface ReplayMarkerReportInfo {
+	status: ReplayMarkerReportStatus;
+	trigger?: ReplayMarkerReportTrigger;
 	markerBytes?: number;
 	visionTextChars?: number;
-	reason?: 'cancelled' | 'stream-error';
+	reasoningTextChars?: number;
+	reason?: 'cancelled' | 'stream-error' | 'no-replay-data';
 	error?: unknown;
 }
 
@@ -247,15 +246,14 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				` thinking=${options.isThinkingModel}` +
 				` thinkingEffort=${options.thinkingEffort}` +
 				` maxTokens=${options.maxTokens ?? 'api-default'}` +
-				` reasoningCache(size=${options.reasoningCacheSize},ttlHours=${formatReasoningCacheTtlHours()})` +
+				` replayMarker=message-local` +
 				` inputMessages=${options.inputMessages.length}` +
 				` deepseekMessages=${options.request.messages.length}`,
 		);
-		logger.info(
-			`[cache-trace #${requestId}] ${formatHostPromptTrace(
-				summarizeHostPromptTrace(options.inputMessages),
-			)}`,
-		);
+		const hostPromptTrace = summarizeHostPromptTrace(options.inputMessages);
+		if (shouldLogHostPromptTrace(hostPromptTrace)) {
+			logger.info(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
+		}
 		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
 		if (vscodeMessageTrace) {
 			logger.info(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
@@ -293,10 +291,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				logger.warn(`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`);
 			}
 		}
-		for (const warning of getCacheTraceWarnings(
-			cacheTrace,
-			visionResolution.historyDescriptionMessages,
-		)) {
+		for (const warning of getCacheTraceWarnings(cacheTrace)) {
 			logger.warn(`[cache-trace #${requestId}] ${warning}`);
 		}
 
@@ -341,13 +336,13 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	) {}
 
 	onDone(info: CacheDiagnosticsDoneInfo): void {
-		logger.info(
-			`[cache-trace #${this.requestId}] reasoningCache afterDone size=${info.reasoningCacheSize}` +
-				` ttlHours=${formatReasoningCacheTtlHours()}` +
-				` evicted=${info.evictedReasoningEntries}` +
-				` emittedToolCalls=${info.emittedToolCalls}` +
-				` trailingToolResults=${info.trailingToolResults}`,
-		);
+		if (info.emittedToolCalls > 0 || info.trailingToolResults > 0) {
+			logger.info(
+				`[cache-trace #${this.requestId}] stream done reasoningTextChars=${info.reasoningTextChars}` +
+					` emittedToolCalls=${info.emittedToolCalls}` +
+					` trailingToolResults=${info.trailingToolResults}`,
+			);
+		}
 		this.recorder.rememberCacheTrace(this.snapshot);
 	}
 
@@ -371,13 +366,9 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
 	}
 
-	onSegmentMarkerReport(info: SegmentMarkerReportInfo): void {
-		logger.info(`[cache-trace #${this.requestId}] ${formatSegmentMarkerReport(info)}`);
+	onReplayMarkerReport(info: ReplayMarkerReportInfo): void {
+		logger.info(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
 	}
-}
-
-function formatReasoningCacheTtlHours(): number {
-	return REASONING_CACHE_TTL_MS / (60 * 60 * 1000);
 }
 
 class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
@@ -385,7 +376,7 @@ class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
 
 	onCancellationTokenRequested(): void {}
 
-	onSegmentMarkerReport(_info: SegmentMarkerReportInfo): void {}
+	onReplayMarkerReport(_info: ReplayMarkerReportInfo): void {}
 
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void {
 		logUsage(usage, charsPerToken);
@@ -393,28 +384,35 @@ class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
 }
 
 function formatSegmentTrace(segment: ConversationSegment): string {
-	const markerLocation =
-		segment.markerMessageIndex === undefined || segment.markerPartIndex === undefined
-			? ''
-			: ` segmentMarkerAt=message#${segment.markerMessageIndex}:part#${segment.markerPartIndex}`;
-	const markerError = segment.markerError ? ` segmentMarkerError=${segment.markerError}` : '';
-	return ` segment=${segment.segmentId} segmentReason=${segment.reason}${markerLocation}${markerError}`;
+	let legacyMarker = '';
+	if (segment.reason === 'markerFound') {
+		legacyMarker = ' legacySegmentMarker=found';
+	} else if (segment.reason === 'markerInvalid') {
+		const markerLocation =
+			segment.markerMessageIndex === undefined || segment.markerPartIndex === undefined
+				? ''
+				: ` at=message#${segment.markerMessageIndex}:part#${segment.markerPartIndex}`;
+		const markerError = segment.markerError ? ` error=${segment.markerError}` : '';
+		legacyMarker = ` legacySegmentMarker=invalid${markerLocation}${markerError}`;
+	}
+	return ` dumpSegment=${segment.segmentId}${legacyMarker}`;
 }
 
-function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
+function formatReplayMarkerReport(info: ReplayMarkerReportInfo): string {
 	const trigger = info.trigger ? ` trigger=${info.trigger}` : '';
 	const markerBytes = info.markerBytes === undefined ? '' : ` markerBytes=${info.markerBytes}`;
 	const visionTextChars =
 		info.visionTextChars === undefined ? '' : ` visionTextChars=${info.visionTextChars}`;
+	const reasoningTextChars =
+		info.reasoningTextChars === undefined ? '' : ` reasoningTextChars=${info.reasoningTextChars}`;
 	const reason = info.reason ? ` reason=${info.reason}` : '';
 	const error = info.error ? ` error=${formatError(info.error)}` : '';
 	return (
-		`segmentMarker status=${info.status}` +
-		` segment=${info.segment.segmentId}` +
-		` segmentReason=${info.segment.reason}` +
+		`replayMarker status=${info.status}` +
 		trigger +
 		markerBytes +
 		visionTextChars +
+		reasoningTextChars +
 		reason +
 		error
 	);
@@ -483,8 +481,18 @@ function formatHostPromptTrace(trace: HostPromptTrace): string {
 	);
 }
 
+function shouldLogHostPromptTrace(trace: HostPromptTrace): boolean {
+	return trace.customizationsUpdateCount > 0 || trace.latestUserHasCustomizationsUpdate;
+}
+
 function formatYesNo(value: boolean): 'yes' | 'no' {
 	return value ? 'yes' : 'no';
+}
+
+function appendNumberIfNonZero(parts: string[], name: string, value: number): void {
+	if (value > 0) {
+		parts.push(`${name}=${value}`);
+	}
 }
 
 function formatError(error: unknown): string {
@@ -606,18 +614,32 @@ function formatVisionTrace(
 	const note =
 		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats);
-	const pipelineTrace = formatVisionPipelineStats(pipelineStats);
-	return (
-		`vision rawImageParts=${stats.inputImageParts}` +
-		` rawImageMessages=${stats.inputImageMessages}` +
-		` newDescriptionMessages=${stats.describedImageMessages}` +
-		` failedDescriptionMessages=${stats.failedImageMessages}` +
-		` droppedImageParts=${stats.droppedImageParts}` +
-		` visionModel=${visionModel}` +
-		` historyDescriptionMessages=${stats.historyDescriptionMessages}` +
-		pipelineTrace +
-		note
-	);
+	const parts = [
+		`vision inputImages=${stats.inputImageParts}`,
+		`inputMessages=${stats.inputImageMessages}`,
+	];
+
+	if (pipelineStats && hasVisionPipelineActivity(pipelineStats)) {
+		parts.push(
+			`current=${pipelineStats.currentImageMessages}`,
+			`generated=${pipelineStats.generatedImageMessages}`,
+			`replayed=${pipelineStats.replayedImageMessages}`,
+			`omitted=${pipelineStats.omittedImageMessages}`,
+			`droppedParts=${pipelineStats.droppedImageParts}`,
+		);
+		appendNumberIfNonZero(parts, 'unavailable', pipelineStats.unavailableImageMessages);
+		appendNumberIfNonZero(parts, 'failed', pipelineStats.failedImageMessages);
+		appendNumberIfNonZero(parts, 'markerChars', pipelineStats.markerVisionTextChars);
+		appendNumberIfNonZero(parts, 'invalidMarkerVision', pipelineStats.invalidMarkerVisionMetadata);
+	} else {
+		appendNumberIfNonZero(parts, 'generated', stats.describedImageMessages);
+		appendNumberIfNonZero(parts, 'failed', stats.failedImageMessages);
+		appendNumberIfNonZero(parts, 'droppedParts', stats.droppedImageParts);
+	}
+
+	parts.push(`model=${visionModel}`);
+	appendNumberIfNonZero(parts, 'historyDescriptions', stats.historyDescriptionMessages);
+	return parts.join(' ') + note;
 }
 
 function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): boolean {
@@ -633,28 +655,6 @@ function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): bool
 		stats.unavailableImageMessages > 0 ||
 		stats.failedImageMessages > 0 ||
 		stats.invalidMarkerVisionMetadata > 0
-	);
-}
-
-function formatVisionPipelineStats(stats: VisionPipelineStats | undefined): string {
-	if (!stats) {
-		return '';
-	}
-	if (!hasVisionPipelineActivity(stats)) {
-		return '';
-	}
-
-	return (
-		` markerReplay(inputImages=${stats.inputImageParts}` +
-		`,current=${stats.currentImageMessages}` +
-		`,generated=${stats.generatedImageMessages}` +
-		`,replayed=${stats.replayedImageMessages}` +
-		`,omitted=${stats.omittedImageMessages}` +
-		`,unavailable=${stats.unavailableImageMessages}` +
-		`,failed=${stats.failedImageMessages}` +
-		`,droppedParts=${stats.droppedImageParts}` +
-		`,markerChars=${stats.markerVisionTextChars}` +
-		`,invalidMarkerVision=${stats.invalidMarkerVisionMetadata})`
 	);
 }
 
@@ -682,72 +682,93 @@ function formatVscodeMessageTrace(
 		return undefined;
 	}
 
-	return messages
-		.map((msg, index) => {
-			const role = formatVscodeMessageRole(msg.role);
-			let textChars = 0;
-			let imageParts = 0;
-			let toolCallParts = 0;
-			let toolResultParts = 0;
-			let thinkingParts = 0;
-			let thinkingChars = 0;
-			const thinkingValueTypes = new Set<string>();
-			const thinkingHashes: string[] = [];
-			const unknownPartConstructors = new Map<string, number>();
+	let hasInterestingParts = false;
+	const traces = messages.map((msg, index) => {
+		const role = formatVscodeMessageRole(msg.role);
+		let textChars = 0;
+		let imageParts = 0;
+		let toolCallParts = 0;
+		let toolResultParts = 0;
+		let thinkingParts = 0;
+		let thinkingChars = 0;
+		let replayMarkerParts = 0;
+		let hostCacheControlParts = 0;
+		const dataPartMimes = new Map<string, number>();
+		const thinkingValueTypes = new Set<string>();
+		const thinkingHashes: string[] = [];
+		const unknownPartConstructors = new Map<string, number>();
 
-			for (const part of msg.content) {
-				if (part instanceof vscode.LanguageModelTextPart) {
-					textChars += part.value.length;
-				} else if (
-					part instanceof vscode.LanguageModelDataPart &&
-					part.mimeType.startsWith('image/')
-				) {
+		for (const part of msg.content) {
+			if (part instanceof vscode.LanguageModelTextPart) {
+				textChars += part.value.length;
+			} else if (part instanceof vscode.LanguageModelDataPart) {
+				if (part.mimeType.startsWith('image/')) {
 					imageParts += 1;
-				} else if (part instanceof vscode.LanguageModelToolCallPart) {
-					toolCallParts += 1;
-				} else if (part instanceof vscode.LanguageModelToolResultPart) {
-					toolResultParts += 1;
-				} else if (isLanguageModelThinkingPart(part)) {
-					const value = normalizeThinkingPartValue(part.value);
-					thinkingParts += 1;
-					thinkingChars += value.text.length;
-					thinkingValueTypes.add(value.type);
-					thinkingHashes.push(hashString(value.text));
+				} else if (part.mimeType === REPLAY_MARKER_MIME) {
+					replayMarkerParts += 1;
+				} else if (part.mimeType === HOST_CACHE_CONTROL_MIME) {
+					hostCacheControlParts += 1;
 				} else {
-					const constructorName = getPartConstructorName(part);
-					unknownPartConstructors.set(
-						constructorName,
-						(unknownPartConstructors.get(constructorName) ?? 0) + 1,
-					);
+					dataPartMimes.set(part.mimeType, (dataPartMimes.get(part.mimeType) ?? 0) + 1);
 				}
-			}
-
-			const parts: string[] = [];
-			if (imageParts) {
-				parts.push(`image=${imageParts}`);
-			}
-			if (toolCallParts) {
-				parts.push(`toolCalls=${toolCallParts}`);
-			}
-			if (toolResultParts) {
-				parts.push(`toolResults=${toolResultParts}`);
-			}
-			if (thinkingParts) {
-				parts.push(
-					`thinking=${thinkingParts}:chars=${thinkingChars}:types=${[...thinkingValueTypes].join(
-						'+',
-					)}:hashes=${thinkingHashes.join(',')}`,
+			} else if (part instanceof vscode.LanguageModelToolCallPart) {
+				toolCallParts += 1;
+			} else if (part instanceof vscode.LanguageModelToolResultPart) {
+				toolResultParts += 1;
+			} else if (isLanguageModelThinkingPart(part)) {
+				const value = normalizeThinkingPartValue(part.value);
+				thinkingParts += 1;
+				thinkingChars += value.text.length;
+				thinkingValueTypes.add(value.type);
+				thinkingHashes.push(hashString(value.text));
+			} else {
+				const constructorName = getPartConstructorName(part);
+				unknownPartConstructors.set(
+					constructorName,
+					(unknownPartConstructors.get(constructorName) ?? 0) + 1,
 				);
 			}
-			for (const [constructorName, count] of unknownPartConstructors) {
-				parts.push(`unknown=${constructorName}:${count}`);
-			}
+		}
 
-			const suffix = parts.length > 0 ? ` (${parts.join(',')})` : '';
+		const parts: string[] = [];
+		if (imageParts) {
+			parts.push(`image=${imageParts}`);
+		}
+		if (toolCallParts) {
+			parts.push(`toolCalls=${toolCallParts}`);
+		}
+		if (toolResultParts) {
+			parts.push(`toolResults=${toolResultParts}`);
+		}
+		if (thinkingParts) {
+			parts.push(
+				`thinking=${thinkingParts}:chars=${thinkingChars}:types=${[...thinkingValueTypes].join(
+					'+',
+				)}:hashes=${thinkingHashes.join(',')}`,
+			);
+		}
+		if (replayMarkerParts) {
+			parts.push(`replayMarker=${replayMarkerParts}`);
+		}
+		for (const [mimeType, count] of dataPartMimes) {
+			parts.push(`data=${mimeType}:${count}`);
+		}
+		if (hostCacheControlParts > 1) {
+			parts.push(`cacheControl=${hostCacheControlParts}`);
+		}
+		for (const [constructorName, count] of unknownPartConstructors) {
+			parts.push(`unknown=${constructorName}:${count}`);
+		}
 
-			return `${role}#${index}:chars=${textChars}${suffix}`;
-		})
-		.join(' | ');
+		const suffix = parts.length > 0 ? ` (${parts.join(',')})` : '';
+		if (parts.length > 0) {
+			hasInterestingParts = true;
+		}
+
+		return `${role}#${index}:chars=${textChars}${suffix}`;
+	});
+
+	return hasInterestingParts ? traces.join(' | ') : undefined;
 }
 
 function formatVscodeMessageRole(role: vscode.LanguageModelChatMessageRole): string {
@@ -794,7 +815,6 @@ export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSn
 		cacheTraceKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
 		redactedComparisonInput,
 		toolsHash: hashString(toolsSerialized),
-		toolNames: request.tools?.map((tool) => tool.function.name) ?? [],
 		toolSummaries,
 		messageSummaries,
 		stats: summarizeStats(request.messages, request.tools?.length ?? 0),
@@ -871,40 +891,61 @@ export function compareCacheTraceSnapshots(
 
 export function formatCacheTraceSnapshot(snapshot: CacheTraceSnapshot): string {
 	const stats = snapshot.stats;
-	return (
-		`fingerprint=${snapshot.fingerprint} cacheTraceKey=${snapshot.cacheTraceKey}` +
-		` messages=${stats.messageCount} tools=${stats.toolCount}` +
-		` chars(content=${stats.totalContentChars},toolArgs=${stats.toolCallArgumentChars},reasoning=${stats.reasoningChars})` +
-		` assistantToolMessages=${stats.assistantToolCallMessages}` +
-		` toolReasoning(nonEmpty=${stats.nonEmptyToolReasoningMessages},empty=${stats.emptyToolReasoningMessages},missing=${stats.missingToolReasoningMessages})` +
-		` missingToolReasoning=${stats.missingToolReasoningMessages}` +
-		` assistantAfterToolResult=${stats.assistantAfterToolResultMessages}` +
-		` afterToolResult(toolCall=${stats.assistantAfterToolResultToolCallMessages},final=${stats.assistantAfterToolResultFinalMessages})` +
-		` postToolReasoning(nonEmpty=${stats.nonEmptyPostToolReasoningMessages},empty=${stats.emptyPostToolReasoningMessages},missing=${stats.missingPostToolReasoningMessages})` +
-		` postToolCallReasoning(nonEmpty=${stats.nonEmptyPostToolCallReasoningMessages},empty=${stats.emptyPostToolCallReasoningMessages},missing=${stats.missingPostToolCallReasoningMessages})` +
-		` postToolFinalReasoning(nonEmpty=${stats.nonEmptyPostToolFinalReasoningMessages},empty=${stats.emptyPostToolFinalReasoningMessages},missing=${stats.missingPostToolFinalReasoningMessages})` +
-		` missingPostToolReasoning=${stats.missingPostToolReasoningMessages}` +
-		` imageDescriptions=${stats.imageDescriptionMessages}` +
-		` toolNames=${formatToolNames(snapshot.toolNames)}`
-	);
+	const parts = [
+		`fingerprint=${snapshot.fingerprint}`,
+		`cacheTraceKey=${snapshot.cacheTraceKey}`,
+		`messages=${stats.messageCount}`,
+		`roles(user=${stats.userMessages},assistant=${stats.assistantMessages},tool=${stats.toolMessages},system=${stats.systemMessages})`,
+		`tools=${stats.toolCount}`,
+		`chars(content=${stats.totalContentChars},toolArgs=${stats.toolCallArgumentChars},reasoning=${stats.reasoningChars})`,
+	];
+
+	if (
+		stats.assistantToolCallMessages > 0 ||
+		stats.nonEmptyToolReasoningMessages > 0 ||
+		stats.emptyToolReasoningMessages > 0 ||
+		stats.missingToolReasoningMessages > 0
+	) {
+		parts.push(
+			`toolReasoning(messages=${stats.assistantToolCallMessages},nonEmpty=${stats.nonEmptyToolReasoningMessages},empty=${stats.emptyToolReasoningMessages},missing=${stats.missingToolReasoningMessages})`,
+		);
+	}
+
+	if (
+		stats.assistantAfterToolResultMessages > 0 ||
+		stats.nonEmptyPostToolReasoningMessages > 0 ||
+		stats.emptyPostToolReasoningMessages > 0 ||
+		stats.missingPostToolReasoningMessages > 0
+	) {
+		parts.push(
+			`postToolReasoning(messages=${stats.assistantAfterToolResultMessages},toolCall=${stats.assistantAfterToolResultToolCallMessages},final=${stats.assistantAfterToolResultFinalMessages},nonEmpty=${stats.nonEmptyPostToolReasoningMessages},empty=${stats.emptyPostToolReasoningMessages},missing=${stats.missingPostToolReasoningMessages})`,
+		);
+	}
+
+	appendNumberIfNonZero(parts, 'imageDescriptions', stats.imageDescriptionMessages);
+	appendNumberIfNonZero(parts, 'largeMessages', stats.largeMessages);
+	return parts.join(' ');
 }
 
 export function formatCacheTraceDetailLines(snapshot: CacheTraceSnapshot): string[] {
 	const stats = snapshot.stats;
-	return [
-		`roles user=${stats.userMessages} assistant=${stats.assistantMessages} tool=${stats.toolMessages} system=${stats.systemMessages}` +
-			` largeMessages>${LARGE_MESSAGE_CHARS}=${stats.largeMessages}` +
-			` largest=${formatLargestMessages(snapshot.messageSummaries)}`,
-		`markers imageDescMsgs=${stats.imageDescriptionMessages}` +
-			` imageDescParts=${stats.imageDescriptionParts}` +
-			` unableImageMsgs=${stats.unableImageMessages}` +
-			` urlMsgs=${stats.urlMessages}` +
-			` urlCount=${stats.urlCount}` +
-			` codeFenceMsgs=${stats.codeFenceMessages}` +
-			` codeFenceCount=${stats.codeFenceCount}` +
-			` likelyPathMsgs=${stats.likelyPathMessages}` +
-			` likelyPathCount=${stats.likelyPathCount}`,
-	];
+	const lines: string[] = [];
+	if (stats.imageDescriptionParts > 0 || stats.unableImageMessages > 0) {
+		lines.push(
+			`imageText imageDescMsgs=${stats.imageDescriptionMessages}` +
+				` imageDescParts=${stats.imageDescriptionParts}` +
+				` unableImageMsgs=${stats.unableImageMessages}`,
+		);
+	}
+	if (stats.urlMessages > 0 || stats.codeFenceMessages > 0) {
+		lines.push(
+			`contentMarkers urlMsgs=${stats.urlMessages}` +
+				` urlCount=${stats.urlCount}` +
+				` codeFenceMsgs=${stats.codeFenceMessages}` +
+				` codeFenceCount=${stats.codeFenceCount}`,
+		);
+	}
+	return lines;
 }
 
 export function formatCacheTraceComparison(comparison: CacheTraceComparison): string {
@@ -915,14 +956,14 @@ export function formatCacheTraceComparison(comparison: CacheTraceComparison): st
 					comparison.previousMessage,
 				)} curr=${formatMessageSummary(comparison.currentMessage)}`;
 	const changedTool = comparison.toolsChanged
-		? ` firstChangedTool=${formatChangedTool(comparison)}`
+		? ` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
+			` firstChangedTool=${formatChangedTool(comparison)}`
 		: '';
 
 	return (
 		`summaryPrefixVsPrevious chars=${comparison.commonPrefixSummaryChars}` +
 		` percent=${comparison.commonPrefixSummaryPercent.toFixed(1)}%` +
 		` toolsChanged=${comparison.toolsChanged}` +
-		` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
 		changedTool +
 		` firstChangedMessage=${changedMessage}`
 	);
@@ -940,7 +981,8 @@ export function formatCacheTraceKeyChangeComparison(
 					comparison.previousMessage,
 				)} curr=${formatMessageSummary(comparison.currentMessage)}`;
 	const changedTool = comparison.toolsChanged
-		? ` firstChangedTool=${formatChangedTool(comparison)}`
+		? ` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
+			` firstChangedTool=${formatChangedTool(comparison)}`
 		: '';
 
 	return (
@@ -948,7 +990,6 @@ export function formatCacheTraceKeyChangeComparison(
 		` fallbackSummaryPrefixVsPrevious chars=${comparison.commonPrefixSummaryChars}` +
 		` percent=${comparison.commonPrefixSummaryPercent.toFixed(1)}%` +
 		` toolsChanged=${comparison.toolsChanged}` +
-		` toolsHash=${comparison.previousToolsHash}->${comparison.currentToolsHash}` +
 		changedTool +
 		` firstChangedMessage=${changedMessage}`
 	);
@@ -973,44 +1014,31 @@ export function formatCacheTraceComparisonDetailLines(comparison: CacheTraceComp
 			`,lines=${current.contentLines - previous.contentLines}` +
 			`,toolArgs=${current.toolCallArgumentChars - previous.toolCallArgumentChars}` +
 			`,reasoning=${current.reasoningChars - previous.reasoningChars})`,
-		`changedMessage hashes content=${previous.contentHash}->${current.contentHash}` +
-			` head=${previous.contentHeadHash}->${current.contentHeadHash}` +
-			` tail=${previous.contentTailHash}->${current.contentTailHash}`,
-		`changedMessage markers prev=${formatMarkerSummary(previous)}` +
-			` curr=${formatMarkerSummary(current)}`,
 	];
 }
 
-export function getCacheTraceWarnings(
-	snapshot: CacheTraceSnapshot,
-	historyDescriptionMessages = snapshot.stats.imageDescriptionMessages,
-): string[] {
+export function getCacheTraceWarnings(snapshot: CacheTraceSnapshot): string[] {
 	const warnings: string[] = [];
 	if (snapshot.stats.missingToolReasoningMessages > 0) {
 		warnings.push(
-			`${snapshot.stats.missingToolReasoningMessages} assistant tool-call message(s) are missing cached reasoning_content; DeepSeek requires this in thinking tool-call histories and cache prefixes may drift.`,
+			`${snapshot.stats.missingToolReasoningMessages} assistant tool-call message(s) are missing marker-replayed reasoning_content; DeepSeek requires this in thinking tool-call histories and cache prefixes may drift.`,
 		);
 	}
 	if (snapshot.stats.missingPostToolCallReasoningMessages > 0) {
 		warnings.push(
-			`${snapshot.stats.missingPostToolCallReasoningMessages} assistant tool-call message(s) after tool results are missing cached reasoning_content; these should replay via tool:<id> keys.`,
+			`${snapshot.stats.missingPostToolCallReasoningMessages} assistant tool-call message(s) after tool results are missing marker-replayed reasoning_content.`,
 		);
 	}
 	if (snapshot.stats.missingPostToolFinalReasoningMessages > 0) {
 		warnings.push(
-			`${snapshot.stats.missingPostToolFinalReasoningMessages} final assistant message(s) after tool results are missing cached reasoning_content; these should replay via post-tool:<ids> keys.`,
+			`${snapshot.stats.missingPostToolFinalReasoningMessages} final assistant message(s) after tool results are missing marker-replayed reasoning_content.`,
 		);
 	}
 	const emptyReasoningMessages =
 		snapshot.stats.emptyToolReasoningMessages + snapshot.stats.emptyPostToolFinalReasoningMessages;
 	if (emptyReasoningMessages > 0) {
 		warnings.push(
-			`${emptyReasoningMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; this is protocol-safe but may indicate the original reasoning cache was unavailable after extension restart/reload.`,
-		);
-	}
-	if (historyDescriptionMessages > 0) {
-		warnings.push(
-			`${historyDescriptionMessages} message(s) already contain generated image-description text in request history; check the vision trace rawImageParts field to see whether this request actually processed image data.`,
+			`${emptyReasoningMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; this is protocol-safe but may indicate marker replay data was unavailable.`,
 		);
 	}
 	return warnings;
@@ -1035,7 +1063,7 @@ export function getCacheTraceComparisonWarnings(comparison: CacheTraceComparison
 			comparison.currentMessage.imageDescriptionCount > 0
 		) {
 			warnings.push(
-				`first changed message contains generated image-description marker(s); if rawImageParts is also non-zero, repeated vision re-description is likely.`,
+				`first changed message contains generated image-description marker(s); if vision inputImages is also non-zero, repeated vision re-description is likely.`,
 			);
 		}
 	}
@@ -1305,49 +1333,31 @@ function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): st
 	if (!summary) {
 		return 'missing';
 	}
-	return (
+	let result =
 		`${summary.role}#${summary.index}` +
-		` hash=${summary.hash}` +
-		` contentHash=${summary.contentHash}` +
 		` chars=${summary.contentChars}` +
 		` lines=${summary.contentLines}` +
 		` toolCalls=${summary.toolCalls}` +
 		` toolArgs=${summary.toolCallArgumentChars}` +
 		` reasoning=${summary.reasoningChars}` +
-		` emptyReasoning=${summary.emptyReasoning}` +
-		` markers=${formatMarkerSummary(summary)}` +
-		` followsToolResult=${summary.followsToolResult}` +
-		` afterToolResultKind=${summary.afterToolResultKind}`
-	);
-}
-
-function formatMarkerSummary(summary: CacheTraceMessageSummary): string {
-	return (
-		`imageDesc=${summary.imageDescriptionCount}` +
-		`,unableImage=${summary.unableImageCount}` +
-		`,url=${summary.urlCount}` +
-		`,codeFence=${summary.codeFenceCount}` +
-		`,likelyPath=${summary.likelyPathCount}`
-	);
-}
-
-function formatLargestMessages(messageSummaries: CacheTraceMessageSummary[]): string {
-	const largest = [...messageSummaries]
-		.sort((left, right) => right.contentChars - left.contentChars)
-		.slice(0, 5)
-		.map(
-			(summary) =>
-				`${summary.role}#${summary.index}:chars=${summary.contentChars},hash=${summary.contentHash},markers=${formatMarkerSummary(summary)}`,
-		);
-	return largest.length > 0 ? largest.join(';') : 'none';
-}
-
-function formatToolNames(toolNames: string[]): string {
-	if (toolNames.length === 0) {
-		return 'none';
+		` emptyReasoning=${summary.emptyReasoning}`;
+	const markers = formatRelevantMarkerSummary(summary);
+	if (markers) {
+		result += ` markers=${markers}`;
 	}
-	const shown = toolNames.slice(0, 10).join(',');
-	return toolNames.length > 10 ? `${shown},+${toolNames.length - 10}` : shown;
+	if (summary.followsToolResult) {
+		result += ` afterToolResultKind=${summary.afterToolResultKind}`;
+	}
+	return result;
+}
+
+function formatRelevantMarkerSummary(summary: CacheTraceMessageSummary): string {
+	const markers: string[] = [];
+	appendNumberIfNonZero(markers, 'imageDesc', summary.imageDescriptionCount);
+	appendNumberIfNonZero(markers, 'unableImage', summary.unableImageCount);
+	appendNumberIfNonZero(markers, 'url', summary.urlCount);
+	appendNumberIfNonZero(markers, 'codeFence', summary.codeFenceCount);
+	return markers.join(',');
 }
 
 function formatChangedTool(comparison: CacheTraceComparison): string {

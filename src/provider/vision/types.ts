@@ -1,5 +1,5 @@
 import type vscode from 'vscode';
-import type { SegmentMarkerMetadata } from '../segment';
+import type { ReplayMarkerMetadata } from '../replay';
 
 export interface VisionResolutionStats {
 	inputImageParts: number;
@@ -18,6 +18,6 @@ export interface VisionResolutionStats {
 export interface VisionResolutionResult {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	stats: VisionResolutionStats;
-	segmentMarkerMetadata: SegmentMarkerMetadata;
+	replayMarkerMetadata: ReplayMarkerMetadata;
 	visionModelId?: string;
 }

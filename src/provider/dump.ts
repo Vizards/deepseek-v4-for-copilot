@@ -8,7 +8,8 @@ import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
 import { safeStringify, toWellFormedString } from '../json';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import { parseSegmentMarkerData, SEGMENT_MARKER_MIME, type ConversationSegment } from './segment';
+import { parseReplayMarkerData, REPLAY_MARKER_MIME } from './replay';
+import type { ConversationSegment } from './segment';
 import type { VisionResolutionStats } from './vision/index';
 
 let dumpCounter = 0;
@@ -396,11 +397,17 @@ type SerializedContentPart =
 			byteLength: number;
 			dataHash: string;
 			isImage: boolean;
-			segmentMarker?: {
+			replayMarker?: {
 				valid: boolean;
 				segmentId?: string;
+				payloadFormat?: string;
+				legacySegmentOnly?: boolean;
 				visionTextChars?: number;
+				visionTextHash?: string;
 				visionTextIgnoredReason?: string;
+				reasoningTextChars?: number;
+				reasoningTextHash?: string;
+				reasoningTextIgnoredReason?: string;
 				error?: string;
 			};
 	  }
@@ -480,9 +487,9 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 	}
 
 	if (part instanceof vscode.LanguageModelDataPart) {
-		const segmentMarker =
-			part.mimeType === SEGMENT_MARKER_MIME
-				? summarizeSegmentMarker(parseSegmentMarkerData(part.data))
+		const replayMarker =
+			part.mimeType === REPLAY_MARKER_MIME
+				? summarizeReplayMarker(parseReplayMarkerData(part.data))
 				: undefined;
 		return {
 			index,
@@ -491,7 +498,7 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 			byteLength: part.data.byteLength,
 			dataHash: hashBytes(part.data),
 			isImage: part.mimeType.toLowerCase().startsWith('image/'),
-			segmentMarker,
+			replayMarker,
 		};
 	}
 
@@ -507,18 +514,30 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 	};
 }
 
-function summarizeSegmentMarker(marker: ReturnType<typeof parseSegmentMarkerData>): {
+function summarizeReplayMarker(marker: ReturnType<typeof parseReplayMarkerData>): {
 	valid: boolean;
 	segmentId?: string;
+	payloadFormat?: string;
+	legacySegmentOnly?: boolean;
 	visionTextChars?: number;
+	visionTextHash?: string;
 	visionTextIgnoredReason?: string;
+	reasoningTextChars?: number;
+	reasoningTextHash?: string;
+	reasoningTextIgnoredReason?: string;
 	error?: string;
 } {
 	return {
 		valid: marker.valid,
 		segmentId: marker.segmentId,
+		payloadFormat: marker.payloadFormat,
+		legacySegmentOnly: marker.legacySegmentOnly,
 		visionTextChars: marker.visionText?.length,
+		visionTextHash: marker.visionText ? hashString(marker.visionText) : undefined,
 		visionTextIgnoredReason: marker.visionTextIgnoredReason,
+		reasoningTextChars: marker.reasoningText?.length,
+		reasoningTextHash: marker.reasoningText ? hashString(marker.reasoningText) : undefined,
+		reasoningTextIgnoredReason: marker.reasoningTextIgnoredReason,
 		error: marker.error,
 	};
 }
@@ -895,8 +914,8 @@ function logProviderInputDump(
 ): void {
 	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
 	logger.info(
-		`providerInputDump written: segment=${options.segment.segmentId}` +
-			` reason=${options.segment.reason} input=${paths.providerInput} ` +
+		`providerInputDump written: ${formatDumpSegment(options.segment)}` +
+			` input=${paths.providerInput} ` +
 			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
 			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
 				toolSummary.activateToolNames,
@@ -914,14 +933,29 @@ function logRequestDump(
 ): void {
 	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
 	logger.info(
-		`requestDump written: segment=${options.segment.segmentId}` +
-			` reason=${options.segment.reason} request=${paths.request} ` +
+		`requestDump written: ${formatDumpSegment(options.segment)}` +
+			` request=${paths.request} ` +
 			`input=${paths.input} resolved=${paths.resolved} ` +
 			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
 			`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
 			formatHostSettingsSummary(summarizeHostSettings()) +
 			` ${formatSystemPromptSummary(systemPromptSummary)}`,
 	);
+}
+
+function formatDumpSegment(segment: ConversationSegment): string {
+	if (segment.reason === 'markerFound') {
+		return `dumpSegment=${segment.segmentId} legacySegmentMarker=found`;
+	}
+	if (segment.reason === 'markerInvalid') {
+		const markerLocation =
+			segment.markerMessageIndex === undefined || segment.markerPartIndex === undefined
+				? ''
+				: ` at=message#${segment.markerMessageIndex}:part#${segment.markerPartIndex}`;
+		const markerError = segment.markerError ? ` error=${segment.markerError}` : '';
+		return `dumpSegment=${segment.segmentId} legacySegmentMarker=invalid${markerLocation}${markerError}`;
+	}
+	return `dumpSegment=${segment.segmentId}`;
 }
 
 function formatHostSettingsSummary(settings: HostSettingsSummary): string {

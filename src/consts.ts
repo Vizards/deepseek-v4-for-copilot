@@ -26,14 +26,6 @@ export const WELCOME_SHOWN_KEY = 'deepseek-copilot.welcomeShown';
 /** Walkthrough contribution ID. */
 export const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingStarted';
 
-// ---- Reasoning cache ----
-
-/** Directory name under globalStorageUri for persisted DeepSeek reasoning_content. */
-export const REASONING_CACHE_DIR_NAME = 'reasoning-cache-v1';
-
-/** Keep persisted reasoning long enough to roughly match DeepSeek context cache lifetime. */
-export const REASONING_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
-
 // ---- Model registry ----
 
 /** Available DeepSeek models exposed through the language model provider. */

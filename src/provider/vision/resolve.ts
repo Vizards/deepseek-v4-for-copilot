@@ -2,7 +2,7 @@ import vscode from 'vscode';
 import { t } from '../../i18n';
 import { toWellFormedString } from '../../json';
 import { logger } from '../../logger';
-import { parseSegmentMarkerData, SEGMENT_MARKER_MIME } from '../segment';
+import { parseFirstReplayMarker } from '../replay';
 import {
 	IMAGE_DESCRIPTION_PREFIX,
 	IMAGE_DESCRIPTION_SUFFIX,
@@ -20,15 +20,14 @@ export async function resolveImageMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	token: vscode.CancellationToken,
 	getModel: () => Promise<vscode.LanguageModelChat | undefined>,
-	segmentId: string,
 ): Promise<VisionResolutionResult> {
 	const stats = createVisionResolutionStats();
 	collectInputImageStats(messages, stats);
 	if (stats.inputImageParts === 0) {
-		return { messages, stats, segmentMarkerMetadata: {} };
+		return { messages, stats, replayMarkerMetadata: {} };
 	}
 
-	const markerBindings = createVisionMarkerBindings(messages, segmentId, stats);
+	const markerBindings = createVisionMarkerBindings(messages, stats);
 	const currentImageMessageIndex = findCurrentImageMessageIndex(messages);
 	const result: vscode.LanguageModelChatRequestMessage[] = [];
 	let visionModel: vscode.LanguageModelChat | undefined;
@@ -89,7 +88,7 @@ export async function resolveImageMessages(
 	return {
 		messages: result,
 		stats,
-		segmentMarkerMetadata: { visionText: markerVisionText },
+		replayMarkerMetadata: { visionText: markerVisionText },
 		visionModelId: visionModel?.id,
 	};
 }
@@ -126,7 +125,6 @@ function collectInputImageStats(
 
 function createVisionMarkerBindings(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
-	segmentId: string,
 	stats: VisionResolutionStats,
 ): Map<number, string> {
 	const bindings = new Map<number, string>();
@@ -137,7 +135,7 @@ function createVisionMarkerBindings(
 			continue;
 		}
 
-		const visionText = findAssistantVisionText(message, segmentId, stats);
+		const visionText = findAssistantVisionText(message, stats);
 		if (!visionText) {
 			continue;
 		}
@@ -165,25 +163,21 @@ function createVisionMarkerBindings(
 
 function findAssistantVisionText(
 	message: vscode.LanguageModelChatRequestMessage,
-	segmentId: string,
 	stats: VisionResolutionStats,
 ): string | undefined {
-	for (let partIndex = message.content.length - 1; partIndex >= 0; partIndex -= 1) {
-		const part = message.content[partIndex];
-		if (!(part instanceof vscode.LanguageModelDataPart) || part.mimeType !== SEGMENT_MARKER_MIME) {
-			continue;
-		}
-
-		const marker = parseSegmentMarkerData(part.data);
-		if (!marker.valid || marker.segmentId !== segmentId) {
-			continue;
-		}
-		if (marker.visionText) {
-			return marker.visionText;
-		}
-		if (marker.visionTextIgnoredReason) {
-			stats.invalidMarkerVisionMetadata += 1;
-		}
+	const marker = parseFirstReplayMarker(message);
+	if (!marker) {
+		return undefined;
+	}
+	if (!marker.valid) {
+		stats.invalidMarkerVisionMetadata += 1;
+		return undefined;
+	}
+	if (marker.visionText) {
+		return marker.visionText;
+	}
+	if (marker.visionTextIgnoredReason) {
+		stats.invalidMarkerVisionMetadata += 1;
 	}
 
 	return undefined;

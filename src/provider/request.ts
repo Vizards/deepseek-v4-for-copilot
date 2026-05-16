@@ -5,12 +5,12 @@ import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import type { ReasoningLookup } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
-import type { ConversationSegment, SegmentMarkerMetadata } from './segment';
+import type { ReplayMarkerMetadata } from './replay';
+import type { ConversationSegment } from './segment';
 import { resolveImageMessages } from './vision/index';
 
 export interface PreparedChatRequest {
@@ -21,7 +21,7 @@ export interface PreparedChatRequest {
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
 	segment: ConversationSegment;
-	segmentMarkerMetadata: SegmentMarkerMetadata;
+	replayMarkerMetadata: ReplayMarkerMetadata;
 	visionMarkerTextChars?: number;
 }
 
@@ -33,8 +33,6 @@ export interface PrepareChatRequestOptions {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	options: vscode.ProvideLanguageModelChatResponseOptions;
 	token: vscode.CancellationToken;
-	reasoningLookup: ReasoningLookup;
-	reasoningCacheSize: number;
 	cacheDiagnostics: CacheDiagnosticsRecorder;
 	getVisionModel: () => Promise<vscode.LanguageModelChat | undefined>;
 }
@@ -47,8 +45,6 @@ export async function prepareChatRequest({
 	messages,
 	options,
 	token,
-	reasoningLookup,
-	reasoningCacheSize,
 	cacheDiagnostics,
 	getVisionModel,
 }: PrepareChatRequestOptions): Promise<PreparedChatRequest> {
@@ -63,14 +59,9 @@ export async function prepareChatRequest({
 	const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 	const maxTokens = getMaxTokens();
 
-	const visionResolution = await resolveImageMessages(
-		messages,
-		token,
-		getVisionModel,
-		segment.segmentId,
-	);
+	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
 	const resolvedMessages = visionResolution.messages;
-	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningLookup);
+	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
@@ -111,7 +102,6 @@ export async function prepareChatRequest({
 		isThinkingModel,
 		thinkingEffort,
 		maxTokens,
-		reasoningCacheSize,
 		inputMessages: messages,
 		resolvedMessages,
 		visionModelId: visionResolution.visionModelId,
@@ -126,7 +116,7 @@ export async function prepareChatRequest({
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
 		segment,
-		segmentMarkerMetadata: visionResolution.segmentMarkerMetadata,
+		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 	};
 }

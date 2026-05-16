@@ -137,6 +137,7 @@ function reportSkippedSegmentMarkerIfNeeded(
 		segment: prepared.segment,
 		status: 'skipped',
 		reason,
+		visionTextChars: prepared.visionMarkerTextChars,
 		error,
 	});
 }
@@ -147,17 +148,24 @@ function reportConversationSegmentMarker(
 	trigger: SegmentMarkerReportTrigger,
 ): void {
 	try {
-		progress.report(createSegmentMarkerPart(prepared.segment.segmentId));
+		const markerPart = createSegmentMarkerPart(
+			prepared.segment.segmentId,
+			prepared.segmentMarkerMetadata,
+		);
+		progress.report(markerPart);
 		prepared.cacheDiagnostics.onSegmentMarkerReport({
 			segment: prepared.segment,
 			status: 'reported',
 			trigger,
+			markerBytes: markerPart.data.byteLength,
+			visionTextChars: prepared.visionMarkerTextChars,
 		});
 	} catch (error) {
 		prepared.cacheDiagnostics.onSegmentMarkerReport({
 			segment: prepared.segment,
 			status: 'failed',
 			trigger,
+			visionTextChars: prepared.visionMarkerTextChars,
 			error,
 		});
 		logger.warn('Failed to report conversation segment marker', error);

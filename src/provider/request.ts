@@ -10,7 +10,7 @@ import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
-import type { ConversationSegment } from './segment';
+import type { ConversationSegment, SegmentMarkerMetadata } from './segment';
 import { resolveImageMessages } from './vision/index';
 
 export interface PreparedChatRequest {
@@ -21,6 +21,8 @@ export interface PreparedChatRequest {
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
 	segment: ConversationSegment;
+	segmentMarkerMetadata: SegmentMarkerMetadata;
+	visionMarkerTextChars?: number;
 }
 
 export interface PrepareChatRequestOptions {
@@ -61,7 +63,12 @@ export async function prepareChatRequest({
 	const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 	const maxTokens = getMaxTokens();
 
-	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
+	const visionResolution = await resolveImageMessages(
+		messages,
+		token,
+		getVisionModel,
+		segment.segmentId,
+	);
 	const resolvedMessages = visionResolution.messages;
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningLookup);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
@@ -94,7 +101,7 @@ export async function prepareChatRequest({
 		resolvedMessages,
 		requestOptions: options,
 		visionModelId: visionResolution.visionModelId,
-		visionCacheStats: visionResolution.stats,
+		visionStats: visionResolution.stats,
 	});
 
 	const diagnosticsRun = cacheDiagnostics.beginRequest({
@@ -108,7 +115,7 @@ export async function prepareChatRequest({
 		inputMessages: messages,
 		resolvedMessages,
 		visionModelId: visionResolution.visionModelId,
-		visionCacheStats: visionResolution.stats,
+		visionStats: visionResolution.stats,
 	});
 
 	return {
@@ -119,6 +126,8 @@ export async function prepareChatRequest({
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
 		segment,
+		segmentMarkerMetadata: visionResolution.segmentMarkerMetadata,
+		visionMarkerTextChars: visionResolution.markerVisionTextChars,
 	};
 }
 

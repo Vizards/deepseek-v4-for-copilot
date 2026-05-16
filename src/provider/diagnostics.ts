@@ -1,15 +1,12 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { getDebugLoggingEnabled } from '../config';
-import {
-	IMAGE_DESCRIPTION_UNAVAILABLE,
-	LANGUAGE_MODEL_CHAT_SYSTEM_ROLE,
-	REASONING_CACHE_TTL_MS,
-} from '../consts';
+import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE, REASONING_CACHE_TTL_MS } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
 import type { ConversationSegment } from './segment';
-import type { VisionDescriptionCacheStats } from './vision/index';
+import { IMAGE_DESCRIPTION_UNAVAILABLE } from './vision/consts';
+import type { VisionResolutionStats as VisionPipelineStats } from './vision/index';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
@@ -124,7 +121,7 @@ export interface BeginCacheDiagnosticsOptions {
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	visionModelId?: string;
-	visionCacheStats?: VisionDescriptionCacheStats;
+	visionStats?: VisionPipelineStats;
 }
 
 export interface CacheDiagnosticsDoneInfo {
@@ -149,6 +146,8 @@ export interface SegmentMarkerReportInfo {
 	segment: ConversationSegment;
 	status: SegmentMarkerReportStatus;
 	trigger?: SegmentMarkerReportTrigger;
+	markerBytes?: number;
+	visionTextChars?: number;
 	reason?: 'cancelled' | 'stream-error';
 	error?: unknown;
 }
@@ -264,7 +263,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
 			logger.info(`[cache-trace #${requestId}] ${detailLine}`);
 		}
-		const visionTrace = formatVisionTrace(visionResolution, options.visionCacheStats);
+		const visionTrace = formatVisionTrace(visionResolution, options.visionStats);
 		if (visionTrace) {
 			logger.info(`[cache-trace #${requestId}] ${visionTrace}`);
 		}
@@ -404,6 +403,9 @@ function formatSegmentTrace(segment: ConversationSegment): string {
 
 function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
 	const trigger = info.trigger ? ` trigger=${info.trigger}` : '';
+	const markerBytes = info.markerBytes === undefined ? '' : ` markerBytes=${info.markerBytes}`;
+	const visionTextChars =
+		info.visionTextChars === undefined ? '' : ` visionTextChars=${info.visionTextChars}`;
 	const reason = info.reason ? ` reason=${info.reason}` : '';
 	const error = info.error ? ` error=${formatError(info.error)}` : '';
 	return (
@@ -411,6 +413,8 @@ function formatSegmentMarkerReport(info: SegmentMarkerReportInfo): string {
 		` segment=${info.segment.segmentId}` +
 		` segmentReason=${info.segment.reason}` +
 		trigger +
+		markerBytes +
+		visionTextChars +
 		reason +
 		error
 	);
@@ -589,16 +593,20 @@ function getMessageText(message: vscode.LanguageModelChatRequestMessage): string
 
 function formatVisionTrace(
 	stats: VisionResolutionStats,
-	cacheStats: VisionDescriptionCacheStats | undefined,
+	pipelineStats: VisionPipelineStats | undefined,
 ): string | undefined {
-	if (stats.inputImageParts === 0 && stats.historyDescriptionMessages === 0) {
+	if (
+		stats.inputImageParts === 0 &&
+		stats.historyDescriptionMessages === 0 &&
+		!hasVisionPipelineActivity(pipelineStats)
+	) {
 		return undefined;
 	}
 
 	const note =
 		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats);
-	const cacheTrace = formatVisionCacheStats(stats, cacheStats);
+	const pipelineTrace = formatVisionPipelineStats(pipelineStats);
 	return (
 		`vision rawImageParts=${stats.inputImageParts}` +
 		` rawImageMessages=${stats.inputImageMessages}` +
@@ -607,38 +615,46 @@ function formatVisionTrace(
 		` droppedImageParts=${stats.droppedImageParts}` +
 		` visionModel=${visionModel}` +
 		` historyDescriptionMessages=${stats.historyDescriptionMessages}` +
-		cacheTrace +
+		pipelineTrace +
 		note
 	);
 }
 
-function formatVisionCacheStats(
-	resolutionStats: VisionResolutionStats,
-	cacheStats: VisionDescriptionCacheStats | undefined,
-): string {
-	if (!cacheStats) {
+function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): boolean {
+	if (!stats) {
+		return false;
+	}
+	return (
+		stats.inputImageParts > 0 ||
+		stats.currentImageMessages > 0 ||
+		stats.generatedImageMessages > 0 ||
+		stats.replayedImageMessages > 0 ||
+		stats.omittedImageMessages > 0 ||
+		stats.unavailableImageMessages > 0 ||
+		stats.failedImageMessages > 0 ||
+		stats.invalidMarkerVisionMetadata > 0
+	);
+}
+
+function formatVisionPipelineStats(stats: VisionPipelineStats | undefined): string {
+	if (!stats) {
 		return '';
 	}
-
-	const hasCacheActivity =
-		cacheStats.hits > 0 ||
-		cacheStats.misses > 0 ||
-		cacheStats.deduplicatedDescriptions > 0 ||
-		cacheStats.generatedDescriptions > 0 ||
-		cacheStats.failedDescriptions > 0 ||
-		cacheStats.droppedImageParts > 0;
-	if (!hasCacheActivity && resolutionStats.inputImageParts === 0) {
+	if (!hasVisionPipelineActivity(stats)) {
 		return '';
 	}
 
 	return (
-		` cache(enabled=${cacheStats.enabled}` +
-		`,hits=${cacheStats.hits}` +
-		`,misses=${cacheStats.misses}` +
-		`,deduped=${cacheStats.deduplicatedDescriptions}` +
-		`,entries=${cacheStats.entries}` +
-		`,generated=${cacheStats.generatedDescriptions}` +
-		`,failed=${cacheStats.failedDescriptions})`
+		` markerReplay(inputImages=${stats.inputImageParts}` +
+		`,current=${stats.currentImageMessages}` +
+		`,generated=${stats.generatedImageMessages}` +
+		`,replayed=${stats.replayedImageMessages}` +
+		`,omitted=${stats.omittedImageMessages}` +
+		`,unavailable=${stats.unavailableImageMessages}` +
+		`,failed=${stats.failedImageMessages}` +
+		`,droppedParts=${stats.droppedImageParts}` +
+		`,markerChars=${stats.markerVisionTextChars}` +
+		`,invalidMarkerVision=${stats.invalidMarkerVisionMetadata})`
 	);
 }
 

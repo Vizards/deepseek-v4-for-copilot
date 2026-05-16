@@ -9,7 +9,7 @@ import { safeStringify, toWellFormedString } from '../json';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { parseSegmentMarkerData, SEGMENT_MARKER_MIME, type ConversationSegment } from './segment';
-import type { VisionDescriptionCacheStats } from './vision/index';
+import type { VisionResolutionStats } from './vision/index';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
@@ -84,7 +84,7 @@ export interface DumpDeepSeekRequestOptions {
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
 	visionModelId?: string;
-	visionCacheStats?: VisionDescriptionCacheStats;
+	visionStats?: VisionResolutionStats;
 }
 
 export interface DumpProviderInputOptions {
@@ -308,7 +308,7 @@ function createPipelineSnapshot(
 			stage === 'resolved'
 				? {
 						modelId: options.visionModelId ?? null,
-						stats: options.visionCacheStats ?? null,
+						stats: options.visionStats ?? null,
 					}
 				: undefined,
 		deepSeekPromptSummary: summarizeDeepSeekSystemPrompt(request.messages),
@@ -399,6 +399,8 @@ type SerializedContentPart =
 			segmentMarker?: {
 				valid: boolean;
 				segmentId?: string;
+				visionTextChars?: number;
+				visionTextIgnoredReason?: string;
 				error?: string;
 			};
 	  }
@@ -479,7 +481,9 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 
 	if (part instanceof vscode.LanguageModelDataPart) {
 		const segmentMarker =
-			part.mimeType === SEGMENT_MARKER_MIME ? parseSegmentMarkerData(part.data) : undefined;
+			part.mimeType === SEGMENT_MARKER_MIME
+				? summarizeSegmentMarker(parseSegmentMarkerData(part.data))
+				: undefined;
 		return {
 			index,
 			type: 'data',
@@ -500,6 +504,22 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 		value,
 		valueJsonChars: valueJson.length,
 		valueHash: hashString(valueJson),
+	};
+}
+
+function summarizeSegmentMarker(marker: ReturnType<typeof parseSegmentMarkerData>): {
+	valid: boolean;
+	segmentId?: string;
+	visionTextChars?: number;
+	visionTextIgnoredReason?: string;
+	error?: string;
+} {
+	return {
+		valid: marker.valid,
+		segmentId: marker.segmentId,
+		visionTextChars: marker.visionText?.length,
+		visionTextIgnoredReason: marker.visionTextIgnoredReason,
+		error: marker.error,
 	};
 }
 

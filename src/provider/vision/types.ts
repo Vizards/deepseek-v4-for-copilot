@@ -1,19 +1,24 @@
 import type vscode from 'vscode';
+import type { SegmentMarkerMetadata } from '../segment';
 
-export interface VisionDescriptionCacheStats {
-	enabled: boolean;
-	hits: number;
-	misses: number;
-	deduplicatedDescriptions: number;
-	entries: number;
-	generatedDescriptions: number;
-	failedDescriptions: number;
-	// Resolution fallback count, not a cache hit/miss metric.
+export interface VisionResolutionStats {
+	inputImageParts: number;
+	inputImageMessages: number;
+	currentImageMessages: number;
+	generatedImageMessages: number;
+	replayedImageMessages: number;
+	omittedImageMessages: number;
+	unavailableImageMessages: number;
+	failedImageMessages: number;
 	droppedImageParts: number;
+	markerVisionTextChars: number;
+	invalidMarkerVisionMetadata: number;
 }
 
 export interface VisionResolutionResult {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
-	stats: VisionDescriptionCacheStats;
+	stats: VisionResolutionStats;
+	segmentMarkerMetadata: SegmentMarkerMetadata;
 	visionModelId?: string;
+	markerVisionTextChars?: number;
 }

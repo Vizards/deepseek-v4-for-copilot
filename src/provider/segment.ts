@@ -16,7 +16,9 @@ const SEGMENT_MARKER_PREFIXES = new Set([
 	...MODELS.map((model) => model.id),
 ]);
 const ENCODED_JSON_MARKER_PREFIX = 'json:';
-const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+={0,2}$/;
+// Segment marker JSON is provider-owned and written as unpadded base64url.
+// Keep this as the explicit wire-format gate because Node's decoder is permissive.
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

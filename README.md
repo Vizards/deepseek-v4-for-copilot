@@ -126,7 +126,7 @@ Example `settings.json` override for compatible API proxies:
 | Works inside Copilot Chat | ✅ | ✅ | ❌ separate UI |
 | Agent mode, tools, skills | ✅ | ✅ | ⚠️ reimplemented |
 | Vision support | ✅ proxied | ❌ | ❌ |
-| Extra process to run | ❌ | ✅ | ❌ |
+| No extra process to run | ✅ | ❌ | ✅ |
 | One-click install | ✅ | ❌ | ✅ |
 | API key in OS keychain | ✅ | ❌ | ⚠️ varies |
 

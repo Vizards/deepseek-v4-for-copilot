@@ -182,7 +182,7 @@ export function createCacheDiagnosticsRecorder(): CacheDiagnosticsRecorder {
 	return new DefaultCacheDiagnosticsRecorder();
 }
 
-interface VisionResolutionStats {
+interface VisionMessageStats {
 	inputImageParts: number;
 	inputImageMessages: number;
 	describedImageMessages: number;
@@ -522,8 +522,8 @@ function summarizeVisionResolution(
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[],
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[],
 	visionModelId: string | undefined,
-): VisionResolutionStats {
-	const stats: VisionResolutionStats = {
+): VisionMessageStats {
+	const stats: VisionMessageStats = {
 		inputImageParts: 0,
 		inputImageMessages: 0,
 		describedImageMessages: 0,
@@ -592,7 +592,7 @@ function getMessageText(message: vscode.LanguageModelChatRequestMessage): string
 }
 
 function formatVisionTrace(
-	stats: VisionResolutionStats,
+	stats: VisionMessageStats,
 	pipelineStats: VisionPipelineStats | undefined,
 ): string | undefined {
 	if (
@@ -658,7 +658,7 @@ function formatVisionPipelineStats(stats: VisionPipelineStats | undefined): stri
 	);
 }
 
-function formatVisionModel(stats: VisionResolutionStats): string {
+function formatVisionModel(stats: VisionMessageStats): string {
 	if (stats.visionModelId) {
 		return stats.visionModelId;
 	}

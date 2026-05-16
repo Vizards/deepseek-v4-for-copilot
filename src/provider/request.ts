@@ -127,7 +127,7 @@ export async function prepareChatRequest({
 		cacheDiagnostics: diagnosticsRun,
 		segment,
 		segmentMarkerMetadata: visionResolution.segmentMarkerMetadata,
-		visionMarkerTextChars: visionResolution.markerVisionTextChars,
+		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 	};
 }
 

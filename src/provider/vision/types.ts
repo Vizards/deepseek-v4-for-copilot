@@ -20,5 +20,4 @@ export interface VisionResolutionResult {
 	stats: VisionResolutionStats;
 	segmentMarkerMetadata: SegmentMarkerMetadata;
 	visionModelId?: string;
-	markerVisionTextChars?: number;
 }

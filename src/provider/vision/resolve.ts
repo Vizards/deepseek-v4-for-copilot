@@ -91,7 +91,6 @@ export async function resolveImageMessages(
 		stats,
 		segmentMarkerMetadata: { visionText: markerVisionText },
 		visionModelId: visionModel?.id,
-		markerVisionTextChars: markerVisionText?.length,
 	};
 }
 

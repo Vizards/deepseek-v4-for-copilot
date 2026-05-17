@@ -4,7 +4,7 @@ import { getDebugLoggingEnabled } from '../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
-import { REPLAY_MARKER_MIME } from './replay';
+import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from './replay';
 import type { ConversationSegment } from './segment';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from './vision/consts';
 import type { VisionResolutionStats as VisionPipelineStats } from './vision/index';
@@ -12,6 +12,17 @@ import type { VisionResolutionStats as VisionPipelineStats } from './vision/inde
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
 const HOST_CACHE_CONTROL_MIME = 'cache_control';
+const SYSTEM_PROMPT_SECTION_MAX_LINES = 40;
+const SAFE_SYSTEM_PROMPT_TAGS = new Set([
+	'agents',
+	'attachments',
+	'customizationsUpdate',
+	'instruction',
+	'instructions',
+	'skill',
+	'skills',
+	'toolUseInstructions',
+]);
 
 export interface CacheTraceStats {
 	messageCount: number;
@@ -75,6 +86,7 @@ export interface CacheTraceMessageSummary {
 	missingPostToolReasoning: boolean;
 	missingPostToolCallReasoning: boolean;
 	missingPostToolFinalReasoning: boolean;
+	contentSections?: CacheTraceContentSectionSummary[];
 }
 
 export interface CacheTraceToolSummary {
@@ -85,14 +97,37 @@ export interface CacheTraceToolSummary {
 	parametersHash: string;
 }
 
+export interface CacheTraceContentSectionSummary {
+	index: number;
+	label: string;
+	startLine: number;
+	endLine: number;
+	startChar: number;
+	endChar: number;
+	chars: number;
+	hash: string;
+}
+
 export interface CacheTraceSnapshot {
 	fingerprint: string;
 	cacheTraceKey: string;
 	redactedComparisonInput: string;
+	requiresReasoningContent: boolean;
+	inputAssistantSummaries: CacheTraceInputAssistantSummary[];
 	toolsHash: string;
 	toolSummaries: CacheTraceToolSummary[];
 	messageSummaries: CacheTraceMessageSummary[];
 	stats: CacheTraceStats;
+}
+
+export interface CacheTraceInputAssistantSummary {
+	index: number;
+	textChars: number;
+	toolCalls: number;
+	thinkingChars: number;
+	replayMarkerParts: number;
+	replayMarkerReasoningChars: number;
+	replayMarkerInvalid: boolean;
 }
 
 export interface CacheTraceComparison {
@@ -109,6 +144,13 @@ export interface CacheTraceComparison {
 	firstChangedToolIndex: number | undefined;
 	previousTool: CacheTraceToolSummary | undefined;
 	currentTool: CacheTraceToolSummary | undefined;
+	systemPromptChange: CacheTraceSystemPromptChange | undefined;
+}
+
+export interface CacheTraceSystemPromptChange {
+	firstChangedSectionIndex: number | undefined;
+	previousSection: CacheTraceContentSectionSummary | undefined;
+	currentSection: CacheTraceContentSectionSummary | undefined;
 }
 
 export interface BeginCacheDiagnosticsOptions {
@@ -223,7 +265,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		}
 
 		const requestId = (this.requestId += 1);
-		const cacheTrace = createCacheTraceSnapshot(options.request);
+		const cacheTrace = createCacheTraceSnapshot(options.request, options.inputMessages);
 		const previousCacheTrace = this.previousCacheTraces.get(cacheTrace.cacheTraceKey);
 		const previousImmediateCacheTrace = this.lastCacheTrace;
 		const cacheTraceComparison = compareCacheTraceSnapshots(previousCacheTrace, cacheTrace);
@@ -293,6 +335,9 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		}
 		for (const warning of getCacheTraceWarnings(cacheTrace)) {
 			logger.warn(`[cache-trace #${requestId}] ${warning}`);
+		}
+		for (const infoLine of getCacheTraceInfoLines(cacheTrace)) {
+			logger.info(`[cache-trace #${requestId}] ${infoLine}`);
 		}
 
 		return new ActiveCacheDiagnosticsRun(
@@ -778,6 +823,55 @@ function formatVscodeMessageRole(role: vscode.LanguageModelChatMessageRole): str
 	return 'unknown';
 }
 
+function summarizeInputAssistantMessages(
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+): CacheTraceInputAssistantSummary[] {
+	const summaries: CacheTraceInputAssistantSummary[] = [];
+
+	for (const [index, message] of messages.entries()) {
+		if (message.role !== vscode.LanguageModelChatMessageRole.Assistant) {
+			continue;
+		}
+
+		let textChars = 0;
+		let toolCalls = 0;
+		let thinkingChars = 0;
+		let replayMarkerParts = 0;
+
+		for (const part of message.content) {
+			if (part instanceof vscode.LanguageModelTextPart) {
+				textChars += part.value.length;
+			} else if (part instanceof vscode.LanguageModelToolCallPart) {
+				toolCalls += 1;
+			} else if (isLanguageModelThinkingPart(part)) {
+				thinkingChars += normalizeThinkingPartValue(part.value).text.length;
+			} else if (
+				part instanceof vscode.LanguageModelDataPart &&
+				part.mimeType === REPLAY_MARKER_MIME
+			) {
+				replayMarkerParts += 1;
+			}
+		}
+
+		if (!textChars && !toolCalls) {
+			continue;
+		}
+
+		const replayMarker = parseFirstReplayMarker(message);
+		summaries.push({
+			index,
+			textChars,
+			toolCalls,
+			thinkingChars,
+			replayMarkerParts,
+			replayMarkerReasoningChars: replayMarker?.reasoningText?.length ?? 0,
+			replayMarkerInvalid: replayMarker?.valid === false,
+		});
+	}
+
+	return summaries;
+}
+
 function isLanguageModelThinkingPart(part: unknown): part is vscode.LanguageModelThinkingPart {
 	return (
 		typeof vscode.LanguageModelThinkingPart === 'function' &&
@@ -799,7 +893,10 @@ function getPartConstructorName(part: unknown): string {
 	return part.constructor?.name ?? 'object';
 }
 
-export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSnapshot {
+export function createCacheTraceSnapshot(
+	request: DeepSeekRequest,
+	inputMessages: readonly vscode.LanguageModelChatRequestMessage[] = [],
+): CacheTraceSnapshot {
 	const toolsSerialized = stableStringify(request.tools ?? []);
 	const messageSummaries = summarizeMessages(request.messages);
 	const toolSummaries = summarizeTools(request.tools ?? []);
@@ -814,6 +911,8 @@ export function createCacheTraceSnapshot(request: DeepSeekRequest): CacheTraceSn
 		fingerprint: hashString(redactedComparisonInput),
 		cacheTraceKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
 		redactedComparisonInput,
+		requiresReasoningContent: request.thinking?.type === 'enabled',
+		inputAssistantSummaries: summarizeInputAssistantMessages(inputMessages),
 		toolsHash: hashString(toolsSerialized),
 		toolSummaries,
 		messageSummaries,
@@ -856,6 +955,14 @@ export function compareCacheTraceSnapshots(
 		previous.toolSummaries,
 		current.toolSummaries,
 	);
+	const previousMessage =
+		firstChangedMessageIndex === undefined
+			? undefined
+			: previous.messageSummaries[firstChangedMessageIndex];
+	const currentMessage =
+		firstChangedMessageIndex === undefined
+			? undefined
+			: current.messageSummaries[firstChangedMessageIndex];
 
 	return {
 		commonPrefixSummaryChars,
@@ -866,14 +973,8 @@ export function compareCacheTraceSnapshots(
 		previousMessageCount: previous.messageSummaries.length,
 		currentMessageCount: current.messageSummaries.length,
 		firstChangedMessageIndex,
-		previousMessage:
-			firstChangedMessageIndex === undefined
-				? undefined
-				: previous.messageSummaries[firstChangedMessageIndex],
-		currentMessage:
-			firstChangedMessageIndex === undefined
-				? undefined
-				: current.messageSummaries[firstChangedMessageIndex],
+		previousMessage,
+		currentMessage,
 		toolsChanged: previous.toolsHash !== current.toolsHash,
 		previousToolsHash: previous.toolsHash,
 		currentToolsHash: current.toolsHash,
@@ -886,6 +987,10 @@ export function compareCacheTraceSnapshots(
 			firstChangedToolIndex === undefined
 				? undefined
 				: current.toolSummaries[firstChangedToolIndex],
+		systemPromptChange:
+			firstChangedMessageIndex === 0
+				? compareSystemPromptSections(previousMessage, currentMessage)
+				: undefined,
 	};
 }
 
@@ -1019,6 +1124,9 @@ export function formatCacheTraceComparisonDetailLines(comparison: CacheTraceComp
 
 export function getCacheTraceWarnings(snapshot: CacheTraceSnapshot): string[] {
 	const warnings: string[] = [];
+	if (!snapshot.requiresReasoningContent) {
+		return warnings;
+	}
 	if (snapshot.stats.missingToolReasoningMessages > 0) {
 		warnings.push(
 			`${snapshot.stats.missingToolReasoningMessages} assistant tool-call message(s) are missing marker-replayed reasoning_content; DeepSeek requires this in thinking tool-call histories and cache prefixes may drift.`,
@@ -1034,14 +1142,83 @@ export function getCacheTraceWarnings(snapshot: CacheTraceSnapshot): string[] {
 			`${snapshot.stats.missingPostToolFinalReasoningMessages} final assistant message(s) after tool results are missing marker-replayed reasoning_content.`,
 		);
 	}
-	const emptyReasoningMessages =
-		snapshot.stats.emptyToolReasoningMessages + snapshot.stats.emptyPostToolFinalReasoningMessages;
-	if (emptyReasoningMessages > 0) {
+	const recoveryLostEmptyMessages = countEmptyReasoningFallbackMessages(snapshot, 'recovery-lost');
+	if (recoveryLostEmptyMessages > 0) {
 		warnings.push(
-			`${emptyReasoningMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; this is protocol-safe but may indicate marker replay data was unavailable.`,
+			`${recoveryLostEmptyMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback despite a non-empty VS Code thinking/replay marker source; marker replay may have failed.`,
+		);
+	}
+	const unknownEmptyMessages = countEmptyReasoningFallbackMessages(snapshot, 'unknown');
+	if (unknownEmptyMessages > 0) {
+		warnings.push(
+			`${unknownEmptyMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback; unable to classify whether the original VS Code message had recoverable reasoning data.`,
 		);
 	}
 	return warnings;
+}
+
+export function getCacheTraceInfoLines(snapshot: CacheTraceSnapshot): string[] {
+	const infoLines: string[] = [];
+	if (!snapshot.requiresReasoningContent) {
+		return infoLines;
+	}
+	const upstreamEmptyMessages = countEmptyReasoningFallbackMessages(
+		snapshot,
+		'upstream-no-reasoning',
+	);
+	if (upstreamEmptyMessages > 0) {
+		infoLines.push(
+			`${upstreamEmptyMessages} reasoning-required assistant message reference(s) have empty reasoning_content fallback because the original VS Code assistant message had no non-empty thinking/replay marker source; likely upstream returned no usable reasoning_content.`,
+		);
+	}
+	return infoLines;
+}
+
+type EmptyReasoningFallbackCause = 'upstream-no-reasoning' | 'recovery-lost' | 'unknown';
+
+function countEmptyReasoningFallbackMessages(
+	snapshot: CacheTraceSnapshot,
+	cause: EmptyReasoningFallbackCause,
+): number {
+	let count = 0;
+	let assistantOrdinal = 0;
+	for (const message of snapshot.messageSummaries) {
+		if (message.role !== 'assistant') {
+			continue;
+		}
+		if (
+			isReasoningRequiredEmptyFallback(message) &&
+			classifyEmptyReasoningFallback(snapshot, assistantOrdinal) === cause
+		) {
+			count += 1;
+		}
+		assistantOrdinal += 1;
+	}
+	return count;
+}
+
+function isReasoningRequiredEmptyFallback(message: CacheTraceMessageSummary): boolean {
+	return (
+		message.emptyReasoning && (message.toolCalls > 0 || message.afterToolResultKind === 'final')
+	);
+}
+
+function classifyEmptyReasoningFallback(
+	snapshot: CacheTraceSnapshot,
+	assistantOrdinal: number,
+): EmptyReasoningFallbackCause {
+	const inputAssistant = snapshot.inputAssistantSummaries[assistantOrdinal];
+	if (!inputAssistant) {
+		return 'unknown';
+	}
+	if (
+		inputAssistant.thinkingChars > 0 ||
+		inputAssistant.replayMarkerReasoningChars > 0 ||
+		inputAssistant.replayMarkerInvalid
+	) {
+		return 'recovery-lost';
+	}
+	return 'upstream-no-reasoning';
 }
 
 export function getCacheTraceComparisonWarnings(comparison: CacheTraceComparison): string[] {
@@ -1053,17 +1230,14 @@ export function getCacheTraceComparisonWarnings(comparison: CacheTraceComparison
 	) {
 		const previousMessagesAfterChange =
 			comparison.previousMessageCount - comparison.firstChangedMessageIndex - 1;
+		if (comparison.systemPromptChange) {
+			warnings.push(
+				`system prompt changed; ${formatSystemPromptChange(comparison.systemPromptChange)}.`,
+			);
+		}
 		if (previousMessagesAfterChange > 2) {
 			warnings.push(
 				`retained history changed before the append boundary at message #${comparison.firstChangedMessageIndex}; ${previousMessagesAfterChange} previous message(s) after it cannot share an identical request prefix.`,
-			);
-		}
-		if (
-			comparison.previousMessage.imageDescriptionCount > 0 ||
-			comparison.currentMessage.imageDescriptionCount > 0
-		) {
-			warnings.push(
-				`first changed message contains generated image-description marker(s); if vision inputImages is also non-zero, repeated vision re-description is likely.`,
 			);
 		}
 	}
@@ -1078,6 +1252,72 @@ export function getCacheTraceComparisonWarnings(comparison: CacheTraceComparison
 		);
 	}
 	return warnings;
+}
+
+function compareSystemPromptSections(
+	previous: CacheTraceMessageSummary | undefined,
+	current: CacheTraceMessageSummary | undefined,
+): CacheTraceSystemPromptChange | undefined {
+	if (!previous || !current) {
+		return {
+			firstChangedSectionIndex: undefined,
+			previousSection: previous?.contentSections?.[0],
+			currentSection: current?.contentSections?.[0],
+		};
+	}
+	if (previous.contentHash === current.contentHash) {
+		return undefined;
+	}
+
+	const previousSections = previous.contentSections ?? [];
+	const currentSections = current.contentSections ?? [];
+	const maxLength = Math.max(previousSections.length, currentSections.length);
+	for (let index = 0; index < maxLength; index += 1) {
+		const previousSection = previousSections[index];
+		const currentSection = currentSections[index];
+		if (
+			previousSection?.hash !== currentSection?.hash ||
+			previousSection?.label !== currentSection?.label
+		) {
+			return {
+				firstChangedSectionIndex: index,
+				previousSection,
+				currentSection,
+			};
+		}
+	}
+
+	return {
+		firstChangedSectionIndex: undefined,
+		previousSection: previousSections[0],
+		currentSection: currentSections[0],
+	};
+}
+
+function formatSystemPromptChange(change: CacheTraceSystemPromptChange): string {
+	const changedSection =
+		change.firstChangedSectionIndex === undefined
+			? 'firstChangedSection=unknown'
+			: `firstChangedSection=${change.firstChangedSectionIndex}`;
+	return (
+		`${changedSection}` +
+		` prev=${formatContentSectionSummary(change.previousSection)}` +
+		` curr=${formatContentSectionSummary(change.currentSection)}` +
+		` content=redacted`
+	);
+}
+
+function formatContentSectionSummary(summary: CacheTraceContentSectionSummary | undefined): string {
+	if (!summary) {
+		return 'missing';
+	}
+	return (
+		`${summary.label}#${summary.index}` +
+		`:lines=${summary.startLine}-${summary.endLine}` +
+		`:chars=${summary.chars}` +
+		`:range=${summary.startChar}-${summary.endChar}` +
+		`:hash=${summary.hash}`
+	);
 }
 
 function summarizeMessages(messages: DeepSeekMessage[]): CacheTraceMessageSummary[] {
@@ -1141,7 +1381,123 @@ function summarizeMessage(
 		missingPostToolReasoning: assistantAfterToolResult && !hasReasoningContent,
 		missingPostToolCallReasoning: afterToolResultKind === 'tool-call' && !hasReasoningContent,
 		missingPostToolFinalReasoning: afterToolResultKind === 'final' && !hasReasoningContent,
+		contentSections: index === 0 ? summarizeSystemPromptSections(message.content) : undefined,
 	};
+}
+
+interface ContentLineRange {
+	text: string;
+	startChar: number;
+	endChar: number;
+}
+
+function summarizeSystemPromptSections(content: string): CacheTraceContentSectionSummary[] {
+	const lines = getContentLineRanges(content);
+	if (lines.length === 0) {
+		return [];
+	}
+
+	const sections: CacheTraceContentSectionSummary[] = [];
+	let sectionStart = 0;
+	let sectionLabel = 'preamble';
+
+	for (const [lineIndex, line] of lines.entries()) {
+		const nextLabel = getSafeSystemPromptSectionLabel(line.text);
+		if (!nextLabel) {
+			continue;
+		}
+
+		if (lineIndex > sectionStart) {
+			appendSystemPromptSectionWindows(
+				sections,
+				content,
+				lines,
+				sectionLabel,
+				sectionStart,
+				lineIndex,
+			);
+		}
+		sectionStart = lineIndex;
+		sectionLabel = nextLabel;
+	}
+
+	appendSystemPromptSectionWindows(
+		sections,
+		content,
+		lines,
+		sectionLabel,
+		sectionStart,
+		lines.length,
+	);
+	return sections;
+}
+
+function appendSystemPromptSectionWindows(
+	sections: CacheTraceContentSectionSummary[],
+	content: string,
+	lines: readonly ContentLineRange[],
+	label: string,
+	startLineIndex: number,
+	endLineIndex: number,
+): void {
+	for (
+		let windowStart = startLineIndex;
+		windowStart < endLineIndex;
+		windowStart += SYSTEM_PROMPT_SECTION_MAX_LINES
+	) {
+		const windowEnd = Math.min(endLineIndex, windowStart + SYSTEM_PROMPT_SECTION_MAX_LINES);
+		const startChar = lines[windowStart].startChar;
+		const endChar = lines[windowEnd - 1].endChar;
+		sections.push({
+			index: sections.length,
+			label,
+			startLine: windowStart + 1,
+			endLine: windowEnd,
+			startChar,
+			endChar,
+			chars: endChar - startChar,
+			hash: hashString(content.slice(startChar, endChar)),
+		});
+	}
+}
+
+function getContentLineRanges(content: string): ContentLineRange[] {
+	if (content.length === 0) {
+		return [];
+	}
+
+	const lines: ContentLineRange[] = [];
+	let lineStart = 0;
+	for (let index = 0; index < content.length; index += 1) {
+		if (content.charAt(index) !== '\n') {
+			continue;
+		}
+		const textEnd = index > lineStart && content.charAt(index - 1) === '\r' ? index - 1 : index;
+		lines.push({
+			text: content.slice(lineStart, textEnd),
+			startChar: lineStart,
+			endChar: index + 1,
+		});
+		lineStart = index + 1;
+	}
+
+	if (lineStart < content.length) {
+		lines.push({
+			text: content.slice(lineStart),
+			startChar: lineStart,
+			endChar: content.length,
+		});
+	}
+
+	return lines;
+}
+
+function getSafeSystemPromptSectionLabel(line: string): string | undefined {
+	const tag = /^\s*<([A-Za-z][\w-]*)\b/.exec(line)?.[1];
+	if (!tag) {
+		return undefined;
+	}
+	return SAFE_SYSTEM_PROMPT_TAGS.has(tag) ? `tag:${tag}` : 'tag:other';
 }
 
 function summarizeTools(tools: DeepSeekTool[]): CacheTraceToolSummary[] {

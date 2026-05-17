@@ -16,6 +16,7 @@ import {
 interface ResponseStreamState {
 	accumulatedReasoning: string;
 	emittedToolCallIds: string[];
+	initialResponseNoticeReported: boolean;
 	replayMarkerReported: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface StreamChatCompletionOptions {
 	prepared: PreparedChatRequest;
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
 	token: vscode.CancellationToken;
+	initialResponseNotice?: string;
 	getCharsPerToken: () => number;
 	setCharsPerToken: (charsPerToken: number) => void;
 }
@@ -33,12 +35,14 @@ export function streamChatCompletion({
 	prepared,
 	progress,
 	token,
+	initialResponseNotice,
 	getCharsPerToken,
 	setCharsPerToken,
 }: StreamChatCompletionOptions): Promise<void> {
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
 		emittedToolCallIds: [],
+		initialResponseNoticeReported: false,
 		replayMarkerReported: false,
 	};
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics);
@@ -48,14 +52,17 @@ export function streamChatCompletion({
 			prepared.request,
 			{
 				onContent: (content: string) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
 
 				onThinking: (text: string) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					handleThinking(text, state, progress);
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
+					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					handleToolCall(toolCall, state, progress);
 				},
 
@@ -102,6 +109,18 @@ export function streamChatCompletion({
 		.finally(() => {
 			cancelListener.dispose();
 		});
+}
+
+function reportInitialResponseNoticeOnce(
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+	state: ResponseStreamState,
+	initialResponseNotice: string | undefined,
+): void {
+	if (!initialResponseNotice || state.initialResponseNoticeReported) {
+		return;
+	}
+	state.initialResponseNoticeReported = true;
+	progress.report(new vscode.LanguageModelTextPart(initialResponseNotice));
 }
 
 function reportReplayMarkerOnce(

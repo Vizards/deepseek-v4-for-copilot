@@ -50,6 +50,14 @@ const zh: Translations = {
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
 
+	// Request
+	'request.toolsLimitExceeded':
+		'DeepSeek 单次 tools 请求最多支持 {0} 个 functions，当前请求包含 {1} 个。请先用 VS Code 的 Configure Tools 关闭不常用的工具；如果正在使用实验性稳定工具列表设置，请关闭它。',
+	'request.preflightRoundLimitExceeded':
+		'实验性稳定工具列表设置已尝试 {0} 轮，仍无法得到稳定的已启用工具列表。请关闭该实验性设置，或先用 VS Code 的 Configure Tools 关闭不常用的工具。',
+	'notice.toolDrift':
+		'⚠️ 工具列表不稳定，缓存命中率可能下降。[了解更多](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.zh.md)',
+
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
 	'extension.deactivateFailed': 'DeepSeek 停用异常',
@@ -94,6 +102,14 @@ const en: Translations = {
 	'vision.notFound': 'Vision model "{0}" not found',
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
+
+	// Request
+	'request.toolsLimitExceeded':
+		'DeepSeek supports at most {0} functions in a single `tools` request, but this request contains {1}. Use VS Code Configure Tools to disable tools you rarely use. If the experimental tool-list stabilization setting is enabled, turn it off.',
+	'request.preflightRoundLimitExceeded':
+		'Experimental tool-list stabilization tried {0} rounds but still could not get a stable enabled-tools list. Turn this experimental setting off, or use VS Code Configure Tools to disable tools you rarely use first.',
+	'notice.toolDrift':
+		'⚠️ Tool list is unstable; cache hit rate may drop. [Learn more](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

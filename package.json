@@ -103,6 +103,14 @@
             "media": {
               "markdown": "resources/walkthrough/show-models.md"
             }
+          },
+          {
+            "id": "advancedSettings",
+            "title": "%deepseek-copilot.walkthrough.advancedSettings.title%",
+            "description": "%deepseek-copilot.walkthrough.advancedSettings.description%",
+            "media": {
+              "markdown": "resources/walkthrough/advanced-settings.md"
+            }
           }
         ]
       }
@@ -120,6 +128,14 @@
           "default": 0,
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
+        },
+        "deepseek-copilot.experimental.stabilizeToolList": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%deepseek-copilot.config.experimental.stabilizeToolList.description%",
+          "tags": [
+            "experimental"
+          ]
         },
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",

@@ -10,13 +10,13 @@ import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { parseReplayMarkerData, REPLAY_MARKER_MIME } from './replay';
 import type { ConversationSegment } from './segment';
+import { ACTIVATE_TOOL_PREFIX } from './tools/consts';
 import type { VisionResolutionStats } from './vision/index';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
 let dumpWriteQueue: Promise<void> = Promise.resolve();
 
-const ACTIVATE_TOOL_PREFIX = 'activate_';
 const REQUEST_OBSERVATIONS_FILE = '_request-observations.jsonl';
 const HASH_WINDOW_CHARS = 2_048;
 

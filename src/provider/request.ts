@@ -4,13 +4,14 @@ import { DeepSeekClient } from '../client';
 import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
-import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import { convertMessages, convertTools, countMessageChars } from './convert';
+import type { DeepSeekRequest } from '../types';
+import { convertMessages, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';
 import type { ConversationSegment } from './segment';
+import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
 import { resolveImageMessages } from './vision/index';
 
 export interface PreparedChatRequest {
@@ -62,7 +63,7 @@ export async function prepareChatRequest({
 	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
 	const resolvedMessages = visionResolution.messages;
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel);
-	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
+	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
 	const request: DeepSeekRequest = {
@@ -119,16 +120,4 @@ export async function prepareChatRequest({
 		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 	};
-}
-
-function collectTrailingToolResultIds(messages: readonly DeepSeekMessage[]): string[] {
-	const trailingToolResultIds: string[] = [];
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message.role !== 'tool' || !message.tool_call_id) {
-			break;
-		}
-		trailingToolResultIds.push(message.tool_call_id);
-	}
-	return trailingToolResultIds.reverse();
 }

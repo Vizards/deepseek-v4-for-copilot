@@ -1,3 +1,4 @@
+import { DEEPSEEK_TOOLS_LIMIT } from './provider/tools/consts';
 import type { ModelDefinition } from './types';
 
 /**
@@ -39,7 +40,7 @@ export const MODELS: ModelDefinition[] = [
 		maxInputTokens: 655360,
 		maxOutputTokens: 393216,
 		capabilities: {
-			toolCalling: true,
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
 			thinking: true,
 		},
@@ -54,7 +55,7 @@ export const MODELS: ModelDefinition[] = [
 		maxInputTokens: 655360,
 		maxOutputTokens: 393216,
 		capabilities: {
-			toolCalling: true,
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
 			thinking: true,
 		},

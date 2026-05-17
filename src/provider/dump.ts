@@ -907,6 +907,10 @@ function enqueueDumpWrite(label: string, write: () => Promise<void>): void {
 	});
 }
 
+function encodeFilePath(fsPath: string): string {
+	return fsPath.split('/').map(encodeURIComponent).join('/');
+}
+
 function logProviderInputDump(
 	options: DumpProviderInputOptions,
 	paths: ProviderInputDumpPaths,
@@ -915,7 +919,7 @@ function logProviderInputDump(
 	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
 	logger.info(
 		`providerInputDump written: ${formatDumpSegment(options.segment)}` +
-			` input=file://${paths.providerInput} ` +
+			` input=file://${encodeFilePath(paths.providerInput)} ` +
 			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
 			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
 				toolSummary.activateToolNames,
@@ -934,8 +938,8 @@ function logRequestDump(
 	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
 	logger.info(
 		`requestDump written: ${formatDumpSegment(options.segment)}` +
-			` request=file://${paths.request} ` +
-			`input=file://${paths.input} resolved=file://${paths.resolved} ` +
+			` request=file://${encodeFilePath(paths.request)} ` +
+			`input=file://${encodeFilePath(paths.input)} resolved=file://${encodeFilePath(paths.resolved)} ` +
 			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
 			`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
 			formatHostSettingsSummary(summarizeHostSettings()) +

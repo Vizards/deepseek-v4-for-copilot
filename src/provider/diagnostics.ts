@@ -1198,7 +1198,9 @@ function countEmptyReasoningFallbackMessages(
 }
 
 function isReasoningRequiredEmptyFallback(message: CacheTraceMessageSummary): boolean {
-	return message.emptyReasoning && (message.toolCalls > 0 || message.afterToolResultKind === 'final');
+	return (
+		message.emptyReasoning && (message.toolCalls > 0 || message.afterToolResultKind === 'final')
+	);
 }
 
 function classifyEmptyReasoningFallback(

@@ -90,11 +90,21 @@ function findLatestHumanUserMessageIndex(
 		if (message.role !== vscode.LanguageModelChatMessageRole.User) {
 			continue;
 		}
-		if (message.content.some((part) => !(part instanceof vscode.LanguageModelToolResultPart))) {
+		if (message.content.some(isHumanUserMessagePart)) {
 			return index;
 		}
 	}
 	return -1;
+}
+
+function isHumanUserMessagePart(part: unknown): boolean {
+	if (part instanceof vscode.LanguageModelToolResultPart) {
+		return false;
+	}
+	if (part instanceof vscode.LanguageModelTextPart) {
+		return part.value.length > 0;
+	}
+	return true;
 }
 
 function parsePreflightPart(part: unknown): { round: number; toolName?: string } | undefined {

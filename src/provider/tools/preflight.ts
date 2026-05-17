@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { ACTIVATE_TOOL_PREFIX, PREFLIGHT_ACTIVATE_CALL_ID_PREFIX } from './consts';
 
-const PREFLIGHT_TOOL_NAME_HASH_LENGTH = 12;
+const PREFLIGHT_TOOL_NAME_HASH_LENGTH = 32;
 
 export interface ActivatePreflightInspection {
 	rounds: number;
@@ -67,7 +67,7 @@ export function filterPreflightControlFlow(
 }
 
 export function createPreflightToolCallId(round: number, toolName: string): string {
-	// Keep synthetic IDs under OpenAI's 64-char call_id limit; other providers may replay them.
+	// 32 hex chars gives 128 bits while keeping IDs under OpenAI's 64-char call_id limit.
 	const toolNameHash = createHash('sha256')
 		.update(toolName)
 		.digest('hex')

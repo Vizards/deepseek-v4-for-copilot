@@ -27,10 +27,12 @@ export function processToolFlow({
 	tools,
 	progress,
 }: ToolFlowOptions): ToolFlowResult {
+	const filteredMessages = filterProviderNotices(filterPreflightControlFlow(messages));
+
 	if (!stabilizeToolList) {
 		return {
 			preflightHandled: false,
-			messages,
+			messages: filteredMessages,
 		};
 	}
 
@@ -62,7 +64,7 @@ export function processToolFlow({
 
 	return {
 		preflightHandled: false,
-		messages: filterProviderNotices(filterPreflightControlFlow(messages)),
+		messages: filteredMessages,
 		initialResponseNotice: hasUnexpandedActivateTools ? createToolDriftNotice() : undefined,
 	};
 }

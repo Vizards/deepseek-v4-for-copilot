@@ -122,8 +122,8 @@ function parsePreflightPart(part: unknown): { round: number; toolName?: string }
 			return undefined;
 		}
 		return {
-			...parsed,
-			toolName: parsed.toolName ?? part.name,
+			round: parsed.round,
+			toolName: part.name,
 		};
 	}
 	if (part instanceof vscode.LanguageModelToolResultPart) {
@@ -144,9 +144,7 @@ function isEmptyTextPart(part: unknown): boolean {
 	return part instanceof vscode.LanguageModelTextPart && part.value.length === 0;
 }
 
-function parsePreflightToolCallId(
-	callId: string,
-): { round: number; toolName?: string } | undefined {
+function parsePreflightToolCallId(callId: string): { round: number } | undefined {
 	if (!callId.startsWith(PREFLIGHT_ACTIVATE_CALL_ID_PREFIX)) {
 		return undefined;
 	}
@@ -162,13 +160,5 @@ function parsePreflightToolCallId(
 		return undefined;
 	}
 
-	try {
-		const maybeToolName = decodeURIComponent(value.slice(separatorIndex + 1));
-		return {
-			round,
-			toolName: maybeToolName.startsWith(ACTIVATE_TOOL_PREFIX) ? maybeToolName : undefined,
-		};
-	} catch {
-		return { round };
-	}
+	return { round };
 }

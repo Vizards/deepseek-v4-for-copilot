@@ -5,11 +5,11 @@ import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import type { ReasoningLookup } from './cache';
 import { convertMessages, convertTools, countMessageChars } from './convert';
 import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
 import { dumpDeepSeekRequest } from './dump';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
+import type { ReplayMarkerMetadata } from './replay';
 import type { ConversationSegment } from './segment';
 import { DEEPSEEK_TOOLS_LIMIT } from './tools/consts';
 import { resolveImageMessages } from './vision/index';
@@ -22,6 +22,8 @@ export interface PreparedChatRequest {
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
 	segment: ConversationSegment;
+	replayMarkerMetadata: ReplayMarkerMetadata;
+	visionMarkerTextChars?: number;
 }
 
 export interface PrepareChatRequestOptions {
@@ -32,8 +34,6 @@ export interface PrepareChatRequestOptions {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	options: vscode.ProvideLanguageModelChatResponseOptions;
 	token: vscode.CancellationToken;
-	reasoningLookup: ReasoningLookup;
-	reasoningCacheSize: number;
 	cacheDiagnostics: CacheDiagnosticsRecorder;
 	getVisionModel: () => Promise<vscode.LanguageModelChat | undefined>;
 }
@@ -46,8 +46,6 @@ export async function prepareChatRequest({
 	messages,
 	options,
 	token,
-	reasoningLookup,
-	reasoningCacheSize,
 	cacheDiagnostics,
 	getVisionModel,
 }: PrepareChatRequestOptions): Promise<PreparedChatRequest> {
@@ -64,7 +62,7 @@ export async function prepareChatRequest({
 
 	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
 	const resolvedMessages = visionResolution.messages;
-	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, reasoningLookup);
+	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel);
 	const tools = modelDef?.capabilities.toolCalling ? convertTools(options.tools) : undefined;
 	const toolsCount = tools?.length ?? 0;
 	if (toolsCount > DEEPSEEK_TOOLS_LIMIT) {
@@ -99,7 +97,7 @@ export async function prepareChatRequest({
 		resolvedMessages,
 		requestOptions: options,
 		visionModelId: visionResolution.visionModelId,
-		visionCacheStats: visionResolution.stats,
+		visionStats: visionResolution.stats,
 	});
 
 	const diagnosticsRun = cacheDiagnostics.beginRequest({
@@ -109,11 +107,10 @@ export async function prepareChatRequest({
 		isThinkingModel,
 		thinkingEffort,
 		maxTokens,
-		reasoningCacheSize,
 		inputMessages: messages,
 		resolvedMessages,
 		visionModelId: visionResolution.visionModelId,
-		visionCacheStats: visionResolution.stats,
+		visionStats: visionResolution.stats,
 	});
 
 	return {
@@ -124,6 +121,8 @@ export async function prepareChatRequest({
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
 		segment,
+		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
+		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 	};
 }
 

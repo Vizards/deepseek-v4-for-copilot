@@ -51,10 +51,12 @@ const zh: Translations = {
 	'vision.proxyError': '视觉代理异常：',
 
 	// Request
-	'request.toolsLimitExceeded': 'DeepSeek 最多支持 {0} 个工具，当前请求包含 {1} 个。',
-	'request.preflightRoundLimitExceeded': '工具预展开轮次超过限制（{0} 轮），请求已停止以避免循环。',
+	'request.toolsLimitExceeded':
+		'DeepSeek 单次 tools 请求最多支持 {0} 个 functions，当前请求包含 {1} 个。请先用 VS Code 的 Configure Tools 关闭不常用的工具；如果正在使用实验性稳定工具列表设置，请关闭它。',
+	'request.preflightRoundLimitExceeded':
+		'实验性稳定工具列表设置已尝试 {0} 轮，仍无法得到稳定的已启用工具列表。请关闭该实验性设置，或先用 VS Code 的 Configure Tools 关闭不常用的工具。',
 	'notice.toolDrift':
-		'⚠️ Tools 不稳定，DeepSeek 缓存命中率可能下降。[说明](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.zh.md)',
+		'⚠️ 工具列表不稳定，缓存命中率可能下降。[了解更多](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.zh.md)',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
@@ -103,11 +105,11 @@ const en: Translations = {
 
 	// Request
 	'request.toolsLimitExceeded':
-		'DeepSeek supports at most {0} tools, but this request contains {1}.',
+		'DeepSeek supports at most {0} functions in one tools request, but this request contains {1}. Use VS Code Configure Tools to disable tools you rarely use. If the experimental tool-list stabilization setting is enabled, turn it off.',
 	'request.preflightRoundLimitExceeded':
-		'Tool pre-expansion exceeded the {0}-round limit, so the request was stopped to avoid a loop.',
+		'Experimental tool-list stabilization tried {0} rounds but still could not get a stable enabled-tools list. Turn this experimental setting off, or use VS Code Configure Tools to disable tools you rarely use first.',
 	'notice.toolDrift':
-		'⚠️ Tools are unstable; DeepSeek cache hits may drop. [Details](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)',
+		'⚠️ Tool list is unstable; cache hit rate may drop. [Learn more](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)',
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',

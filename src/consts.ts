@@ -27,42 +27,6 @@ export const WELCOME_SHOWN_KEY = 'deepseek-copilot.welcomeShown';
 /** Walkthrough contribution ID. */
 export const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingStarted';
 
-// ---- Vision proxy ----
-
-/** Default model ID used for the vision proxy when auto-detection is enabled. */
-export const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
-
-/**
- * Prompt sent to the vision proxy model when describing image attachments
- * before forwarding them to text-only DeepSeek models.
- */
-export const IMAGE_DESCRIPTION_PROMPT =
-	'Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.';
-
-/**
- * Stable fallback marker inserted into the chat prompt when the vision proxy
- * fails to describe an image. Keep this in English and out of i18n so prompt
- * shape and cache behaviour do not vary by VS Code display language.
- */
-export const IMAGE_DESCRIPTION_UNAVAILABLE = '[Image Description unavailable]';
-
-/**
- * Wrapper applied to vision model descriptions before they are inserted into
- * the chat prompt. The full format is: `[Image Description: <description>]`.
- * Keep these in English and out of i18n so cache keys and token estimates
- * stay stable regardless of VS Code display language.
- */
-export const IMAGE_DESCRIPTION_PREFIX = '[Image Description: ';
-export const IMAGE_DESCRIPTION_SUFFIX = ']';
-
-// ---- Reasoning cache ----
-
-/** Directory name under globalStorageUri for persisted DeepSeek reasoning_content. */
-export const REASONING_CACHE_DIR_NAME = 'reasoning-cache-v1';
-
-/** Keep persisted reasoning long enough to roughly match DeepSeek context cache lifetime. */
-export const REASONING_CACHE_TTL_MS = 72 * 60 * 60 * 1000;
-
 // ---- Model registry ----
 
 /** Available DeepSeek models exposed through the language model provider. */

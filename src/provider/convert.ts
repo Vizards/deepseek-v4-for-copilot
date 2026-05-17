@@ -1,31 +1,31 @@
 import vscode from 'vscode';
 import { safeStringify } from '../json';
 import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
-import type { ReasoningLookup } from './cache';
+import { parseFirstReplayMarker } from './replay';
 
 /**
  * Convert VS Code chat messages to DeepSeek format.
- * Injects cached reasoning_content for assistant tool-call messages and final
- * assistant messages after tool results.
+ * Injects marker-replayed reasoning_content for assistant messages.
  */
 export function convertMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	isThinkingModel: boolean,
-	reasoningLookup: ReasoningLookup,
 ): DeepSeekMessage[] {
 	const result: DeepSeekMessage[] = [];
-	let recentToolResultIds: string[] = [];
 
 	for (const message of messages) {
 		const role = mapRole(message.role);
 
 		let content = '';
+		let thinkingContent = '';
 		const toolCalls: DeepSeekToolCall[] = [];
 		const toolResults: Array<{ callId: string; content: string }> = [];
 
 		for (const part of message.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				content += part.value;
+			} else if (isLanguageModelThinkingPart(part)) {
+				thinkingContent += normalizeThinkingPartText(part.value);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				toolCalls.push({
 					id: part.callId,
@@ -50,22 +50,8 @@ export function convertMessages(
 		}
 
 		if (role === 'assistant') {
-			// Inject reasoning_content from cache for assistant messages
-			// that have tool calls (per DeepSeek API requirement).
-			let reasoningContent: string | undefined;
-			if (isThinkingModel && toolCalls.length > 0) {
-				for (const tc of toolCalls) {
-					const cached = reasoningLookup.getToolCallReasoning(tc.id);
-					if (cached) {
-						reasoningContent = cached;
-						break;
-					}
-				}
-			} else if (isThinkingModel && recentToolResultIds.length > 0) {
-				reasoningContent = reasoningLookup.getPostToolReasoning(recentToolResultIds);
-			}
-
 			if (content || toolCalls.length > 0) {
+				const replayMarker = isThinkingModel ? parseFirstReplayMarker(message) : undefined;
 				const msg: DeepSeekMessage = {
 					role: 'assistant' as const,
 					content: content || '',
@@ -76,21 +62,17 @@ export function convertMessages(
 				}
 
 				if (isThinkingModel) {
-					msg.reasoning_content = reasoningContent || '';
+					msg.reasoning_content = getReasoningContent(replayMarker, thinkingContent);
 				}
 
 				result.push(msg);
-				recentToolResultIds = [];
 			}
 		} else {
 			if (content) {
-				recentToolResultIds = [];
 				result.push({
 					role: role as 'user' | 'assistant',
 					content: content,
 				});
-			} else if (toolResults.length === 0) {
-				recentToolResultIds = [];
 			}
 		}
 
@@ -101,11 +83,31 @@ export function convertMessages(
 				content: tr.content,
 				tool_call_id: tr.callId,
 			});
-			recentToolResultIds.push(tr.callId);
 		}
 	}
 
 	return result;
+}
+
+function getReasoningContent(
+	replayMarker: ReturnType<typeof parseFirstReplayMarker>,
+	thinkingContent: string,
+): string {
+	if (replayMarker?.valid && replayMarker.reasoningText) {
+		return replayMarker.reasoningText;
+	}
+	return thinkingContent;
+}
+
+function isLanguageModelThinkingPart(part: unknown): part is vscode.LanguageModelThinkingPart {
+	return (
+		typeof vscode.LanguageModelThinkingPart === 'function' &&
+		part instanceof vscode.LanguageModelThinkingPart
+	);
+}
+
+function normalizeThinkingPartText(value: string | string[]): string {
+	return Array.isArray(value) ? value.join('') : value;
 }
 
 function mapRole(role: vscode.LanguageModelChatMessageRole): 'user' | 'assistant' {

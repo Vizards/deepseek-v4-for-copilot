@@ -64,9 +64,18 @@ export function getRequestDumpEnabled(): boolean {
 	return getDebugMode() === 'verbose';
 }
 
-export function getPreExpandActivateToolsEnabled(): boolean {
+export function getStabilizeToolListEnabled(): boolean {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	return config.get<boolean>('experimental.preExpandActivateTools', false);
+	const configured = getConfiguredBoolean(config, 'experimental.stabilizeToolList');
+	if (configured !== undefined) {
+		return configured;
+	}
+
+	// Backward compatibility for users who tried the setting before it was renamed.
+	return (
+		getConfiguredBoolean(config, 'experimental.alwaysSendTools') ??
+		config.get<boolean>('experimental.preExpandActivateTools', false)
+	);
 }
 
 /**
@@ -92,6 +101,22 @@ function normalizeDebugMode(value: unknown): DebugMode | undefined {
 		return value;
 	}
 	return undefined;
+}
+
+function getConfiguredBoolean(
+	config: vscode.WorkspaceConfiguration,
+	section: string,
+): boolean | undefined {
+	const inspected = config.inspect<unknown>(section);
+	return (
+		normalizeBoolean(inspected?.workspaceFolderValue) ??
+		normalizeBoolean(inspected?.workspaceValue) ??
+		normalizeBoolean(inspected?.globalValue)
+	);
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+	return typeof value === 'boolean' ? value : undefined;
 }
 
 async function migrateLegacyDebugSettingAtScope(

@@ -1,7 +1,7 @@
 import vscode from 'vscode';
-import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../../consts';
 import { t } from '../../i18n';
 import { logger } from '../../logger';
+import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from './consts';
 
 /**
  * Get the vision proxy model. Cached after first lookup.

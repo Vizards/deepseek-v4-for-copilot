@@ -1,20 +1,23 @@
 import vscode from 'vscode';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
-import type { ReasoningRecorder } from './cache';
 import {
 	observeCancellationToken,
 	type CacheDiagnosticsRun,
-	type SegmentMarkerReportTrigger,
+	type ReplayMarkerReportTrigger,
 } from './diagnostics';
 import type { PreparedChatRequest } from './request';
-import { createSegmentMarkerPart } from './segment';
+import {
+	createReplayMarkerPart,
+	hasReplayMarkerMetadata,
+	type ReplayMarkerMetadata,
+} from './replay';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
 	emittedToolCallIds: string[];
-	segmentMarkerReported: boolean;
 	initialResponseNoticeReported: boolean;
+	replayMarkerReported: boolean;
 }
 
 const COPILOT_USAGE_DATA_PART_MIME = 'usage';
@@ -24,7 +27,6 @@ export interface StreamChatCompletionOptions {
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
 	token: vscode.CancellationToken;
 	initialResponseNotice?: string;
-	reasoningRecorder: ReasoningRecorder;
 	getCharsPerToken: () => number;
 	setCharsPerToken: (charsPerToken: number) => void;
 }
@@ -34,19 +36,16 @@ export function streamChatCompletion({
 	progress,
 	token,
 	initialResponseNotice,
-	reasoningRecorder,
 	getCharsPerToken,
 	setCharsPerToken,
 }: StreamChatCompletionOptions): Promise<void> {
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
 		emittedToolCallIds: [],
-		segmentMarkerReported: false,
 		initialResponseNoticeReported: false,
+		replayMarkerReported: false,
 	};
-	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics, () => {
-		cacheEmittedToolCallReasoningOnCancellation(prepared.isThinkingModel, state, reasoningRecorder);
-	});
+	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics);
 
 	return prepared.client
 		.streamChatCompletion(
@@ -54,19 +53,16 @@ export function streamChatCompletion({
 			{
 				onContent: (content: string) => {
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
 
 				onThinking: (text: string) => {
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleThinking(text, state, progress);
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					reportConversationSegmentMarkerOnce(prepared, progress, state, 'first-assistant-part');
 					handleToolCall(toolCall, state, progress);
 				},
 
@@ -75,12 +71,10 @@ export function streamChatCompletion({
 				},
 
 				onDone: () => {
-					reportConversationSegmentMarkerOnce(prepared, progress, state, 'done');
-					finalizeReasoningCache(
-						prepared.isThinkingModel,
+					reportReplayMarkerOnce(prepared, progress, state, 'done');
+					finalizeReplayDiagnostics(
 						prepared.trailingToolResultIds,
 						state,
-						reasoningRecorder,
 						prepared.cacheDiagnostics,
 					);
 				},
@@ -99,7 +93,7 @@ export function streamChatCompletion({
 			token,
 		)
 		.then(undefined, (error) => {
-			reportSkippedSegmentMarkerIfNeeded(
+			reportSkippedReplayMarkerIfNeeded(
 				prepared,
 				state,
 				token.isCancellationRequested ? 'cancelled' : 'stream-error',
@@ -109,7 +103,7 @@ export function streamChatCompletion({
 		})
 		.then(() => {
 			if (token.isCancellationRequested) {
-				reportSkippedSegmentMarkerIfNeeded(prepared, state, 'cancelled');
+				reportSkippedReplayMarkerIfNeeded(prepared, state, 'cancelled');
 			}
 		})
 		.finally(() => {
@@ -129,58 +123,86 @@ function reportInitialResponseNoticeOnce(
 	progress.report(new vscode.LanguageModelTextPart(initialResponseNotice));
 }
 
-function reportConversationSegmentMarkerOnce(
+function reportReplayMarkerOnce(
 	prepared: PreparedChatRequest,
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 	state: ResponseStreamState,
-	trigger: SegmentMarkerReportTrigger,
+	trigger: ReplayMarkerReportTrigger,
 ): void {
-	if (state.segmentMarkerReported) {
+	if (state.replayMarkerReported) {
 		return;
 	}
-	state.segmentMarkerReported = true;
-	reportConversationSegmentMarker(prepared, progress, trigger);
+	state.replayMarkerReported = true;
+	reportReplayMarker(prepared, progress, state, trigger);
 }
 
-function reportSkippedSegmentMarkerIfNeeded(
+function reportSkippedReplayMarkerIfNeeded(
 	prepared: PreparedChatRequest,
 	state: ResponseStreamState,
 	reason: 'cancelled' | 'stream-error',
 	error?: unknown,
 ): void {
-	if (state.segmentMarkerReported) {
+	if (state.replayMarkerReported) {
 		return;
 	}
-	state.segmentMarkerReported = true;
-	prepared.cacheDiagnostics.onSegmentMarkerReport({
-		segment: prepared.segment,
+	state.replayMarkerReported = true;
+	prepared.cacheDiagnostics.onReplayMarkerReport({
 		status: 'skipped',
 		reason,
+		visionTextChars: prepared.visionMarkerTextChars,
+		reasoningTextChars: state.accumulatedReasoning.length || undefined,
 		error,
 	});
 }
 
-function reportConversationSegmentMarker(
+function reportReplayMarker(
 	prepared: PreparedChatRequest,
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
-	trigger: SegmentMarkerReportTrigger,
+	state: ResponseStreamState,
+	trigger: ReplayMarkerReportTrigger,
 ): void {
+	const metadata = getReplayMarkerMetadata(prepared, state);
+	if (!hasReplayMarkerMetadata(metadata)) {
+		prepared.cacheDiagnostics.onReplayMarkerReport({
+			status: 'skipped',
+			trigger,
+			reason: 'no-replay-data',
+			visionTextChars: prepared.visionMarkerTextChars,
+			reasoningTextChars: state.accumulatedReasoning.length || undefined,
+		});
+		return;
+	}
+
 	try {
-		progress.report(createSegmentMarkerPart(prepared.segment.segmentId));
-		prepared.cacheDiagnostics.onSegmentMarkerReport({
-			segment: prepared.segment,
+		const markerPart = createReplayMarkerPart(metadata);
+		progress.report(markerPart);
+		prepared.cacheDiagnostics.onReplayMarkerReport({
 			status: 'reported',
 			trigger,
+			markerBytes: markerPart.data.byteLength,
+			visionTextChars: prepared.visionMarkerTextChars,
+			reasoningTextChars: state.accumulatedReasoning.length || undefined,
 		});
 	} catch (error) {
-		prepared.cacheDiagnostics.onSegmentMarkerReport({
-			segment: prepared.segment,
+		prepared.cacheDiagnostics.onReplayMarkerReport({
 			status: 'failed',
 			trigger,
+			visionTextChars: prepared.visionMarkerTextChars,
+			reasoningTextChars: state.accumulatedReasoning.length || undefined,
 			error,
 		});
-		logger.warn('Failed to report conversation segment marker', error);
+		logger.warn('Failed to report replay marker', error);
 	}
+}
+
+function getReplayMarkerMetadata(
+	prepared: PreparedChatRequest,
+	state: ResponseStreamState,
+): ReplayMarkerMetadata {
+	return {
+		...prepared.replayMarkerMetadata,
+		reasoningText: state.accumulatedReasoning || undefined,
+	};
 }
 
 function handleThinking(
@@ -213,44 +235,16 @@ function handleToolCall(
 	}
 }
 
-function finalizeReasoningCache(
-	isThinkingModel: boolean,
+function finalizeReplayDiagnostics(
 	trailingToolResultIds: readonly string[],
 	state: ResponseStreamState,
-	reasoningRecorder: ReasoningRecorder,
 	cacheDiagnostics: CacheDiagnosticsRun,
 ): void {
-	if (isThinkingModel && state.accumulatedReasoning) {
-		if (state.emittedToolCallIds.length > 0) {
-			reasoningRecorder.recordToolCallReasoning(
-				state.emittedToolCallIds,
-				state.accumulatedReasoning,
-			);
-		} else if (trailingToolResultIds.length > 0) {
-			reasoningRecorder.recordPostToolReasoning(trailingToolResultIds, state.accumulatedReasoning);
-		}
-	}
-
-	const pruneResult = reasoningRecorder.prune();
 	cacheDiagnostics.onDone({
-		reasoningCacheSize: reasoningRecorder.size,
-		evictedReasoningEntries: pruneResult.removed,
+		reasoningTextChars: state.accumulatedReasoning.length,
 		emittedToolCalls: state.emittedToolCallIds.length,
 		trailingToolResults: trailingToolResultIds.length,
 	});
-}
-
-function cacheEmittedToolCallReasoningOnCancellation(
-	isThinkingModel: boolean,
-	state: ResponseStreamState,
-	reasoningRecorder: ReasoningRecorder,
-): void {
-	if (!isThinkingModel || !state.accumulatedReasoning || state.emittedToolCallIds.length === 0) {
-		return;
-	}
-
-	reasoningRecorder.recordToolCallReasoning(state.emittedToolCallIds, state.accumulatedReasoning);
-	reasoningRecorder.prune();
 }
 
 function updateCharsPerToken(

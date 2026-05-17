@@ -45,7 +45,10 @@ export function filterPreflightControlFlow(
 	const filteredMessages: vscode.LanguageModelChatRequestMessage[] = [];
 
 	for (const message of messages) {
-		const filteredContent = message.content.filter((part) => !isPreflightPart(part));
+		const hasPreflightPart = message.content.some(isPreflightPart);
+		const filteredContent = message.content.filter(
+			(part) => !isPreflightPart(part) && !(hasPreflightPart && isEmptyTextPart(part)),
+		);
 		if (filteredContent.length === message.content.length) {
 			filteredMessages.push(message);
 			continue;
@@ -110,6 +113,10 @@ function isPreflightPart(part: unknown): boolean {
 			part instanceof vscode.LanguageModelToolResultPart) &&
 		part.callId.startsWith(PREFLIGHT_ACTIVATE_CALL_ID_PREFIX)
 	);
+}
+
+function isEmptyTextPart(part: unknown): boolean {
+	return part instanceof vscode.LanguageModelTextPart && part.value.length === 0;
 }
 
 function parsePreflightToolCallId(

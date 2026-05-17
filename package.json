@@ -129,10 +129,10 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
-        "deepseek-copilot.experimental.preExpandActivateTools": {
+        "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "%deepseek-copilot.config.experimental.preExpandActivateTools.description%",
+          "markdownDescription": "%deepseek-copilot.config.experimental.stabilizeToolList.description%",
           "tags": [
             "experimental"
           ]
@@ -164,7 +164,7 @@
         "deepseek-copilot.visionPrompt": {
           "type": "string",
           "editPresentation": "multilineText",
-          "default": "Describe the visual contents of this image in detail, including any text, objects, people, or context that would be relevant for understanding it. Focus on factual visual elements.",
+          "default": "Describe all image attachments in this message.\n\nIf there is one image, describe it directly.\nIf there are multiple images:\n1. Describe each image separately, preserving their order.\n2. Then provide a combined description explaining the overall context and relationships across the images.\n\nReturn one concise factual description suitable for inserting into a text-only chat prompt. Include visible text, objects, UI elements, people, and relevant context. Do not invent details.",
           "description": "%deepseek-copilot.config.visionPrompt.description%"
         },
         "deepseek-copilot.debugMode": {

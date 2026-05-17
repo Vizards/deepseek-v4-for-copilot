@@ -1,10 +1,9 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getPreExpandActivateToolsEnabled } from '../config';
+import { getStabilizeToolListEnabled } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import { ReasoningCacheStore } from './cache';
 import { createCacheDiagnosticsRecorder } from './diagnostics';
 import { dumpProviderInput } from './dump';
 import { toChatInfo } from './models';
@@ -28,8 +27,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	readonly onDidChangeLanguageModelChatInformation =
 		this.onDidChangeLanguageModelChatInformationEmitter.event;
 
-	/** Segment-scoped reasoning_content cache. */
-	private readonly reasoningCache: ReasoningCacheStore;
 	private readonly cacheDiagnostics = createCacheDiagnosticsRecorder();
 
 	/** Vision proxy: resolver + cached model. */
@@ -44,7 +41,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
 		this.globalStorageUri = context.globalStorageUri;
-		this.reasoningCache = new ReasoningCacheStore(context.globalStorageUri);
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
@@ -107,12 +103,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		} catch (error) {
 			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
 		}
-
-		try {
-			await this.reasoningCache.flush();
-		} catch (error) {
-			logger.warn('Failed to persist reasoning cache during deactivate', error);
-		}
 	}
 
 	/** See provider/vision */
@@ -142,8 +132,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		token: vscode.CancellationToken,
 	): Promise<void> {
 		const segment = resolveConversationSegment(messages);
-		const reasoning = await this.reasoningCache.forSegment(segment.segmentId);
-		reasoning.prune();
 
 		dumpProviderInput({
 			globalStorageUri: this.globalStorageUri,
@@ -154,7 +142,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		});
 
 		const toolFlow = processToolFlow({
-			preExpandActivateTools: getPreExpandActivateToolsEnabled(),
+			stabilizeToolList: getStabilizeToolListEnabled(),
 			messages,
 			tools: options.tools,
 			progress,
@@ -171,8 +159,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			messages: toolFlow.messages,
 			options,
 			token,
-			reasoningLookup: reasoning,
-			reasoningCacheSize: reasoning.size,
 			cacheDiagnostics: this.cacheDiagnostics,
 			getVisionModel: () => this.vision.get(),
 		});
@@ -182,7 +168,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			progress,
 			token,
 			initialResponseNotice: toolFlow.initialResponseNotice,
-			reasoningRecorder: reasoning,
 			getCharsPerToken: () => this.charsPerToken,
 			setCharsPerToken: (charsPerToken) => {
 				this.charsPerToken = charsPerToken;

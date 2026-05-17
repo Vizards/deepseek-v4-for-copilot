@@ -1,7 +1,7 @@
 import vscode from 'vscode';
-import { IMAGE_DESCRIPTION_PREFIX, IMAGE_DESCRIPTION_SUFFIX } from '../consts';
-import { SEGMENT_MARKER_MIME } from './segment';
-import { computeDataHash, getCachedDescriptionByDataHash } from './vision/cache';
+import { REPLAY_MARKER_MIME } from './replay';
+
+const IMAGE_PART_ESTIMATED_CHARS = 1020;
 
 /**
  * Recursively estimate the character count for a single content part.
@@ -41,30 +41,19 @@ function estimatePartChars(part: unknown): number {
 	//    by the vision pipeline; raw byteLength would massively overestimate.
 	if (part instanceof vscode.LanguageModelDataPart) {
 		const mime = part.mimeType;
-		if (mime === SEGMENT_MARKER_MIME) {
+		if (mime === REPLAY_MARKER_MIME) {
+			// Marker metadata is not sent as assistant content. Its vision text belongs
+			// logically to a previous user image message, but provideTokenCount only
+			// receives one message at a time and cannot safely bind history here.
 			return 0;
 		}
 
-		// Images: try the vision description cache first. If this image was
-		// already resolved, the cached description length is the most accurate
-		// estimate of what the model will actually receive.
+		// Images are resolved by the vision pipeline before reaching DeepSeek.
+		// At token-count time we cannot know whether this image will be generated,
+		// replayed from a later assistant marker, or omitted as a historical miss.
+		// Use a stable fallback estimate instead of raw image bytes.
 		if (mime.startsWith('image/')) {
-			// Skip SHA-256 for very large images — the hash cost outweighs the
-			// benefit of a cache lookup, and such images are unlikely to be
-			// processed by the vision pipeline anyway.
-			if (part.data.byteLength <= 500_000) {
-				const cached = getCachedDescriptionByDataHash(computeDataHash(part.data));
-				if (cached !== undefined) {
-					return IMAGE_DESCRIPTION_PREFIX.length + cached.length + IMAGE_DESCRIPTION_SUFFIX.length;
-				}
-			}
-			// Cold cache (or image too large to hash): use a conservative
-			// fixed estimate (~255 tokens at 4 chars/tok, roughly matching
-			// OpenAI auto-detail for a moderate image).
-			// The vision pipeline will replace these with text descriptions
-			// whose actual token cost is counted via LanguageModelTextPart
-			// on the next pass.
-			return 1020;
+			return IMAGE_PART_ESTIMATED_CHARS;
 		}
 		// PDFs and other documents: use byteLength as a rough proxy but cap it
 		// to prevent a single large attachment from dominating the budget.

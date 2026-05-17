@@ -9,10 +9,6 @@ function getChannel(): vscode.LogOutputChannel {
 	return channel;
 }
 
-function ts(): string {
-	return new Date().toISOString().slice(11, 23);
-}
-
 function formatMessage(args: unknown[]): string {
 	return args
 		.map((a) => {
@@ -28,10 +24,10 @@ function formatMessage(args: unknown[]): string {
 }
 
 export const logger = {
-	info: (...args: unknown[]) => getChannel().info(`[${ts()}]`, formatMessage(args)),
-	warn: (...args: unknown[]) => getChannel().warn(`[${ts()}]`, formatMessage(args)),
-	error: (...args: unknown[]) => getChannel().error(`[${ts()}]`, formatMessage(args)),
-	debug: (...args: unknown[]) => getChannel().debug(`[${ts()}]`, formatMessage(args)),
+	info: (...args: unknown[]) => getChannel().info(formatMessage(args)),
+	warn: (...args: unknown[]) => getChannel().warn(formatMessage(args)),
+	error: (...args: unknown[]) => getChannel().error(formatMessage(args)),
+	debug: (...args: unknown[]) => getChannel().debug(formatMessage(args)),
 	show: () => getChannel().show(),
 	dispose: () => {
 		channel?.dispose();

@@ -280,8 +280,8 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			options.visionModelId,
 		);
 
-		logger.info(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
-		logger.info(
+		logger.debug(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
+		logger.debug(
 			`[cache-trace #${requestId}] request vscodeModel=${options.vscodeModelId}` +
 				formatSegmentTrace(options.segment) +
 				` apiModel=${options.request.model}` +
@@ -294,32 +294,32 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		);
 		const hostPromptTrace = summarizeHostPromptTrace(options.inputMessages);
 		if (shouldLogHostPromptTrace(hostPromptTrace)) {
-			logger.info(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
+			logger.debug(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
 		}
 		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
 		if (vscodeMessageTrace) {
-			logger.info(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
+			logger.debug(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
 		}
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
-			logger.info(`[cache-trace #${requestId}] ${detailLine}`);
+			logger.debug(`[cache-trace #${requestId}] ${detailLine}`);
 		}
 		const visionTrace = formatVisionTrace(visionResolution, options.visionStats);
 		if (visionTrace) {
-			logger.info(`[cache-trace #${requestId}] ${visionTrace}`);
+			logger.debug(`[cache-trace #${requestId}] ${visionTrace}`);
 		}
 		if (cacheTraceComparison) {
-			logger.info(
+			logger.debug(
 				`[cache-trace #${requestId}] ${formatCacheTraceComparison(cacheTraceComparison)}`,
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(cacheTraceComparison)) {
-				logger.info(`[cache-trace #${requestId}] ${detailLine}`);
+				logger.debug(`[cache-trace #${requestId}] ${detailLine}`);
 			}
 			for (const warning of getCacheTraceComparisonWarnings(cacheTraceComparison)) {
 				logger.warn(`[cache-trace #${requestId}] ${warning}`);
 			}
 		}
 		if (traceKeyChangeComparison && previousImmediateCacheTrace) {
-			logger.info(
+			logger.debug(
 				`[cache-trace #${requestId}] ${formatCacheTraceKeyChangeComparison(
 					previousImmediateCacheTrace.cacheTraceKey,
 					cacheTrace.cacheTraceKey,
@@ -327,7 +327,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				)}`,
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(traceKeyChangeComparison)) {
-				logger.info(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
+				logger.debug(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
 			}
 			for (const warning of getCacheTraceComparisonWarnings(traceKeyChangeComparison)) {
 				logger.warn(`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`);
@@ -337,7 +337,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			logger.warn(`[cache-trace #${requestId}] ${warning}`);
 		}
 		for (const infoLine of getCacheTraceInfoLines(cacheTrace)) {
-			logger.info(`[cache-trace #${requestId}] ${infoLine}`);
+			logger.debug(`[cache-trace #${requestId}] ${infoLine}`);
 		}
 
 		return new ActiveCacheDiagnosticsRun(
@@ -382,7 +382,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 
 	onDone(info: CacheDiagnosticsDoneInfo): void {
 		if (info.emittedToolCalls > 0 || info.trailingToolResults > 0) {
-			logger.info(
+			logger.debug(
 				`[cache-trace #${this.requestId}] stream done reasoningTextChars=${info.reasoningTextChars}` +
 					` emittedToolCalls=${info.emittedToolCalls}` +
 					` trailingToolResults=${info.trailingToolResults}`,
@@ -395,7 +395,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 		logUsage(usage, charsPerToken, this.requestId);
 		if (this.resultComparison) {
 			const hitRate = getCacheHitRate(usage);
-			logger.info(
+			logger.debug(
 				`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
 					` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
 					` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
@@ -408,11 +408,11 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			return;
 		}
 		this.cancellationLogged = true;
-		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
+		logger.debug(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
 	}
 
 	onReplayMarkerReport(info: ReplayMarkerReportInfo): void {
-		logger.info(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
+		logger.debug(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
 	}
 }
 

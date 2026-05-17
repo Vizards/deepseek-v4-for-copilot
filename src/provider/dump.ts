@@ -915,7 +915,7 @@ function logProviderInputDump(
 	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
 	logger.info(
 		`providerInputDump written: ${formatDumpSegment(options.segment)}` +
-			` input=${paths.providerInput} ` +
+			` input=file://${paths.providerInput} ` +
 			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
 			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
 				toolSummary.activateToolNames,
@@ -934,8 +934,8 @@ function logRequestDump(
 	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
 	logger.info(
 		`requestDump written: ${formatDumpSegment(options.segment)}` +
-			` request=${paths.request} ` +
-			`input=${paths.input} resolved=${paths.resolved} ` +
+			` request=file://${paths.request} ` +
+			`input=file://${paths.input} resolved=file://${paths.resolved} ` +
 			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
 			`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
 			formatHostSettingsSummary(summarizeHostSettings()) +

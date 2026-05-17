@@ -1,5 +1,8 @@
+import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { ACTIVATE_TOOL_PREFIX, PREFLIGHT_ACTIVATE_CALL_ID_PREFIX } from './consts';
+
+const PREFLIGHT_TOOL_NAME_HASH_LENGTH = 12;
 
 export interface ActivatePreflightInspection {
 	rounds: number;
@@ -64,7 +67,12 @@ export function filterPreflightControlFlow(
 }
 
 export function createPreflightToolCallId(round: number, toolName: string): string {
-	return `${PREFLIGHT_ACTIVATE_CALL_ID_PREFIX}${round}:${encodeURIComponent(toolName)}`;
+	// Keep synthetic IDs under OpenAI's 64-char call_id limit; other providers may replay them.
+	const toolNameHash = createHash('sha256')
+		.update(toolName)
+		.digest('hex')
+		.slice(0, PREFLIGHT_TOOL_NAME_HASH_LENGTH);
+	return `${PREFLIGHT_ACTIVATE_CALL_ID_PREFIX}${round}:${toolNameHash}`;
 }
 
 function collectActivateToolNames(
@@ -109,7 +117,14 @@ function isHumanUserMessagePart(part: unknown): boolean {
 
 function parsePreflightPart(part: unknown): { round: number; toolName?: string } | undefined {
 	if (part instanceof vscode.LanguageModelToolCallPart) {
-		return parsePreflightToolCallId(part.callId) ?? undefined;
+		const parsed = parsePreflightToolCallId(part.callId);
+		if (!parsed) {
+			return undefined;
+		}
+		return {
+			...parsed,
+			toolName: parsed.toolName ?? part.name,
+		};
 	}
 	if (part instanceof vscode.LanguageModelToolResultPart) {
 		return parsePreflightToolCallId(part.callId) ?? undefined;
@@ -148,7 +163,11 @@ function parsePreflightToolCallId(
 	}
 
 	try {
-		return { round, toolName: decodeURIComponent(value.slice(separatorIndex + 1)) };
+		const maybeToolName = decodeURIComponent(value.slice(separatorIndex + 1));
+		return {
+			round,
+			toolName: maybeToolName.startsWith(ACTIVATE_TOOL_PREFIX) ? maybeToolName : undefined,
+		};
 	} catch {
 		return { round };
 	}

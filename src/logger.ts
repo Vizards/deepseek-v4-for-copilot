@@ -1,10 +1,10 @@
 import vscode from 'vscode';
 
-let channel: vscode.OutputChannel | undefined;
+let channel: vscode.LogOutputChannel | undefined;
 
-function getChannel(): vscode.OutputChannel {
+function getChannel(): vscode.LogOutputChannel {
 	if (!channel) {
-		channel = vscode.window.createOutputChannel('DeepSeek');
+		channel = vscode.window.createOutputChannel('DeepSeek', { log: true });
 	}
 	return channel;
 }
@@ -13,8 +13,8 @@ function ts(): string {
 	return new Date().toISOString().slice(11, 23);
 }
 
-function write(level: string, args: unknown[]): void {
-	const text = args
+function formatMessage(args: unknown[]): string {
+	return args
 		.map((a) => {
 			if (typeof a === 'string') return a;
 			if (a instanceof Error) return a.stack ?? a.message;
@@ -25,14 +25,13 @@ function write(level: string, args: unknown[]): void {
 			}
 		})
 		.join(' ');
-	getChannel().appendLine(`[${ts()}] [${level}] ${text}`);
 }
 
 export const logger = {
-	info: (...args: unknown[]) => write('info', args),
-	warn: (...args: unknown[]) => write('warn', args),
-	error: (...args: unknown[]) => write('error', args),
-	debug: (...args: unknown[]) => write('debug', args),
+	info: (...args: unknown[]) => getChannel().info(`[${ts()}]`, formatMessage(args)),
+	warn: (...args: unknown[]) => getChannel().warn(`[${ts()}]`, formatMessage(args)),
+	error: (...args: unknown[]) => getChannel().error(`[${ts()}]`, formatMessage(args)),
+	debug: (...args: unknown[]) => getChannel().debug(`[${ts()}]`, formatMessage(args)),
 	show: () => getChannel().show(),
 	dispose: () => {
 		channel?.dispose();

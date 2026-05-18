@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
+import { logToolFlowDiagnostics } from '../diagnostics';
 import { ACTIVATE_TOOL_PREFIX, MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST } from './consts';
 import { createToolDriftNotice, filterProviderNotices } from './notices';
 import {
@@ -28,8 +29,14 @@ export function processToolFlow({
 	progress,
 }: ToolFlowOptions): ToolFlowResult {
 	const filteredMessages = filterProviderNotices(filterPreflightControlFlow(messages));
+	const filteredProviderMessages = filteredMessages !== messages;
 
 	if (!stabilizeToolList) {
+		logToolFlowDiagnostics({
+			tools,
+			filteredProviderMessages,
+			preflight: 'skipped',
+		});
 		return {
 			preflightHandled: false,
 			messages: filteredMessages,
@@ -39,12 +46,25 @@ export function processToolFlow({
 	const activatePreflight = inspectActivatePreflight(messages, tools);
 	if (activatePreflight.remainingActivatorNames.length > 0) {
 		if (activatePreflight.rounds >= MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST) {
+			logToolFlowDiagnostics({
+				tools,
+				filteredProviderMessages,
+				preflight: 'round-limit',
+				activatePreflight,
+			});
 			throw new Error(
 				t('request.preflightRoundLimitExceeded', MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST),
 			);
 		}
 
 		const nextRound = activatePreflight.rounds + 1;
+		logToolFlowDiagnostics({
+			tools,
+			filteredProviderMessages,
+			preflight: 'handled',
+			activatePreflight,
+			nextRound,
+		});
 		for (const toolName of activatePreflight.remainingActivatorNames) {
 			progress.report(
 				new vscode.LanguageModelToolCallPart(
@@ -61,6 +81,13 @@ export function processToolFlow({
 	const hasUnexpandedActivateTools =
 		activatePreflight.rounds > 0 &&
 		tools?.some((tool) => tool.name.startsWith(ACTIVATE_TOOL_PREFIX));
+	logToolFlowDiagnostics({
+		tools,
+		filteredProviderMessages,
+		preflight: 'ready',
+		activatePreflight,
+		initialResponseNotice: hasUnexpandedActivateTools,
+	});
 
 	return {
 		preflightHandled: false,

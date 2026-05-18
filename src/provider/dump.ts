@@ -917,7 +917,7 @@ function logProviderInputDump(
 	toolSummary: ToolSummary,
 ): void {
 	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
-	logger.info(
+	logger.debug(
 		`providerInputDump written: ${formatDumpSegment(options.segment)}` +
 			` input=file://${encodeFilePath(paths.providerInput)} ` +
 			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
@@ -936,7 +936,7 @@ function logRequestDump(
 	requestJsonLength: number,
 ): void {
 	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
-	logger.info(
+	logger.debug(
 		`requestDump written: ${formatDumpSegment(options.segment)}` +
 			` request=file://${encodeFilePath(paths.request)} ` +
 			`input=file://${encodeFilePath(paths.input)} resolved=file://${encodeFilePath(paths.resolved)} ` +

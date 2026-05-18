@@ -6,6 +6,8 @@ import { logger } from '../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
 import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from './replay';
 import type { ConversationSegment } from './segment';
+import { ACTIVATE_TOOL_PREFIX } from './tools/consts';
+import type { ActivatePreflightInspection } from './tools/preflight';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from './vision/consts';
 import type { VisionResolutionStats as VisionPipelineStats } from './vision/index';
 
@@ -223,6 +225,57 @@ export function createCacheDiagnosticsRecorder(): CacheDiagnosticsRecorder {
 	return new DefaultCacheDiagnosticsRecorder();
 }
 
+export function logToolFlowDiagnostics({
+	tools,
+	filteredProviderMessages,
+	preflight,
+	activatePreflight,
+	nextRound,
+	initialResponseNotice,
+}: {
+	tools: readonly vscode.LanguageModelChatTool[] | undefined;
+	filteredProviderMessages: boolean;
+	preflight: 'skipped' | 'handled' | 'ready' | 'round-limit';
+	activatePreflight?: ActivatePreflightInspection;
+	nextRound?: number;
+	initialResponseNotice?: boolean;
+}): void {
+	if (!getDebugLoggingEnabled()) {
+		return;
+	}
+
+	const activateToolCount =
+		tools?.reduce(
+			(count, tool) => count + (tool.name.startsWith(ACTIVATE_TOOL_PREFIX) ? 1 : 0),
+			0,
+		) ?? 0;
+	if (preflight === 'skipped' && !filteredProviderMessages && activateToolCount === 0) {
+		return;
+	}
+
+	let message =
+		`[tool-flow] preflight=${preflight}` +
+		` tools=${tools?.length ?? 0}` +
+		` activateTools=${activateToolCount}`;
+	if (filteredProviderMessages) {
+		message += ` filteredProviderMessages=true`;
+	}
+	if (activatePreflight) {
+		message +=
+			` preflightRounds=${activatePreflight.rounds}` +
+			` calledActivators=${activatePreflight.calledActivatorNames.length}` +
+			` remainingActivators=${activatePreflight.remainingActivatorNames.length}`;
+	}
+	if (nextRound !== undefined) {
+		message += ` nextRound=${nextRound}`;
+	}
+	if (initialResponseNotice) {
+		message += ` initialResponseNotice=true`;
+	}
+
+	logger.info(message);
+}
+
 interface VisionMessageStats {
 	inputImageParts: number;
 	inputImageMessages: number;
@@ -280,46 +333,50 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			options.visionModelId,
 		);
 
-		logger.debug(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
-		logger.debug(
+		logger.info(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
+		logger.info(
 			`[cache-trace #${requestId}] request vscodeModel=${options.vscodeModelId}` +
 				formatSegmentTrace(options.segment) +
 				` apiModel=${options.request.model}` +
 				` thinking=${options.isThinkingModel}` +
 				` thinkingEffort=${options.thinkingEffort}` +
 				` maxTokens=${options.maxTokens ?? 'api-default'}` +
-				` replayMarker=message-local` +
 				` inputMessages=${options.inputMessages.length}` +
 				` deepseekMessages=${options.request.messages.length}`,
 		);
 		const hostPromptTrace = summarizeHostPromptTrace(options.inputMessages);
 		if (shouldLogHostPromptTrace(hostPromptTrace)) {
-			logger.debug(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
+			logger.info(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
 		}
 		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
 		if (vscodeMessageTrace) {
 			logger.debug(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
 		}
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
-			logger.debug(`[cache-trace #${requestId}] ${detailLine}`);
+			const message = `[cache-trace #${requestId}] ${detailLine}`;
+			if (detailLine.startsWith('contentMarkers ')) {
+				logger.debug(message);
+			} else {
+				logger.info(message);
+			}
 		}
 		const visionTrace = formatVisionTrace(visionResolution, options.visionStats);
 		if (visionTrace) {
-			logger.debug(`[cache-trace #${requestId}] ${visionTrace}`);
+			logger.info(`[cache-trace #${requestId}] ${visionTrace}`);
 		}
 		if (cacheTraceComparison) {
-			logger.debug(
+			logger.info(
 				`[cache-trace #${requestId}] ${formatCacheTraceComparison(cacheTraceComparison)}`,
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(cacheTraceComparison)) {
-				logger.debug(`[cache-trace #${requestId}] ${detailLine}`);
+				logger.info(`[cache-trace #${requestId}] ${detailLine}`);
 			}
 			for (const warning of getCacheTraceComparisonWarnings(cacheTraceComparison)) {
 				logger.warn(`[cache-trace #${requestId}] ${warning}`);
 			}
 		}
 		if (traceKeyChangeComparison && previousImmediateCacheTrace) {
-			logger.debug(
+			logger.info(
 				`[cache-trace #${requestId}] ${formatCacheTraceKeyChangeComparison(
 					previousImmediateCacheTrace.cacheTraceKey,
 					cacheTrace.cacheTraceKey,
@@ -327,7 +384,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				)}`,
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(traceKeyChangeComparison)) {
-				logger.debug(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
+				logger.info(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
 			}
 			for (const warning of getCacheTraceComparisonWarnings(traceKeyChangeComparison)) {
 				logger.warn(`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`);
@@ -337,7 +394,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			logger.warn(`[cache-trace #${requestId}] ${warning}`);
 		}
 		for (const infoLine of getCacheTraceInfoLines(cacheTrace)) {
-			logger.debug(`[cache-trace #${requestId}] ${infoLine}`);
+			logger.info(`[cache-trace #${requestId}] ${infoLine}`);
 		}
 
 		return new ActiveCacheDiagnosticsRun(
@@ -382,7 +439,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 
 	onDone(info: CacheDiagnosticsDoneInfo): void {
 		if (info.emittedToolCalls > 0 || info.trailingToolResults > 0) {
-			logger.debug(
+			logger.info(
 				`[cache-trace #${this.requestId}] stream done reasoningTextChars=${info.reasoningTextChars}` +
 					` emittedToolCalls=${info.emittedToolCalls}` +
 					` trailingToolResults=${info.trailingToolResults}`,
@@ -395,7 +452,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 		logUsage(usage, charsPerToken, this.requestId);
 		if (this.resultComparison) {
 			const hitRate = getCacheHitRate(usage);
-			logger.debug(
+			logger.info(
 				`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
 					` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
 					` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
@@ -408,11 +465,11 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			return;
 		}
 		this.cancellationLogged = true;
-		logger.debug(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
+		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
 	}
 
 	onReplayMarkerReport(info: ReplayMarkerReportInfo): void {
-		logger.debug(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
+		logger.info(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
 	}
 }
 

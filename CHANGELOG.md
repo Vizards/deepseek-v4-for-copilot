@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.5.0...v0.5.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **provider:** make preflight tool call ids provider-safe ([#86](https://github.com/Vizards/deepseek-v4-for-copilot/issues/86)) ([cb91620](https://github.com/Vizards/deepseek-v4-for-copilot/commit/cb916206c1c27795a80c7923d95800e8968530d2))
+* **provider:** persist reasoning across reloads ([#79](https://github.com/Vizards/deepseek-v4-for-copilot/issues/79)) ([0605da9](https://github.com/Vizards/deepseek-v4-for-copilot/commit/0605da9af052c9bede99333a39615762ae53ea29))
+* **provider:** stabilize DeepSeek tool list handling ([#77](https://github.com/Vizards/deepseek-v4-for-copilot/issues/77)) ([eec6bde](https://github.com/Vizards/deepseek-v4-for-copilot/commit/eec6bdeb11e08f4f77bf4ff11b273a45c635d585))
+* **replay:** persist reasoning and vision markers across turns ([#82](https://github.com/Vizards/deepseek-v4-for-copilot/issues/82)) ([30b725b](https://github.com/Vizards/deepseek-v4-for-copilot/commit/30b725b90b43b5165ac6299354e4f5f05381cc54))
+* report context window correctly ([#71](https://github.com/Vizards/deepseek-v4-for-copilot/issues/71)) ([d8c9b86](https://github.com/Vizards/deepseek-v4-for-copilot/commit/d8c9b86cfcd62304a9893c77224d8c0275781688))
+* **vision:** retain image context in follow-up turns ([#81](https://github.com/Vizards/deepseek-v4-for-copilot/issues/81)) ([797b3d3](https://github.com/Vizards/deepseek-v4-for-copilot/commit/797b3d3f40f1da7c5c64a2f09d273104dcfd094c))
+
+
+### Documentation
+
+* **readme:** clarify no extra process comparison ([#84](https://github.com/Vizards/deepseek-v4-for-copilot/issues/84)) ([39a1cf6](https://github.com/Vizards/deepseek-v4-for-copilot/commit/39a1cf687be36edc2ba81270b2f14ebe6a39a0d6))
+
 ## [0.5.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.4.1...v0.5.0) (2026-05-13)
 
 

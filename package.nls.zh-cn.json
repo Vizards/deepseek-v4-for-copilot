@@ -17,7 +17,7 @@
   "deepseek-copilot.config.title": "DeepSeek 助手",
   "deepseek-copilot.config.baseUrl.description": "DeepSeek API 基础 URL，默认为官方 DeepSeek API 端点。",
   "deepseek-copilot.config.maxTokens.description": "每次请求的最大输出 Token 数，设为 0 则不限制，可用于控制成本。",
-  "deepseek-copilot.config.experimental.stabilizeToolList.description": "**实验性功能**：通过预先激活可用的工具来提升 DeepSeek 上下文缓存命中率。\n- 当已启用工具列表跨轮次变化时，这可能提高 DeepSeek 上下文缓存命中率；\n- 请求中将包含更多函数工具定义，input tokens 可能增加，虽然缓存命中的 input tokens 单价更低，但仍会计入用量。\n\n 通过 [配置工具](command:workbench.action.chat.configureTools) **查看和管理**工具列表：\n\n- 64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；\n- 超过 128 个已启用工具时不建议开启：DeepSeek 单次 `tools` 请求最多支持 128 个 functions。考虑禁用部分不常用工具。",
+  "deepseek-copilot.config.experimental.stabilizeToolList.description": "**实验性功能**：通过预先激活可用的工具来提升 DeepSeek 上下文缓存命中率。\n- 当已启用工具列表跨轮次变化时，这可能提高 DeepSeek 上下文缓存命中率；\n- 请求中将包含更多函数工具定义，input tokens 可能增加，虽然缓存命中的 input tokens 单价更低，但仍会计入用量；\n- 此设置可能会在当前 Copilot 对话历史中加入内部预检工具调用。在同一对话中切换到其他模型时，部分模型提供方可能无法正确重放这段历史；如果切换模型后请求异常，请新建对话后重试。\n\n 通过 [配置工具](command:workbench.action.chat.configureTools) **查看和管理**工具列表：\n\n- 64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；\n- 超过 128 个已启用工具时不建议开启：DeepSeek 单次 `tools` 请求最多支持 128 个 functions。考虑禁用部分不常用工具。",
   "deepseek-copilot.config.debugMode.description": "控制 DeepSeek Copilot 写入的诊断信息量。无论此设置如何，token 用量始终上报给 Copilot。\n\n- **基本** — 仅上报 token 用量，不输出诊断日志或请求 dump。\n- **元数据** — 隐私安全的诊断元数据（请求哈希、前缀重合度、工具定义变更）。不含提示词原文，可安全附在公开 issue 中反馈问题。使用 [`DeepSeek: 显示日志`](command:deepseek-copilot.showLogs) 查看。\n- **详细** — 将完整请求体写入磁盘，供本地调试。**警告：包含敏感的提示词内容。** 使用 [`DeepSeek: 打开请求 Dump 目录`](command:deepseek-copilot.openRequestDumpsFolder) 浏览。",
   "deepseek-copilot.config.debugMode.minimal.label": "基本",
   "deepseek-copilot.config.debugMode.minimal.description": "仅上报 token 用量，不输出诊断日志或 dump。",

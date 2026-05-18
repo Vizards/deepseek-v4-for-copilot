@@ -3,6 +3,7 @@ import vscode from 'vscode';
 import { ACTIVATE_TOOL_PREFIX, PREFLIGHT_ACTIVATE_CALL_ID_PREFIX } from './consts';
 
 const PREFLIGHT_TOOL_NAME_HASH_LENGTH = 32;
+const PREFLIGHT_CALL_ID_SEPARATOR = '_';
 
 export interface ActivatePreflightInspection {
 	rounds: number;
@@ -67,12 +68,12 @@ export function filterPreflightControlFlow(
 }
 
 export function createPreflightToolCallId(round: number, toolName: string): string {
-	// 32 hex chars gives 128 bits while keeping IDs under OpenAI's 64-char call_id limit.
+	// Keep IDs short and within the conservative alnum/_ set for cross-provider replay.
 	const toolNameHash = createHash('sha256')
 		.update(toolName)
 		.digest('hex')
 		.slice(0, PREFLIGHT_TOOL_NAME_HASH_LENGTH);
-	return `${PREFLIGHT_ACTIVATE_CALL_ID_PREFIX}${round}:${toolNameHash}`;
+	return `${PREFLIGHT_ACTIVATE_CALL_ID_PREFIX}${round}${PREFLIGHT_CALL_ID_SEPARATOR}${toolNameHash}`;
 }
 
 function collectActivateToolNames(
@@ -150,7 +151,7 @@ function parsePreflightToolCallId(callId: string): { round: number } | undefined
 	}
 
 	const value = callId.slice(PREFLIGHT_ACTIVATE_CALL_ID_PREFIX.length);
-	const separatorIndex = value.indexOf(':');
+	const separatorIndex = value.indexOf(PREFLIGHT_CALL_ID_SEPARATOR);
 	if (separatorIndex < 0) {
 		return undefined;
 	}

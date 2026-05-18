@@ -29,12 +29,12 @@ export function processToolFlow({
 	progress,
 }: ToolFlowOptions): ToolFlowResult {
 	const filteredMessages = filterProviderNotices(filterPreflightControlFlow(messages));
-	const filteredProviderMessages = filteredMessages !== messages;
+	const messagesFiltered = filteredMessages !== messages;
 
 	if (!stabilizeToolList) {
 		logToolFlowDiagnostics({
 			tools,
-			filteredProviderMessages,
+			messagesFiltered,
 			preflight: 'skipped',
 		});
 		return {
@@ -48,7 +48,7 @@ export function processToolFlow({
 		if (activatePreflight.rounds >= MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST) {
 			logToolFlowDiagnostics({
 				tools,
-				filteredProviderMessages,
+				messagesFiltered,
 				preflight: 'round-limit',
 				activatePreflight,
 			});
@@ -60,7 +60,7 @@ export function processToolFlow({
 		const nextRound = activatePreflight.rounds + 1;
 		logToolFlowDiagnostics({
 			tools,
-			filteredProviderMessages,
+			messagesFiltered,
 			preflight: 'handled',
 			activatePreflight,
 			nextRound,
@@ -83,7 +83,7 @@ export function processToolFlow({
 		tools?.some((tool) => tool.name.startsWith(ACTIVATE_TOOL_PREFIX));
 	logToolFlowDiagnostics({
 		tools,
-		filteredProviderMessages,
+		messagesFiltered,
 		preflight: 'ready',
 		activatePreflight,
 		initialResponseNotice: hasUnexpandedActivateTools,

@@ -227,14 +227,14 @@ export function createCacheDiagnosticsRecorder(): CacheDiagnosticsRecorder {
 
 export function logToolFlowDiagnostics({
 	tools,
-	filteredProviderMessages,
+	messagesFiltered,
 	preflight,
 	activatePreflight,
 	nextRound,
 	initialResponseNotice,
 }: {
 	tools: readonly vscode.LanguageModelChatTool[] | undefined;
-	filteredProviderMessages: boolean;
+	messagesFiltered: boolean;
 	preflight: 'skipped' | 'handled' | 'ready' | 'round-limit';
 	activatePreflight?: ActivatePreflightInspection;
 	nextRound?: number;
@@ -249,7 +249,7 @@ export function logToolFlowDiagnostics({
 			(count, tool) => count + (tool.name.startsWith(ACTIVATE_TOOL_PREFIX) ? 1 : 0),
 			0,
 		) ?? 0;
-	if (preflight === 'skipped' && !filteredProviderMessages && activateToolCount === 0) {
+	if (preflight === 'skipped' && !messagesFiltered && activateToolCount === 0) {
 		return;
 	}
 
@@ -257,8 +257,8 @@ export function logToolFlowDiagnostics({
 		`[tool-flow] preflight=${preflight}` +
 		` tools=${tools?.length ?? 0}` +
 		` activateTools=${activateToolCount}`;
-	if (filteredProviderMessages) {
-		message += ` filteredProviderMessages=true`;
+	if (messagesFiltered) {
+		message += ` messagesFiltered=true`;
 	}
 	if (activatePreflight) {
 		message +=

@@ -2,10 +2,11 @@ import vscode from 'vscode';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
+	formatRequestLogLine,
 	observeCancellationToken,
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
-} from './diagnostics';
+} from './debug';
 import type { PreparedChatRequest } from './request';
 import {
 	createReplayMarkerPart,
@@ -191,7 +192,10 @@ function reportReplayMarker(
 			reasoningTextChars: state.accumulatedReasoning.length || undefined,
 			error,
 		});
-		logger.warn('Failed to report replay marker', error);
+		logger.warn(
+			formatRequestLogLine(prepared.requestKind, 'Failed to report replay marker'),
+			error,
+		);
 	}
 }
 

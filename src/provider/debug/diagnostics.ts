@@ -1,15 +1,21 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
-import { getDebugLoggingEnabled } from '../config';
-import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
-import { logger } from '../logger';
-import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../types';
-import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from './replay';
-import type { ConversationSegment } from './segment';
-import { ACTIVATE_TOOL_PREFIX } from './tools/consts';
-import type { ActivatePreflightInspection } from './tools/preflight';
-import { IMAGE_DESCRIPTION_UNAVAILABLE } from './vision/consts';
-import type { VisionResolutionStats as VisionPipelineStats } from './vision/index';
+import { getDebugLoggingEnabled } from '../../config';
+import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
+import { logger } from '../../logger';
+import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../../types';
+import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
+import type { ConversationSegment } from '../segment';
+import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
+import type { ActivatePreflightInspection } from '../tools/preflight';
+import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../vision/consts';
+import type { VisionResolutionStats as VisionPipelineStats } from '../vision/index';
+import {
+	classifyDeepSeekRequest,
+	formatModelFields,
+	formatRequestLogLine,
+	type RequestKind,
+} from './classifier';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
@@ -112,6 +118,8 @@ export interface CacheTraceContentSectionSummary {
 
 export interface CacheTraceSnapshot {
 	fingerprint: string;
+	requestKind: RequestKind;
+	model: string;
 	cacheTraceKey: string;
 	redactedComparisonInput: string;
 	requiresReasoningContent: boolean;
@@ -158,6 +166,7 @@ export interface CacheTraceSystemPromptChange {
 export interface BeginCacheDiagnosticsOptions {
 	request: DeepSeekRequest;
 	segment: ConversationSegment;
+	requestKind?: RequestKind;
 	vscodeModelId: string;
 	isThinkingModel: boolean;
 	thinkingEffort: string;
@@ -226,6 +235,7 @@ export function createCacheDiagnosticsRecorder(): CacheDiagnosticsRecorder {
 }
 
 export function logToolFlowDiagnostics({
+	requestKind,
 	tools,
 	messagesFiltered,
 	preflight,
@@ -233,6 +243,7 @@ export function logToolFlowDiagnostics({
 	nextRound,
 	initialResponseNotice,
 }: {
+	requestKind: RequestKind;
 	tools: readonly vscode.LanguageModelChatTool[] | undefined;
 	messagesFiltered: boolean;
 	preflight: 'skipped' | 'handled' | 'ready' | 'round-limit';
@@ -273,7 +284,7 @@ export function logToolFlowDiagnostics({
 		message += ` initialResponseNotice=true`;
 	}
 
-	logger.info(message);
+	logger.info(formatRequestLogLine(requestKind, message));
 }
 
 interface VisionMessageStats {
@@ -302,8 +313,15 @@ interface HostPromptTrace {
 	latestUserHasCustomizationsUpdate: boolean;
 }
 
+interface UsageLogContext {
+	vscodeModelId: string;
+	apiModelId: string;
+	requestKind: RequestKind;
+}
+
 class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 	private readonly previousCacheTraces = new Map<string, CacheTraceSnapshot>();
+	private readonly lastCacheTracesByScope = new Map<string, CacheTraceSnapshot>();
 	private lastCacheTrace: CacheTraceSnapshot | undefined;
 	private requestId = 0;
 
@@ -312,20 +330,56 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 	}
 
 	beginRequest(options: BeginCacheDiagnosticsOptions): CacheDiagnosticsRun {
+		const requestKind =
+			options.requestKind ??
+			classifyDeepSeekRequest({
+				request: options.request,
+				inputMessages: options.inputMessages,
+			});
+
 		if (!this.isEnabled()) {
 			this.clearCacheTraces();
-			return new NoopCacheDiagnosticsRun();
+			return new NoopCacheDiagnosticsRun({
+				vscodeModelId: options.vscodeModelId,
+				apiModelId: options.request.model,
+				requestKind,
+			});
 		}
 
 		const requestId = (this.requestId += 1);
-		const cacheTrace = createCacheTraceSnapshot(options.request, options.inputMessages);
-		const previousCacheTrace = this.previousCacheTraces.get(cacheTrace.cacheTraceKey);
+		const cacheTrace = createCacheTraceSnapshot(
+			options.request,
+			options.inputMessages,
+			requestKind,
+		);
+		const previousCacheTrace = this.previousCacheTraces.get(getCacheTraceStoreKey(cacheTrace));
 		const previousImmediateCacheTrace = this.lastCacheTrace;
+		const previousScopedCacheTrace = this.lastCacheTracesByScope.get(
+			getCacheTraceScopeKey(cacheTrace),
+		);
 		const cacheTraceComparison = compareCacheTraceSnapshots(previousCacheTrace, cacheTrace);
+		const immediateTraceKeyChanged =
+			previousImmediateCacheTrace?.cacheTraceKey !== undefined &&
+			previousImmediateCacheTrace.cacheTraceKey !== cacheTrace.cacheTraceKey;
+		const sameImmediateComparisonScope =
+			previousImmediateCacheTrace !== undefined &&
+			previousImmediateCacheTrace.requestKind === cacheTrace.requestKind &&
+			previousImmediateCacheTrace.model === cacheTrace.model &&
+			previousImmediateCacheTrace.toolsHash === cacheTrace.toolsHash;
 		const traceKeyChangeComparison =
-			previousImmediateCacheTrace &&
-			previousImmediateCacheTrace.cacheTraceKey !== cacheTrace.cacheTraceKey
+			previousImmediateCacheTrace && immediateTraceKeyChanged && sameImmediateComparisonScope
 				? compareCacheTraceSnapshots(previousImmediateCacheTrace, cacheTrace)
+				: undefined;
+		const skippedImmediateFallback =
+			previousImmediateCacheTrace && immediateTraceKeyChanged && !sameImmediateComparisonScope
+				? previousImmediateCacheTrace
+				: undefined;
+		const scopedTraceKeyChangeComparison =
+			!traceKeyChangeComparison &&
+			previousScopedCacheTrace &&
+			previousScopedCacheTrace !== previousImmediateCacheTrace &&
+			previousScopedCacheTrace.cacheTraceKey !== cacheTrace.cacheTraceKey
+				? compareCacheTraceSnapshots(previousScopedCacheTrace, cacheTrace)
 				: undefined;
 		const visionResolution = summarizeVisionResolution(
 			options.inputMessages,
@@ -333,27 +387,48 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			options.visionModelId,
 		);
 
-		logger.info(`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`);
 		logger.info(
-			`[cache-trace #${requestId}] request vscodeModel=${options.vscodeModelId}` +
-				formatSegmentTrace(options.segment) +
-				` apiModel=${options.request.model}` +
-				` thinking=${options.isThinkingModel}` +
-				` thinkingEffort=${options.thinkingEffort}` +
-				` maxTokens=${options.maxTokens ?? 'api-default'}` +
-				` inputMessages=${options.inputMessages.length}` +
-				` deepseekMessages=${options.request.messages.length}`,
+			formatRequestLogLine(
+				requestKind,
+				`[cache-trace #${requestId}] ${formatCacheTraceSnapshot(cacheTrace)}`,
+			),
+		);
+		logger.info(
+			formatRequestLogLine(
+				requestKind,
+				`[cache-trace #${requestId}] request ` +
+					formatModelFields(options.vscodeModelId, options.request.model) +
+					formatSegmentTrace(options.segment) +
+					` thinking=${options.isThinkingModel}` +
+					` thinkingEffort=${options.thinkingEffort}` +
+					` maxTokens=${options.maxTokens ?? 'api-default'}` +
+					` inputMessages=${options.inputMessages.length}` +
+					` deepseekMessages=${options.request.messages.length}`,
+			),
 		);
 		const hostPromptTrace = summarizeHostPromptTrace(options.inputMessages);
 		if (shouldLogHostPromptTrace(hostPromptTrace)) {
-			logger.info(`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`);
+			logger.info(
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] ${formatHostPromptTrace(hostPromptTrace)}`,
+				),
+			);
 		}
 		const vscodeMessageTrace = formatVscodeMessageTrace(options.inputMessages);
 		if (vscodeMessageTrace) {
-			logger.debug(`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`);
+			logger.debug(
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] vscodeMsgs ${vscodeMessageTrace}`,
+				),
+			);
 		}
 		for (const detailLine of formatCacheTraceDetailLines(cacheTrace)) {
-			const message = `[cache-trace #${requestId}] ${detailLine}`;
+			const message = formatRequestLogLine(
+				requestKind,
+				`[cache-trace #${requestId}] ${detailLine}`,
+			);
 			if (detailLine.startsWith('contentMarkers ')) {
 				logger.debug(message);
 			} else {
@@ -362,59 +437,139 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 		}
 		const visionTrace = formatVisionTrace(visionResolution, options.visionStats);
 		if (visionTrace) {
-			logger.info(`[cache-trace #${requestId}] ${visionTrace}`);
+			logger.info(formatRequestLogLine(requestKind, `[cache-trace #${requestId}] ${visionTrace}`));
 		}
 		if (cacheTraceComparison) {
 			logger.info(
-				`[cache-trace #${requestId}] ${formatCacheTraceComparison(cacheTraceComparison)}`,
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] ${formatCacheTraceComparison(cacheTraceComparison)}`,
+				),
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(cacheTraceComparison)) {
-				logger.info(`[cache-trace #${requestId}] ${detailLine}`);
+				logger.info(formatRequestLogLine(requestKind, `[cache-trace #${requestId}] ${detailLine}`));
 			}
 			for (const warning of getCacheTraceComparisonWarnings(cacheTraceComparison)) {
-				logger.warn(`[cache-trace #${requestId}] ${warning}`);
+				logger.warn(formatRequestLogLine(requestKind, `[cache-trace #${requestId}] ${warning}`));
 			}
 		}
 		if (traceKeyChangeComparison && previousImmediateCacheTrace) {
 			logger.info(
-				`[cache-trace #${requestId}] ${formatCacheTraceKeyChangeComparison(
-					previousImmediateCacheTrace.cacheTraceKey,
-					cacheTrace.cacheTraceKey,
-					traceKeyChangeComparison,
-				)}`,
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] ${formatCacheTraceKeyChangeComparison(
+						previousImmediateCacheTrace.cacheTraceKey,
+						cacheTrace.cacheTraceKey,
+						traceKeyChangeComparison,
+					)}`,
+				),
 			);
 			for (const detailLine of formatCacheTraceComparisonDetailLines(traceKeyChangeComparison)) {
-				logger.info(`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`);
+				logger.info(
+					formatRequestLogLine(
+						requestKind,
+						`[cache-trace #${requestId}] cacheTraceKeyChanged ${detailLine}`,
+					),
+				);
 			}
 			for (const warning of getCacheTraceComparisonWarnings(traceKeyChangeComparison)) {
-				logger.warn(`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`);
+				logger.warn(
+					formatRequestLogLine(
+						requestKind,
+						`[cache-trace #${requestId}] cacheTraceKeyChanged fallback diff: ${warning}`,
+					),
+				);
+			}
+		}
+		if (skippedImmediateFallback) {
+			logger.info(
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] comparisonScopeChanged` +
+						` prevKind=${skippedImmediateFallback.requestKind}` +
+						` currKind=${cacheTrace.requestKind}` +
+						` prevModel=${skippedImmediateFallback.model}` +
+						` currModel=${cacheTrace.model}` +
+						` toolsChanged=${skippedImmediateFallback.toolsHash !== cacheTrace.toolsHash}` +
+						` cacheTraceKeyChanged=true skipFallbackDiff=true`,
+				),
+			);
+		}
+		if (scopedTraceKeyChangeComparison && previousScopedCacheTrace) {
+			logger.info(
+				formatRequestLogLine(
+					requestKind,
+					`[cache-trace #${requestId}] sameScope ${formatCacheTraceKeyChangeComparison(
+						previousScopedCacheTrace.cacheTraceKey,
+						cacheTrace.cacheTraceKey,
+						scopedTraceKeyChangeComparison,
+					)}`,
+				),
+			);
+			for (const detailLine of formatCacheTraceComparisonDetailLines(
+				scopedTraceKeyChangeComparison,
+			)) {
+				logger.info(
+					formatRequestLogLine(
+						requestKind,
+						`[cache-trace #${requestId}] sameScope cacheTraceKeyChanged ${detailLine}`,
+					),
+				);
+			}
+			for (const warning of getCacheTraceComparisonWarnings(scopedTraceKeyChangeComparison)) {
+				logger.warn(
+					formatRequestLogLine(
+						requestKind,
+						`[cache-trace #${requestId}] sameScope cacheTraceKeyChanged fallback diff: ${warning}`,
+					),
+				);
 			}
 		}
 		for (const warning of getCacheTraceWarnings(cacheTrace)) {
-			logger.warn(`[cache-trace #${requestId}] ${warning}`);
+			logger.warn(formatRequestLogLine(requestKind, `[cache-trace #${requestId}] ${warning}`));
 		}
 		for (const infoLine of getCacheTraceInfoLines(cacheTrace)) {
-			logger.info(`[cache-trace #${requestId}] ${infoLine}`);
+			logger.info(formatRequestLogLine(requestKind, `[cache-trace #${requestId}] ${infoLine}`));
 		}
 
 		return new ActiveCacheDiagnosticsRun(
 			this,
 			requestId,
 			cacheTrace,
-			cacheTraceComparison ?? traceKeyChangeComparison,
-			cacheTraceComparison ? 'summaryPrefixVsPrevious' : 'fallbackSummaryPrefixVsPrevious',
+			{
+				vscodeModelId: options.vscodeModelId,
+				apiModelId: options.request.model,
+				requestKind,
+			},
+			cacheTraceComparison ?? traceKeyChangeComparison ?? scopedTraceKeyChangeComparison,
+			cacheTraceComparison
+				? 'summaryPrefixVsPrevious'
+				: scopedTraceKeyChangeComparison
+					? 'sameScopeFallbackSummaryPrefixVsPrevious'
+					: 'fallbackSummaryPrefixVsPrevious',
 		);
 	}
 
 	private clearCacheTraces(): void {
 		this.lastCacheTrace = undefined;
 		this.previousCacheTraces.clear();
+		this.lastCacheTracesByScope.clear();
 	}
 
 	rememberCacheTrace(snapshot: CacheTraceSnapshot): void {
 		this.lastCacheTrace = snapshot;
-		this.previousCacheTraces.delete(snapshot.cacheTraceKey);
-		this.previousCacheTraces.set(snapshot.cacheTraceKey, snapshot);
+		this.lastCacheTracesByScope.set(getCacheTraceScopeKey(snapshot), snapshot);
+		while (this.lastCacheTracesByScope.size > 50) {
+			const oldestKey = this.lastCacheTracesByScope.keys().next().value;
+			if (!oldestKey) {
+				break;
+			}
+			this.lastCacheTracesByScope.delete(oldestKey);
+		}
+
+		const cacheTraceStoreKey = getCacheTraceStoreKey(snapshot);
+		this.previousCacheTraces.delete(cacheTraceStoreKey);
+		this.previousCacheTraces.set(cacheTraceStoreKey, snapshot);
 
 		while (this.previousCacheTraces.size > 50) {
 			const oldestKey = this.previousCacheTraces.keys().next().value;
@@ -426,6 +581,14 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 	}
 }
 
+function getCacheTraceStoreKey(snapshot: CacheTraceSnapshot): string {
+	return `${snapshot.requestKind}:${snapshot.cacheTraceKey}`;
+}
+
+function getCacheTraceScopeKey(snapshot: CacheTraceSnapshot): string {
+	return `${snapshot.requestKind}:${snapshot.model}:${snapshot.toolsHash}`;
+}
+
 class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	private cancellationLogged = false;
 
@@ -433,6 +596,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 		private readonly recorder: DefaultCacheDiagnosticsRecorder,
 		private readonly requestId: number,
 		private readonly snapshot: CacheTraceSnapshot,
+		private readonly usageLogContext: UsageLogContext,
 		private readonly resultComparison: CacheTraceComparison | undefined,
 		private readonly prefixLabel: string,
 	) {}
@@ -440,22 +604,28 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onDone(info: CacheDiagnosticsDoneInfo): void {
 		if (info.emittedToolCalls > 0 || info.trailingToolResults > 0) {
 			logger.info(
-				`[cache-trace #${this.requestId}] stream done reasoningTextChars=${info.reasoningTextChars}` +
-					` emittedToolCalls=${info.emittedToolCalls}` +
-					` trailingToolResults=${info.trailingToolResults}`,
+				formatRequestLogLine(
+					this.snapshot.requestKind,
+					`[cache-trace #${this.requestId}] stream done reasoningTextChars=${info.reasoningTextChars}` +
+						` emittedToolCalls=${info.emittedToolCalls}` +
+						` trailingToolResults=${info.trailingToolResults}`,
+				),
 			);
 		}
 		this.recorder.rememberCacheTrace(this.snapshot);
 	}
 
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void {
-		logUsage(usage, charsPerToken, this.requestId);
+		logUsage(usage, charsPerToken, this.usageLogContext, this.requestId);
 		if (this.resultComparison) {
 			const hitRate = getCacheHitRate(usage);
 			logger.info(
-				`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
-					` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
-					` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
+				formatRequestLogLine(
+					this.snapshot.requestKind,
+					`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
+						` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
+						` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
+				),
 			);
 		}
 	}
@@ -465,15 +635,27 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			return;
 		}
 		this.cancellationLogged = true;
-		logger.info(`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`);
+		logger.info(
+			formatRequestLogLine(
+				this.snapshot.requestKind,
+				`[cache-trace #${this.requestId}] cancellation token requested; aborting stream`,
+			),
+		);
 	}
 
 	onReplayMarkerReport(info: ReplayMarkerReportInfo): void {
-		logger.info(`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`);
+		logger.info(
+			formatRequestLogLine(
+				this.snapshot.requestKind,
+				`[cache-trace #${this.requestId}] ${formatReplayMarkerReport(info)}`,
+			),
+		);
 	}
 }
 
 class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
+	constructor(private readonly usageLogContext: UsageLogContext) {}
+
 	onDone(_info: CacheDiagnosticsDoneInfo): void {}
 
 	onCancellationTokenRequested(): void {}
@@ -481,7 +663,7 @@ class NoopCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onReplayMarkerReport(_info: ReplayMarkerReportInfo): void {}
 
 	onUsage(usage: DeepSeekUsage, charsPerToken: number): void {
-		logUsage(usage, charsPerToken);
+		logUsage(usage, charsPerToken, this.usageLogContext);
 	}
 }
 
@@ -611,13 +793,23 @@ function sanitizeLogValue(value: string): string {
 	return value.replace(/\s+/g, ' ').slice(0, 200);
 }
 
-function logUsage(usage: DeepSeekUsage, charsPerToken: number, requestId?: number): void {
+function logUsage(
+	usage: DeepSeekUsage,
+	charsPerToken: number,
+	context: UsageLogContext,
+	requestId?: number,
+): void {
 	const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
 	const cacheMiss = usage.prompt_cache_miss_tokens ?? 0;
 	logger.info(
-		`tokens${requestId ? ` #${requestId}` : ''}: prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
-			` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${getCacheHitRate(usage)}%` +
-			` | chars/tok=${charsPerToken.toFixed(2)}`,
+		formatRequestLogLine(
+			context.requestKind,
+			`tokens${requestId ? ` #${requestId}` : ''}: ` +
+				formatModelFields(context.vscodeModelId, context.apiModelId) +
+				` prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
+				` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${getCacheHitRate(usage)}%` +
+				` | chars/tok=${charsPerToken.toFixed(2)}`,
+		),
 	);
 }
 
@@ -953,6 +1145,7 @@ function getPartConstructorName(part: unknown): string {
 export function createCacheTraceSnapshot(
 	request: DeepSeekRequest,
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[] = [],
+	requestKind: RequestKind = classifyDeepSeekRequest({ request, inputMessages }),
 ): CacheTraceSnapshot {
 	const toolsSerialized = stableStringify(request.tools ?? []);
 	const messageSummaries = summarizeMessages(request.messages);
@@ -966,6 +1159,8 @@ export function createCacheTraceSnapshot(
 
 	return {
 		fingerprint: hashString(redactedComparisonInput),
+		requestKind,
+		model: request.model,
 		cacheTraceKey: hashString(`${request.model}:${firstMessage?.hash ?? 'empty'}`),
 		redactedComparisonInput,
 		requiresReasoningContent: request.thinking?.type === 'enabled',

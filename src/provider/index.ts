@@ -4,8 +4,11 @@ import { getStabilizeToolListEnabled } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import { createCacheDiagnosticsRecorder } from './diagnostics';
-import { dumpProviderInput } from './dump';
+import {
+	classifyProviderRequest,
+	createCacheDiagnosticsRecorder,
+	dumpProviderInput,
+} from './debug';
 import { toChatInfo } from './models';
 import { prepareChatRequest } from './request';
 import { resolveConversationSegment } from './segment';
@@ -132,6 +135,10 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		token: vscode.CancellationToken,
 	): Promise<void> {
 		const segment = resolveConversationSegment(messages);
+		const requestKind = classifyProviderRequest({
+			messages,
+			tools: options.tools,
+		});
 
 		dumpProviderInput({
 			globalStorageUri: this.globalStorageUri,
@@ -139,6 +146,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			modelInfo,
 			messages,
 			requestOptions: options,
+			requestKind,
 		});
 
 		const toolFlow = processToolFlow({
@@ -146,6 +154,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			messages,
 			tools: options.tools,
 			progress,
+			requestKind,
 		});
 		if (toolFlow.preflightHandled) {
 			return;

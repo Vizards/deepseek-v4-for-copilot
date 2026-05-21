@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
-import { logToolFlowDiagnostics } from '../diagnostics';
+import { logToolFlowDiagnostics, type RequestKind } from '../debug';
 import { ACTIVATE_TOOL_PREFIX, MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST } from './consts';
 import { createToolDriftNotice, filterProviderNotices } from './notices';
 import {
@@ -14,6 +14,7 @@ interface ToolFlowOptions {
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	tools: readonly vscode.LanguageModelChatTool[] | undefined;
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>;
+	requestKind: RequestKind;
 }
 
 interface ToolFlowResult {
@@ -27,12 +28,14 @@ export function processToolFlow({
 	messages,
 	tools,
 	progress,
+	requestKind,
 }: ToolFlowOptions): ToolFlowResult {
 	const filteredMessages = filterProviderNotices(filterPreflightControlFlow(messages));
 	const messagesFiltered = filteredMessages !== messages;
 
 	if (!stabilizeToolList) {
 		logToolFlowDiagnostics({
+			requestKind,
 			tools,
 			messagesFiltered,
 			preflight: 'skipped',
@@ -47,6 +50,7 @@ export function processToolFlow({
 	if (activatePreflight.remainingActivatorNames.length > 0) {
 		if (activatePreflight.rounds >= MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST) {
 			logToolFlowDiagnostics({
+				requestKind,
 				tools,
 				messagesFiltered,
 				preflight: 'round-limit',
@@ -59,6 +63,7 @@ export function processToolFlow({
 
 		const nextRound = activatePreflight.rounds + 1;
 		logToolFlowDiagnostics({
+			requestKind,
 			tools,
 			messagesFiltered,
 			preflight: 'handled',
@@ -82,6 +87,7 @@ export function processToolFlow({
 		activatePreflight.rounds > 0 &&
 		tools?.some((tool) => tool.name.startsWith(ACTIVATE_TOOL_PREFIX));
 	logToolFlowDiagnostics({
+		requestKind,
 		tools,
 		messagesFiltered,
 		preflight: 'ready',

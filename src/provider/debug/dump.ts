@@ -3,15 +3,22 @@ import { appendFile, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import vscode from 'vscode';
-import { getRequestDumpEnabled } from '../config';
-import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../consts';
-import { safeStringify, toWellFormedString } from '../json';
-import { logger } from '../logger';
-import type { DeepSeekMessage, DeepSeekRequest } from '../types';
-import { parseReplayMarkerData, REPLAY_MARKER_MIME } from './replay';
-import type { ConversationSegment } from './segment';
-import { ACTIVATE_TOOL_PREFIX } from './tools/consts';
-import type { VisionResolutionStats } from './vision/index';
+import { getRequestDumpEnabled } from '../../config';
+import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
+import { safeStringify, toWellFormedString } from '../../json';
+import { logger } from '../../logger';
+import type { DeepSeekMessage, DeepSeekRequest } from '../../types';
+import { parseReplayMarkerData, REPLAY_MARKER_MIME } from '../replay';
+import type { ConversationSegment } from '../segment';
+import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
+import type { VisionResolutionStats } from '../vision/index';
+import {
+	classifyDeepSeekRequest,
+	classifyProviderRequest,
+	formatModelFields,
+	formatRequestLogLine,
+	type RequestKind,
+} from './classifier';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
@@ -27,6 +34,7 @@ interface DumpContext {
 	root: string;
 	timestamp: string;
 	basename: string;
+	requestKind: RequestKind;
 }
 
 interface ProviderInputDumpPaths {
@@ -57,7 +65,19 @@ interface CustomizationsSummary {
 
 interface HostSettingsSummary {
 	copilotFreezeCustomizationsIndex: boolean | 'unknown';
+	chatUtilityModel: string | 'unknown';
+	chatUtilitySmallModel: string | 'unknown';
+	chatPlanAgentDefaultModel: string | 'unknown';
+	chatExploreAgentDefaultModel: string | 'unknown';
+	copilotAskAgentModel: string | 'unknown';
+	copilotImplementAgentModel: string | 'unknown';
+	copilotExploreAgentModel: string | 'unknown';
 }
+
+type ProviderRequestOptions = vscode.ProvideLanguageModelChatResponseOptions & {
+	readonly requestInitiator?: unknown;
+	readonly modelConfiguration?: unknown;
+};
 
 interface SystemPromptSummary extends CustomizationsSummary {
 	messageIndex: number | null;
@@ -77,6 +97,7 @@ interface SystemPromptSummary extends CustomizationsSummary {
 export interface DumpDeepSeekRequestOptions {
 	globalStorageUri: vscode.Uri;
 	segment: ConversationSegment;
+	requestKind?: RequestKind;
 	vscodeModelId: string;
 	isThinkingModel: boolean;
 	thinkingEffort: string;
@@ -91,6 +112,7 @@ export interface DumpDeepSeekRequestOptions {
 export interface DumpProviderInputOptions {
 	globalStorageUri: vscode.Uri;
 	segment: ConversationSegment;
+	requestKind?: RequestKind;
 	modelInfo: vscode.LanguageModelChatInformation;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
@@ -104,16 +126,23 @@ export interface DumpProviderInputOptions {
 export function dumpProviderInput(options: DumpProviderInputOptions): void {
 	if (!getRequestDumpEnabled()) return;
 
+	const requestKind =
+		options.requestKind ??
+		classifyProviderRequest({
+			messages: options.messages,
+			tools: options.requestOptions.tools,
+		});
 	const context = createDumpContext(
 		options.globalStorageUri,
 		options.segment,
 		'deepseek-provider-input',
 		(providerInputDumpCounter += 1),
+		requestKind,
 	);
 	const paths = createProviderInputDumpPaths(context);
 	const toolSummary = summarizeTools(options.requestOptions.tools);
 
-	enqueueDumpWrite('providerInputDump', async () => {
+	enqueueDumpWrite(formatRequestLogLine(requestKind, 'providerInputDump'), async () => {
 		await mkdir(context.root, { recursive: true });
 		await writeJsonFile(paths.providerInput, createProviderInputSnapshot(options, context));
 
@@ -127,12 +156,13 @@ export function dumpProviderInput(options: DumpProviderInputOptions): void {
 				model: {
 					vscodeModelId: options.modelInfo.id,
 				},
+				requestKind,
 				requestOptions: options.requestOptions,
 				messages: options.messages,
 				toolSummary,
 			}),
 		);
-		logProviderInputDump(options, paths, toolSummary);
+		logProviderInputDump(options, paths, toolSummary, requestKind);
 	});
 }
 
@@ -154,17 +184,24 @@ export function dumpDeepSeekRequest(
 ): void {
 	if (!getRequestDumpEnabled()) return;
 
+	const requestKind =
+		options.requestKind ??
+		classifyDeepSeekRequest({
+			request,
+			inputMessages: options.inputMessages,
+		});
 	const context = createDumpContext(
 		options.globalStorageUri,
 		options.segment,
 		'deepseek-request',
 		(dumpCounter += 1),
+		requestKind,
 	);
 	const msg0 = request.messages[0];
 	const paths = createRequestDumpPaths(context, Boolean(msg0));
 	const toolSummary = summarizeTools(options.requestOptions.tools);
 
-	enqueueDumpWrite('requestDump', async () => {
+	enqueueDumpWrite(formatRequestLogLine(requestKind, 'requestDump'), async () => {
 		await mkdir(context.root, { recursive: true });
 		await writeJsonFile(
 			paths.input,
@@ -192,14 +229,15 @@ export function dumpDeepSeekRequest(
 				paths,
 				model: {
 					vscodeModelId: options.vscodeModelId,
-					apiModelId: request.model,
+					apiModelId: request.model === options.vscodeModelId ? undefined : request.model,
 				},
+				requestKind,
 				requestOptions: options.requestOptions,
 				messages: options.inputMessages,
 				toolSummary,
 			}),
 		);
-		logRequestDump(request, options, paths, requestJson.length);
+		logRequestDump(request, options, paths, requestJson.length, requestKind);
 	});
 }
 
@@ -214,12 +252,14 @@ function createDumpContext(
 	segment: ConversationSegment,
 	prefix: string,
 	seq: number,
+	requestKind: RequestKind,
 ): DumpContext {
 	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 	return {
 		root: getRequestDumpRoot(globalStorageUri, segment),
 		timestamp,
 		basename: `${prefix}-${timestamp}-${String(seq).padStart(4, '0')}`,
+		requestKind,
 	};
 }
 
@@ -246,6 +286,7 @@ function createDumpObservation(options: {
 	segment: ConversationSegment;
 	paths: ProviderInputDumpPaths | RequestDumpPaths;
 	model: object;
+	requestKind: RequestKind;
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	toolSummary: ToolSummary;
@@ -257,6 +298,7 @@ function createDumpObservation(options: {
 		segment: options.segment,
 		paths: options.paths,
 		model: options.model,
+		requestKind: options.requestKind,
 		options: summarizeRequestOptions(options.requestOptions),
 		hostSettings: summarizeHostSettings(),
 		systemPromptSummary: summarizeVscodeSystemPrompt(options.messages),
@@ -273,6 +315,7 @@ function createProviderInputSnapshot(
 		stage: 'provider-input',
 		context,
 		segment: options.segment,
+		requestKind: context.requestKind,
 		model: {
 			vscodeModelId: options.modelInfo.id,
 			name: options.modelInfo.name,
@@ -298,9 +341,10 @@ function createPipelineSnapshot(
 		stage,
 		context,
 		segment: options.segment,
+		requestKind: context.requestKind,
 		model: {
 			vscodeModelId: options.vscodeModelId,
-			apiModelId: request.model,
+			apiModelId: request.model === options.vscodeModelId ? undefined : request.model,
 			isThinkingModel: options.isThinkingModel,
 			thinkingEffort: options.thinkingEffort,
 			maxTokens: options.maxTokens ?? null,
@@ -322,6 +366,7 @@ function createDumpSnapshot(options: {
 	stage: DumpStage;
 	context: DumpContext;
 	segment: ConversationSegment;
+	requestKind: RequestKind;
 	model: object;
 	vision?: object;
 	deepSeekPromptSummary?: SystemPromptSummary;
@@ -336,6 +381,7 @@ function createDumpSnapshot(options: {
 		timestamp: options.context.timestamp,
 		basename: options.context.basename,
 		segment: options.segment,
+		requestKind: options.requestKind,
 		model: options.model,
 		options: summarizeRequestOptions(options.requestOptions),
 		hostSettings: summarizeHostSettings(),
@@ -702,6 +748,13 @@ function summarizeHostSettings(): HostSettingsSummary {
 			'github.copilot.chat',
 			'freezeCustomizationsIndex',
 		),
+		chatUtilityModel: getStringSetting('chat', 'utilityModel'),
+		chatUtilitySmallModel: getStringSetting('chat', 'utilitySmallModel'),
+		chatPlanAgentDefaultModel: getStringSetting('chat', 'planAgent.defaultModel'),
+		chatExploreAgentDefaultModel: getStringSetting('chat', 'exploreAgent.defaultModel'),
+		copilotAskAgentModel: getStringSetting('github.copilot.chat', 'askAgent.model'),
+		copilotImplementAgentModel: getStringSetting('github.copilot.chat', 'implementAgent.model'),
+		copilotExploreAgentModel: getStringSetting('github.copilot.chat', 'exploreAgent.model'),
 	};
 }
 
@@ -720,6 +773,11 @@ function getBooleanSetting(section: string, key: string): boolean | 'unknown' {
 	return typeof value === 'boolean' ? value : 'unknown';
 }
 
+function getStringSetting(section: string, key: string): string | 'unknown' {
+	const value = vscode.workspace.getConfiguration(section).get<unknown>(key);
+	return typeof value === 'string' ? value : 'unknown';
+}
+
 function summarizeTools(tools: readonly vscode.LanguageModelChatTool[] | undefined): ToolSummary {
 	const toolNames = getToolNames(tools);
 	const activateToolNames = getActivateToolNames(toolNames);
@@ -732,12 +790,17 @@ function summarizeTools(tools: readonly vscode.LanguageModelChatTool[] | undefin
 }
 
 function summarizeRequestOptions(options: vscode.ProvideLanguageModelChatResponseOptions): object {
+	const providerOptions = options as ProviderRequestOptions;
 	const modelOptions = sanitizeJsonValue(options.modelOptions);
+	const modelConfiguration = sanitizeJsonValue(providerOptions.modelConfiguration);
 	return {
 		optionKeys: Object.keys(options).sort(),
+		requestInitiator: sanitizeJsonValue(providerOptions.requestInitiator),
 		toolMode: formatToolMode(options.toolMode),
 		modelOptions,
 		modelOptionsKeys: getObjectKeys(modelOptions),
+		modelConfiguration,
+		modelConfigurationKeys: getObjectKeys(modelConfiguration),
 	};
 }
 
@@ -915,17 +978,22 @@ function logProviderInputDump(
 	options: DumpProviderInputOptions,
 	paths: ProviderInputDumpPaths,
 	toolSummary: ToolSummary,
+	requestKind: RequestKind,
 ): void {
 	const systemPromptSummary = summarizeVscodeSystemPrompt(options.messages);
 	logger.debug(
-		`providerInputDump written: ${formatDumpSegment(options.segment)}` +
-			` input=${formatFileUri(paths.providerInput)} ` +
-			`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
-			`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
-				toolSummary.activateToolNames,
-			)}) ` +
-			formatHostSettingsSummary(summarizeHostSettings()) +
-			` ${formatSystemPromptSummary(systemPromptSummary)}`,
+		formatRequestLogLine(
+			requestKind,
+			`providerInputDump written: ${formatDumpSegment(options.segment)}` +
+				` ${formatModelFields(options.modelInfo.id)}` +
+				` input=${formatFileUri(paths.providerInput)} ` +
+				`(${options.messages.length} msgs, ${toolSummary.toolCount} tools, ` +
+				`activateTools=${toolSummary.activateToolCount}${formatActivateToolNames(
+					toolSummary.activateToolNames,
+				)}) ` +
+				formatHostSettingsSummary(summarizeHostSettings()) +
+				` ${formatSystemPromptSummary(systemPromptSummary)}`,
+		),
 	);
 }
 
@@ -934,16 +1002,21 @@ function logRequestDump(
 	options: DumpDeepSeekRequestOptions,
 	paths: RequestDumpPaths,
 	requestJsonLength: number,
+	requestKind: RequestKind,
 ): void {
 	const systemPromptSummary = summarizeDeepSeekSystemPrompt(request.messages);
 	logger.debug(
-		`requestDump written: ${formatDumpSegment(options.segment)}` +
-			` request=${formatFileUri(paths.request)} ` +
-			`input=${formatFileUri(paths.input)} resolved=${formatFileUri(paths.resolved)} ` +
-			`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
-			`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
-			formatHostSettingsSummary(summarizeHostSettings()) +
-			` ${formatSystemPromptSummary(systemPromptSummary)}`,
+		formatRequestLogLine(
+			requestKind,
+			`requestDump written: ${formatDumpSegment(options.segment)}` +
+				` ${formatModelFields(options.vscodeModelId, request.model)}` +
+				` request=${formatFileUri(paths.request)} ` +
+				`input=${formatFileUri(paths.input)} resolved=${formatFileUri(paths.resolved)} ` +
+				`(${request.messages.length} msgs, ${request.tools?.length ?? 0} tools, ` +
+				`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
+				formatHostSettingsSummary(summarizeHostSettings()) +
+				` ${formatSystemPromptSummary(systemPromptSummary)}`,
+		),
 	);
 }
 
@@ -963,7 +1036,22 @@ function formatDumpSegment(segment: ConversationSegment): string {
 }
 
 function formatHostSettingsSummary(settings: HostSettingsSummary): string {
-	return `hostFreezeCustomizationsIndex=${settings.copilotFreezeCustomizationsIndex}`;
+	return (
+		`hostFreezeCustomizationsIndex=${settings.copilotFreezeCustomizationsIndex}` +
+		` chatUtilityModel=${formatSettingValue(settings.chatUtilityModel)}` +
+		` chatUtilitySmallModel=${formatSettingValue(settings.chatUtilitySmallModel)}` +
+		` chatPlanAgentDefaultModel=${formatSettingValue(settings.chatPlanAgentDefaultModel)}` +
+		` chatExploreAgentDefaultModel=${formatSettingValue(settings.chatExploreAgentDefaultModel)}` +
+		` copilotAskAgentModel=${formatSettingValue(settings.copilotAskAgentModel)}` +
+		` copilotImplementAgentModel=${formatSettingValue(settings.copilotImplementAgentModel)}` +
+		` copilotExploreAgentModel=${formatSettingValue(settings.copilotExploreAgentModel)}`
+	);
+}
+
+function formatSettingValue(value: string | 'unknown'): string {
+	if (value === '') return 'empty';
+	if (value === 'unknown') return 'unknown';
+	return safeStringify(value);
 }
 
 function formatSystemPromptSummary(summary: SystemPromptSummary): string {

@@ -4,7 +4,7 @@ import { CONFIG_SECTION, WALKTHROUGH_ID, WELCOME_SHOWN_KEY } from './consts';
 import { t } from './i18n';
 import { logger } from './logger';
 import { DeepSeekChatProvider } from './provider';
-import { ensureRequestDumpRoot } from './provider/dump';
+import { ensureRequestDumpRoot } from './provider/debug';
 
 let activeProvider: DeepSeekChatProvider | undefined;
 

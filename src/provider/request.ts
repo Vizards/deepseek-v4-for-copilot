@@ -6,8 +6,13 @@ import { MODELS } from '../consts';
 import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
-import type { CacheDiagnosticsRecorder, CacheDiagnosticsRun } from './diagnostics';
-import { dumpDeepSeekRequest } from './dump';
+import {
+	classifyDeepSeekRequest,
+	dumpDeepSeekRequest,
+	type CacheDiagnosticsRecorder,
+	type CacheDiagnosticsRun,
+	type RequestKind,
+} from './debug';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';
 import type { ConversationSegment } from './segment';
@@ -21,6 +26,7 @@ export interface PreparedChatRequest {
 	totalRequestChars: number;
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
+	requestKind: RequestKind;
 	segment: ConversationSegment;
 	replayMarkerMetadata: ReplayMarkerMetadata;
 	visionMarkerTextChars?: number;
@@ -82,9 +88,14 @@ export async function prepareChatRequest({
 				}
 			: {}),
 	};
+	const requestKind = classifyDeepSeekRequest({
+		request,
+		inputMessages: messages,
+	});
 	dumpDeepSeekRequest(request, {
 		globalStorageUri,
 		segment,
+		requestKind,
 		vscodeModelId: modelInfo.id,
 		isThinkingModel,
 		thinkingEffort,
@@ -99,6 +110,7 @@ export async function prepareChatRequest({
 	const diagnosticsRun = cacheDiagnostics.beginRequest({
 		request,
 		segment,
+		requestKind,
 		vscodeModelId: modelInfo.id,
 		isThinkingModel,
 		thinkingEffort,
@@ -116,6 +128,7 @@ export async function prepareChatRequest({
 		totalRequestChars,
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
+		requestKind,
 		segment,
 		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,

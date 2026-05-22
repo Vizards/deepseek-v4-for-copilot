@@ -17,6 +17,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	logger.info(
 		`Activating extension version=${context.extension.packageJSON.version}` +
+			` vscode=${vscode.version}` +
+			` extensionKind=${formatExtensionKind(context.extension.extensionKind)}` +
+			` remoteName=${vscode.env.remoteName ?? 'none'}` +
+			` uiKind=${formatUiKind(vscode.env.uiKind)}` +
+			` platform=${process.platform}` +
+			` arch=${process.arch}` +
 			` debugMode=${getDebugMode()}`,
 	);
 
@@ -102,6 +108,28 @@ async function openRequestDumpsFolder(context: vscode.ExtensionContext): Promise
 	} catch (error) {
 		logger.warn('Failed to open request dumps folder', error);
 		void vscode.window.showErrorMessage(t('extension.openRequestDumpsFolderFailed'));
+	}
+}
+
+function formatExtensionKind(kind: vscode.ExtensionKind): string {
+	switch (kind) {
+		case vscode.ExtensionKind.UI:
+			return 'ui';
+		case vscode.ExtensionKind.Workspace:
+			return 'workspace';
+		default:
+			return String(kind);
+	}
+}
+
+function formatUiKind(kind: vscode.UIKind): string {
+	switch (kind) {
+		case vscode.UIKind.Desktop:
+			return 'desktop';
+		case vscode.UIKind.Web:
+			return 'web';
+		default:
+			return String(kind);
 	}
 }
 

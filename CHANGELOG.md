@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.5.1...v0.5.2) (2026-05-22)
+
+
+### Bug Fixes
+
+* **diagnostics:** classify cache traces by request kind ([#97](https://github.com/Vizards/deepseek-v4-for-copilot/issues/97)) ([7212765](https://github.com/Vizards/deepseek-v4-for-copilot/commit/7212765aaa53a57145fa9d33412bfb453ee7f879))
+* **extension:** let VS Code infer extension host ([#78](https://github.com/Vizards/deepseek-v4-for-copilot/issues/78)) ([95e79ab](https://github.com/Vizards/deepseek-v4-for-copilot/commit/95e79ab5e77f2745f1044e25e55a01fe7c7910eb))
+* **logger:** diagnostics log visibility ([#89](https://github.com/Vizards/deepseek-v4-for-copilot/issues/89)) ([792691d](https://github.com/Vizards/deepseek-v4-for-copilot/commit/792691d15ca77ecc4a7313d5c9f6ebb3392d5bb7))
+
 ## [0.5.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.5.0...v0.5.1) (2026-05-18)
 
 

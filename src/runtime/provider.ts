@@ -16,6 +16,8 @@ export async function registerProvider(
 		vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
 	);
 
+	// Copilot Chat can serve cached model info without configurationSchema.
+	// Activate it first so this refresh reaches a live listener and re-queries the provider.
 	await activateCopilotChat();
 	provider.refreshModelPicker();
 

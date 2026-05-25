@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { EXTERNAL_URLS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import { ensureRequestDumpRoot } from '../provider/debug';
@@ -10,7 +11,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 			openRequestDumpsFolder(context),
 		),
 		vscode.commands.registerCommand('deepseek-copilot.getApiKey', () =>
-			vscode.env.openExternal(vscode.Uri.parse('https://platform.deepseek.com/api_keys')),
+			vscode.env.openExternal(vscode.Uri.parse(EXTERNAL_URLS.deepseek.apiKeys)),
 		),
 		vscode.commands.registerCommand('deepseek-copilot.openSettings', () =>
 			vscode.commands.executeCommand('workbench.action.openSettings', 'deepseek-copilot'),

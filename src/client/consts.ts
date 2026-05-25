@@ -4,11 +4,9 @@ import type {
 	HttpErrorLinkStatusKey,
 	NetworkErrorCategory,
 } from './types';
+import { EXTERNAL_URLS } from '../consts';
 
 export const OFFICIAL_DEEPSEEK_API_HOST = 'api.deepseek.com';
-export const DEEPSEEK_API_KEYS_PAGE_URL = 'https://platform.deepseek.com/api_keys';
-export const DEEPSEEK_USAGE_PAGE_URL = 'https://platform.deepseek.com/usage';
-export const DEEPSEEK_STATUS_PAGE_URL = 'https://status.deepseek.com';
 export const MAX_DIAGNOSTIC_FIELD_LENGTH = 300;
 
 export const API_PROVIDER_HTTP_ERROR_LINKS: Readonly<
@@ -17,19 +15,19 @@ export const API_PROVIDER_HTTP_ERROR_LINKS: Readonly<
 	401: {
 		deepseek: {
 			labelKey: 'error.action.createApiKey',
-			url: DEEPSEEK_API_KEYS_PAGE_URL,
+			url: EXTERNAL_URLS.deepseek.apiKeys,
 		},
 	},
 	402: {
 		deepseek: {
 			labelKey: 'error.action.viewUsage',
-			url: DEEPSEEK_USAGE_PAGE_URL,
+			url: EXTERNAL_URLS.deepseek.usage,
 		},
 	},
 	'5xx': {
 		deepseek: {
 			labelKey: 'error.action.checkDeepSeekStatus',
-			url: DEEPSEEK_STATUS_PAGE_URL,
+			url: EXTERNAL_URLS.deepseek.status,
 		},
 	},
 };

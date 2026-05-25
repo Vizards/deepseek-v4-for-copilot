@@ -11,6 +11,14 @@ import type { ModelDefinition } from './types';
 /** VS Code configuration section prefix for all extension settings. */
 export const CONFIG_SECTION = 'deepseek-copilot';
 
+export const EXTERNAL_URLS = {
+	deepseek: {
+		apiKeys: 'https://platform.deepseek.com/api_keys',
+		usage: 'https://platform.deepseek.com/usage',
+		status: 'https://status.deepseek.com',
+	},
+} as const;
+
 /** URI path handled by this extension to reveal the output log. */
 export const SHOW_LOGS_URI_PATH = '/showLogs';
 

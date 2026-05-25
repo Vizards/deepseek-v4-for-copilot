@@ -11,6 +11,12 @@ import type { ModelDefinition } from './types';
 /** VS Code configuration section prefix for all extension settings. */
 export const CONFIG_SECTION = 'deepseek-copilot';
 
+/** URI path handled by this extension to reveal the output log. */
+export const SHOW_LOGS_URI_PATH = '/showLogs';
+
+/** URI path handled by this extension to open API key configuration. */
+export const CONFIGURE_API_KEY_URI_PATH = '/setApiKey';
+
 // VS Code's internal LanguageModelChatMessageRole.System is not exposed in @types/vscode.
 export const LANGUAGE_MODEL_CHAT_SYSTEM_ROLE = 3;
 

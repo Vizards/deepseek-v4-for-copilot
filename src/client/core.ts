@@ -1,12 +1,13 @@
 import type { CancellationToken } from 'vscode';
-import { safeStringify } from './json';
-import { logger } from './logger';
+import { safeStringify } from '../json';
+import { logger } from '../logger';
 import type {
 	DeepSeekRequest,
 	DeepSeekStreamChunk,
 	DeepSeekToolCall,
 	StreamCallbacks,
-} from './types';
+} from '../types';
+import { createHttpError, normalizeRequestError } from './error';
 
 /**
  * Lightweight SSE-streaming DeepSeek API client.
@@ -53,15 +54,7 @@ export class DeepSeekClient {
 			});
 
 			if (!response.ok) {
-				const errorText = await response.text();
-				let errorMessage: string;
-				try {
-					const errorJson = JSON.parse(errorText);
-					errorMessage = errorJson.error?.message || errorJson.message || errorText;
-				} catch {
-					errorMessage = errorText;
-				}
-				throw new Error(`DeepSeek API error (${response.status}): ${errorMessage}`);
+				throw await createHttpError(response, this.baseUrl);
 			}
 
 			if (!response.body) {
@@ -178,7 +171,9 @@ export class DeepSeekClient {
 			if (isAbortError(error) && cancellationToken?.isCancellationRequested) {
 				return;
 			}
-			callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+			const normalizedError = normalizeRequestError(error);
+			logger.error('DeepSeek request failed:', getDiagnosticMessage(normalizedError), error);
+			callbacks.onError(normalizedError);
 		} finally {
 			cancelListener?.dispose();
 		}
@@ -187,4 +182,10 @@ export class DeepSeekClient {
 
 function isAbortError(error: unknown): boolean {
 	return error instanceof Error && error.name === 'AbortError';
+}
+
+function getDiagnosticMessage(error: Error): string {
+	return 'diagnosticMessage' in error && typeof error.diagnosticMessage === 'string'
+		? error.diagnosticMessage
+		: error.message;
 }

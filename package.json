@@ -35,6 +35,7 @@
     "chat"
   ],
   "activationEvents": [
+    "onUri",
     "onStartupFinished"
   ],
   "enabledApiProposals": [],

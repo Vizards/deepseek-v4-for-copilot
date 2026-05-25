@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { createUserFacingError } from '../client';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
@@ -7,12 +8,12 @@ import {
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
 } from './debug';
-import type { PreparedChatRequest } from './request';
 import {
 	createReplayMarkerPart,
 	hasReplayMarkerMetadata,
 	type ReplayMarkerMetadata,
 } from './replay';
+import type { PreparedChatRequest } from './request';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
@@ -68,7 +69,7 @@ export function streamChatCompletion({
 				},
 
 				onError: (error: Error) => {
-					throw error;
+					throw createUserFacingError(error);
 				},
 
 				onDone: () => {

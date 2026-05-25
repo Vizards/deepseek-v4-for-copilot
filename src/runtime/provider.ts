@@ -25,7 +25,7 @@ export async function registerProvider(
 async function activateCopilotChat(): Promise<void> {
 	try {
 		await vscode.extensions.getExtension('github.copilot-chat')?.activate();
-	} catch {
-		logger.warn('Copilot Chat activation unavailable; model picker refresh may be delayed');
+	} catch (error) {
+		logger.warn('Copilot Chat activation unavailable; model picker refresh may be delayed', error);
 	}
 }

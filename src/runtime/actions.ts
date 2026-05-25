@@ -6,7 +6,7 @@ import { logger } from '../logger';
 interface ActionUrlDefinition {
 	key: keyof ErrorActionUrls;
 	path: string;
-	handle: () => void;
+	handle: () => void | Thenable<unknown>;
 	resolveFailureMessage: string;
 }
 
@@ -14,9 +14,7 @@ const ACTION_URLS: readonly ActionUrlDefinition[] = [
 	{
 		key: 'configureApiKey',
 		path: CONFIGURE_API_KEY_URI_PATH,
-		handle: () => {
-			void vscode.commands.executeCommand('deepseek-copilot.setApiKey');
-		},
+		handle: () => vscode.commands.executeCommand('deepseek-copilot.setApiKey'),
 		resolveFailureMessage: 'Failed to resolve DeepSeek set API key URI',
 	},
 	{
@@ -33,7 +31,9 @@ export function registerActionUrls(context: vscode.ExtensionContext): void {
 			handleUri(uri) {
 				const action = ACTION_URLS.find((item) => item.path === uri.path);
 				if (action) {
-					action.handle();
+					void Promise.resolve(action.handle()).catch((error) => {
+						logger.warn(`Failed to handle DeepSeek URI action: ${uri.path}`, error);
+					});
 					return;
 				}
 				logger.warn(`Unhandled DeepSeek URI: ${uri.toString(true)}`);

@@ -103,7 +103,7 @@ export function normalizeRequestError(error: unknown): Error {
 			message: `DeepSeek request failed with a non-Error value: ${value}`,
 			userSummary: t('error.unknown', value),
 			kind: 'unknown',
-			diagnosticMessage: `kind=unknown error=${String(error)}`,
+			diagnosticMessage: `kind=unknown error=${value}`,
 		});
 	}
 
@@ -126,7 +126,7 @@ export function normalizeRequestError(error: unknown): Error {
 			`kind=network`,
 			code ? `code=${code}` : undefined,
 			causeInfo.name ? `name=${causeInfo.name}` : undefined,
-			`message=${error.message}`,
+			`message=${truncateSingleLine(error.message)}`,
 			causeInfo.message ? `cause=${causeInfo.message}` : undefined,
 		),
 	});

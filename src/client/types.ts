@@ -1,6 +1,13 @@
+import type { DeepSeekRequest } from '../types';
+
 export interface ErrorActionUrls {
 	configureApiKey?: string;
 	showLogs?: string;
+}
+
+export interface RequestErrorContext {
+	baseUrl: string;
+	request: DeepSeekRequest;
 }
 
 export interface ErrorActionLink {

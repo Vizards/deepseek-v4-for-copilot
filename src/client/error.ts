@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { safeStringify } from '../json';
 import {
 	API_PROVIDER_HTTP_ERROR_LINKS,
 	MAX_DIAGNOSTIC_FIELD_LENGTH,
@@ -13,6 +14,7 @@ import type {
 	HttpErrorLinkDefinition,
 	HttpErrorLinkStatusKey,
 	NetworkErrorCategory,
+	RequestErrorContext,
 } from './types';
 export type { DeepSeekRequestErrorKind, ErrorActionUrls } from './types';
 
@@ -62,23 +64,14 @@ export class DeepSeekRequestError extends Error {
 
 export async function createHttpError(
 	response: Response,
-	baseUrl: string,
+	context: RequestErrorContext,
 ): Promise<DeepSeekRequestError> {
+	const { baseUrl } = context;
 	const responseText = await response.text();
 	const serverMessage = extractServerMessage(responseText);
 	const userSummary = getHttpErrorMessage(
 		response.status,
 		getCreateApiKeyUrl(response.status, baseUrl),
-	);
-	const diagnosticMessage = joinDiagnosticParts(
-		`kind=http`,
-		`status=${response.status}`,
-		`baseUrl=${truncateSingleLine(baseUrl)}`,
-		`statusText=${response.statusText || 'unknown'}`,
-		serverMessage ? `serverMessage=${serverMessage}` : undefined,
-		responseText && responseText !== serverMessage
-			? `body=${truncateSingleLine(responseText)}`
-			: undefined,
 	);
 
 	return new DeepSeekRequestError({
@@ -88,11 +81,20 @@ export async function createHttpError(
 		baseUrl,
 		status: response.status,
 		code: `HTTP_${response.status}`,
-		diagnosticMessage,
+		diagnosticMessage: joinDiagnosticParts(
+			`kind=http`,
+			`status=${response.status}`,
+			getRequestDiagnosticMessage(context),
+			`statusText=${safeStringify(response.statusText || 'unknown')}`,
+			serverMessage ? `serverMessage=${safeStringify(serverMessage)}` : undefined,
+			responseText && responseText !== serverMessage
+				? `body=${safeStringify(truncateSingleLine(responseText))}`
+				: undefined,
+		),
 	});
 }
 
-export function normalizeRequestError(error: unknown): Error {
+export function normalizeRequestError(error: unknown, context: RequestErrorContext): Error {
 	if (error instanceof DeepSeekRequestError) {
 		return error;
 	}
@@ -103,7 +105,12 @@ export function normalizeRequestError(error: unknown): Error {
 			message: `DeepSeek request failed with a non-Error value: ${value}`,
 			userSummary: t('error.unknown', value),
 			kind: 'unknown',
-			diagnosticMessage: `kind=unknown error=${value}`,
+			baseUrl: context.baseUrl,
+			diagnosticMessage: joinDiagnosticParts(
+				`kind=unknown`,
+				getRequestDiagnosticMessage(context),
+				`error=${safeStringify(value)}`,
+			),
 		});
 	}
 
@@ -120,18 +127,28 @@ export function normalizeRequestError(error: unknown): Error {
 			: 'DeepSeek request failed due to a network error',
 		userSummary,
 		kind: 'network',
+		baseUrl: context.baseUrl,
 		code,
 		cause: error,
 		diagnosticMessage: joinDiagnosticParts(
 			`kind=network`,
 			code ? `code=${code}` : undefined,
-			causeInfo.name ? `name=${causeInfo.name}` : undefined,
-			`message=${truncateSingleLine(error.message)}`,
-			causeInfo.message ? `cause=${causeInfo.message}` : undefined,
+			getRequestDiagnosticMessage(context),
+			`message=${safeStringify(truncateSingleLine(error.message))}`,
+			`cause=${causeInfo.value}`,
 		),
 	});
 	enhanced.stack = error.stack;
 	return enhanced;
+}
+
+export function formatRequestError(error: Error): string {
+	const diagnosticMessage = joinDiagnosticParts(
+		error instanceof DeepSeekRequestError
+			? error.diagnosticMessage
+			: `message=${safeStringify(error.message)}`,
+	);
+	return error.stack ? `${diagnosticMessage}\n${error.stack}` : diagnosticMessage;
 }
 
 export function createUserFacingError(error: Error): Error {
@@ -233,22 +250,22 @@ function extractServerMessage(responseText: string): string | undefined {
 	}
 }
 
-function getCauseInfo(
-	error: Error,
-): { code?: string; name?: string; message?: string } | undefined {
+function getCauseInfo(error: Error): { code?: string; name?: string; value: string } | undefined {
 	const cause = (error as Error & { cause?: unknown }).cause;
 	if (!cause) {
 		return undefined;
 	}
 
 	if (cause instanceof Error) {
-		return {
-			code: getStringProperty(cause, 'code'),
+		const value = {
 			name: cause.name,
-			message:
-				cause.message && cause.message !== error.message
-					? truncateSingleLine(cause.message)
-					: undefined,
+			message: cause.message,
+			...Object.fromEntries(Object.entries(cause)),
+		};
+		return {
+			code: getStringProperty(value, 'code'),
+			name: cause.name,
+			value: stringifyDiagnosticCause(value),
 		};
 	}
 
@@ -256,11 +273,39 @@ function getCauseInfo(
 		return {
 			code: getStringProperty(cause, 'code'),
 			name: getStringProperty(cause, 'name'),
-			message: truncateOptional(getStringProperty(cause, 'message')),
+			value: stringifyDiagnosticCause(cause),
 		};
 	}
 
-	return { message: truncateSingleLine(String(cause)) };
+	return { value: safeStringify(String(cause)) };
+}
+
+function stringifyDiagnosticCause(cause: unknown): string {
+	try {
+		return safeStringify(cause);
+	} catch {
+		return safeStringify(String(cause));
+	}
+}
+
+function getRequestDiagnosticMessage(context: RequestErrorContext): string {
+	const { request } = context;
+	return joinDiagnosticParts(
+		`baseUrl=${safeStringify(context.baseUrl)}`,
+		`model=${safeStringify(request.model)}`,
+		`stream=${request.stream}`,
+		request.temperature !== undefined ? `temperature=${request.temperature}` : undefined,
+		request.top_p !== undefined ? `topP=${request.top_p}` : undefined,
+		request.max_tokens !== undefined ? `maxTokens=${request.max_tokens}` : undefined,
+		request.thinking?.type ? `thinking=${safeStringify(request.thinking.type)}` : undefined,
+		request.reasoning_effort
+			? `reasoningEffort=${safeStringify(request.reasoning_effort)}`
+			: undefined,
+		request.tool_choice ? `toolChoice=${safeStringify(request.tool_choice)}` : undefined,
+		`toolCount=${request.tools?.length ?? 0}`,
+		`messageCount=${request.messages.length}`,
+		`messageChars=${request.messages.reduce((total, message) => total + message.content.length, 0)}`,
+	);
 }
 
 function getObjectProperty(value: unknown, key: string): unknown {
@@ -360,10 +405,6 @@ function truncateSingleLine(value: string): string {
 
 function escapeBoldText(value: string): string {
 	return value.replace(/\*/g, '\\*');
-}
-
-function truncateOptional(value: string | undefined): string | undefined {
-	return value ? truncateSingleLine(value) : undefined;
 }
 
 function identifyApiProvider(baseUrl: string): ApiProviderId | undefined {

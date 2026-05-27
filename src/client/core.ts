@@ -7,7 +7,7 @@ import type {
 	DeepSeekToolCall,
 	StreamCallbacks,
 } from '../types';
-import { createHttpError, normalizeRequestError } from './error';
+import { createHttpError, formatRequestError, normalizeRequestError } from './error';
 
 /**
  * Lightweight SSE-streaming DeepSeek API client.
@@ -54,7 +54,7 @@ export class DeepSeekClient {
 			});
 
 			if (!response.ok) {
-				throw await createHttpError(response, this.baseUrl);
+				throw await createHttpError(response, { baseUrl: this.baseUrl, request });
 			}
 
 			if (!response.body) {
@@ -171,8 +171,8 @@ export class DeepSeekClient {
 			if (isAbortError(error) && cancellationToken?.isCancellationRequested) {
 				return;
 			}
-			const normalizedError = normalizeRequestError(error);
-			logger.error('DeepSeek request failed:', getDiagnosticMessage(normalizedError), error);
+			const normalizedError = normalizeRequestError(error, { baseUrl: this.baseUrl, request });
+			logger.error('DeepSeek request failed:', formatRequestError(normalizedError));
 			callbacks.onError(normalizedError);
 		} finally {
 			cancelListener?.dispose();
@@ -182,10 +182,4 @@ export class DeepSeekClient {
 
 function isAbortError(error: unknown): boolean {
 	return error instanceof Error && error.name === 'AbortError';
-}
-
-function getDiagnosticMessage(error: Error): string {
-	return 'diagnosticMessage' in error && typeof error.diagnosticMessage === 'string'
-		? error.diagnosticMessage
-		: error.message;
 }

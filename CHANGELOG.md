@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.5.3...v0.5.4) (2026-06-01)
+
+
+### Bug Fixes
+
+* **client:** improve request failure diagnostics ([#109](https://github.com/Vizards/deepseek-v4-for-copilot/issues/109)) ([40cc542](https://github.com/Vizards/deepseek-v4-for-copilot/commit/40cc542bfc7cdf266f857e30ecb4ad35a2f439f1))
+
 ## [0.5.3](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.5.2...v0.5.3) (2026-05-25)
 
 

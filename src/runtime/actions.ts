@@ -39,7 +39,6 @@ const ACTION_URLS: readonly ActionUrlDefinition[] = [
 		handle: () => vscode.commands.executeCommand('deepseek-copilot.setVisionModel'),
 		resolveFailureMessage: 'Failed to resolve DeepSeek set vision model URI',
 		setUrl: setVisionProxyConfigurationUrl,
-		externalize: false,
 	},
 ];
 

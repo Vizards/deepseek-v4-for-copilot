@@ -39,7 +39,7 @@ export function createVSCodeLanguageModelVisionDescriberGetter(): {
 			}
 
 			const requestGeneration = generation;
-			describerPromise = (async () => {
+			const currentPromise = (async () => {
 				const models = await listVSCodeVisionModels();
 				if (requestGeneration !== generation) {
 					return undefined;
@@ -53,8 +53,16 @@ export function createVSCodeLanguageModelVisionDescriberGetter(): {
 				logger.warn(t('vision.notFound', getConfiguredVisionModelId() ?? DEFAULT_VISION_MODEL_ID));
 				return undefined;
 			})();
+			describerPromise = currentPromise;
 
-			return describerPromise;
+			try {
+				return await currentPromise;
+			} catch (error) {
+				if (requestGeneration === generation && describerPromise === currentPromise) {
+					describerPromise = undefined;
+				}
+				throw error;
+			}
 		},
 
 		reset() {

@@ -39,7 +39,6 @@ export class VisionProxyClient {
 			config,
 			endpoint,
 			headers,
-			body,
 			request,
 			apiKey,
 		);
@@ -110,6 +109,7 @@ async function postJsonRequest<T>(
 
 	try {
 		const bodyText = safeStringify(options.body);
+		options.context.bodyBytes = Buffer.byteLength(bodyText, 'utf8');
 		const response = await fetch(endpoint, {
 			method: 'POST',
 			headers: options.headers,
@@ -181,7 +181,6 @@ function createVisionProxyRequestDiagnostics(
 	config: VisionProxyConfig,
 	endpoint: URL,
 	headers: Record<string, string>,
-	body: object,
 	request: VisionDescriptionRequest,
 	apiKey: string | undefined,
 ): VisionProxyRequestDiagnostics {
@@ -197,7 +196,6 @@ function createVisionProxyRequestDiagnostics(
 		imageCount: request.images.length,
 		imageBytes: request.images.reduce((total, image) => total + image.data.byteLength, 0),
 		promptChars: request.prompt.length,
-		bodyBytes: Buffer.byteLength(safeStringify(body), 'utf8'),
 	};
 }
 

@@ -167,7 +167,7 @@ export function formatVisionProxyError(error: unknown): string {
 		const message = joinDiagnosticParts(
 			`kind=unknown`,
 			`message=${safeDiagnosticString(error.message)}`,
-			`cause=${formatDiagnosticCause(error)}`,
+			error.cause !== undefined ? `cause=${formatDiagnosticCause(error.cause)}` : undefined,
 		);
 		return error.stack ? `${message}\n${error.stack}` : message;
 	}

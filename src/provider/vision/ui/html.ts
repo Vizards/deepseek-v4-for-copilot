@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import vscode from 'vscode';
 import { t } from '../../../i18n';
 import type { VisionLanguageModelOption, VisionProxyConfig, VisionProxySource } from '../types';
@@ -136,12 +137,7 @@ export function getVisionProxyPanelHtml(
 }
 
 function createNonce(): string {
-	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	let nonce = '';
-	for (let i = 0; i < 32; i += 1) {
-		nonce += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return nonce;
+	return randomBytes(16).toString('base64');
 }
 
 function escapeScriptJson(value: unknown): string {

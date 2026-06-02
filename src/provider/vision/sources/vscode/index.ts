@@ -56,7 +56,15 @@ export function createVSCodeLanguageModelVisionDescriberGetter(): {
 			describerPromise = currentPromise;
 
 			try {
-				return await currentPromise;
+				const result = await currentPromise;
+				if (
+					result === undefined &&
+					requestGeneration === generation &&
+					describerPromise === currentPromise
+				) {
+					describerPromise = undefined;
+				}
+				return result;
 			} catch (error) {
 				if (requestGeneration === generation && describerPromise === currentPromise) {
 					describerPromise = undefined;

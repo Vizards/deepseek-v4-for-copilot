@@ -116,10 +116,7 @@ function normalizeApiType(
 	if (value === 'chat-completions' || value === 'responses') {
 		return value;
 	}
-	throw new VisionProxyError(
-		'missing-configuration',
-		t('vision.proxy.error.providerFamilyInvalid'),
-	);
+	throw new VisionProxyError('missing-configuration', t('vision.proxy.error.apiTypeInvalid'));
 }
 
 function normalizeRequiredString(value: unknown, label: string): string {

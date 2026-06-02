@@ -181,7 +181,9 @@ export function getVisionProxyErrorDisplayCode(error: unknown): string {
 		}
 
 		const causeInfo =
-			error.cause instanceof Error ? getNetworkErrorCauseInfo(error.cause) : undefined;
+			error.cause instanceof Error && !(error.cause instanceof VisionProxyError)
+				? getNetworkErrorCauseInfo(error.cause)
+				: undefined;
 		return getNetworkErrorCode(causeInfo) ?? getFallbackVisionProxyErrorCode(error.code);
 	}
 

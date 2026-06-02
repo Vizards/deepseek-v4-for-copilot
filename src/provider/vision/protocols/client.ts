@@ -107,9 +107,9 @@ async function postJsonRequest<T>(
 	const cancelListener = options.token.onCancellationRequested(() => {
 		controller.abort();
 	});
-	const bodyText = safeStringify(options.body);
 
 	try {
+		const bodyText = safeStringify(options.body);
 		const response = await fetch(endpoint, {
 			method: 'POST',
 			headers: options.headers,

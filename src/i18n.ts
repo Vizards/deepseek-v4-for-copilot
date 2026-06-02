@@ -49,7 +49,6 @@ const zh: Translations = {
 	'vision.panel.title': 'DeepSeek 视觉代理',
 	'vision.panel.description':
 		'配置一个支持图片输入的模型，用来先把图片转换成文字描述，再把描述随消息发送给 DeepSeek。图片本身不会发送给 DeepSeek。',
-	'vision.panel.sourceAria': '视觉代理来源',
 	'vision.panel.source.vscodeLm': 'VS Code 模型',
 	'vision.panel.source.apiEndpoint': 'API 端点',
 	'vision.panel.field.source': '视觉代理来源',
@@ -76,7 +75,7 @@ const zh: Translations = {
 	'vision.panel.hint.endpointTypeManual': '无法根据 URL 自动识别，请手动选择端点类型。',
 	'vision.panel.hint.endpointTypeSelected': '使用手动选择的端点类型：{0}。',
 	'vision.panel.hint.apiKeySet': '已保存 API Key。输入新 key 可替换当前 key。',
-	'vision.panel.hint.apiKeyUnset': '保存在 VS Code SecretStorage 中。',
+	'vision.panel.hint.apiKeyUnset': 'API Key 将保存在 VS Code SecretStorage 中。',
 	'vision.panel.cost.tokenCost': '费用：{0} credits / 100 万 tokens',
 	'vision.panel.cost.longContextTokenCost': '长上下文：{0} credits / 100 万 tokens',
 	'vision.panel.cost.input': '输入 {0}',
@@ -238,7 +237,6 @@ const en: Translations = {
 	'vision.panel.title': 'DeepSeek Vision Proxy',
 	'vision.panel.description':
 		'Configure a vision-capable model to turn image attachments into text before DeepSeek receives the request. DeepSeek receives the description, not the original images.',
-	'vision.panel.sourceAria': 'Vision proxy source',
 	'vision.panel.source.vscodeLm': 'VS Code model',
 	'vision.panel.source.apiEndpoint': 'API endpoint',
 	'vision.panel.field.source': 'Vision proxy source',
@@ -268,7 +266,7 @@ const en: Translations = {
 		'Could not infer this URL. Select the endpoint type manually.',
 	'vision.panel.hint.endpointTypeSelected': 'Using selected endpoint type: {0}.',
 	'vision.panel.hint.apiKeySet': 'Stored API key is set. Enter a new key to replace it.',
-	'vision.panel.hint.apiKeyUnset': 'Saved in VS Code SecretStorage.',
+	'vision.panel.hint.apiKeyUnset': 'API key will be stored in VS Code SecretStorage.',
 	'vision.panel.cost.tokenCost': 'Cost: {0} credits / 1M tokens',
 	'vision.panel.cost.longContextTokenCost': 'Long context: {0} credits / 1M tokens',
 	'vision.panel.cost.input': 'input {0}',

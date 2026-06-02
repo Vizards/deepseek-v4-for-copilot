@@ -53,7 +53,7 @@ export function getVisionProxyPanelHtml(
 			<fieldset>
 				<div id="sourceField" class="field">
 					<div id="sourceLabel" class="field-label">${escapeHtml(strings.fieldSource)}</div>
-					<div class="source-options" role="radiogroup" aria-labelledby="sourceLabel" aria-label="${escapeHtml(strings.sourceAria)}">
+					<div class="source-options" role="radiogroup" aria-labelledby="sourceLabel">
 						<label class="source-option">
 							<input id="sourceVscodeLm" type="radio" name="source" value="vscode-lm">
 							<span>${escapeHtml(strings.sourceVscodeLm)}</span>
@@ -160,7 +160,6 @@ function getVisionProxyPanelStrings() {
 	return {
 		title: t('vision.panel.title'),
 		description: t('vision.panel.description'),
-		sourceAria: t('vision.panel.sourceAria'),
 		sourceVscodeLm: t('vision.panel.source.vscodeLm'),
 		sourceApiEndpoint: t('vision.panel.source.apiEndpoint'),
 		fieldSource: t('vision.panel.field.source'),

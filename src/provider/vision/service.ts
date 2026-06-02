@@ -5,7 +5,7 @@ import { VISION_PROXY_API_KEY_SECRET, VisionProxyConfigStore } from './sources/e
 import { createEndpointVisionDescriber } from './sources/endpoint';
 import { openVisionProxyPanel } from './ui/panel';
 import type { VisionDescriber, VisionProxyConfig } from './types';
-import { VisionProxyError } from './protocols/errors';
+import { isVisionProxyError, VisionProxyError } from './protocols/errors';
 import { createVSCodeLanguageModelVisionDescriberGetter } from './sources/vscode';
 
 interface ApiEndpointConfigResult {
@@ -48,6 +48,9 @@ export function createVisionService(context: vscode.ExtensionContext): {
 			if (source === 'api-endpoint') {
 				const result = getApiEndpointConfig(store, true);
 				if (!result.config) {
+					if (!result.error) {
+						return undefined;
+					}
 					return createInvalidApiEndpointDescriber(result.error);
 				}
 				const apiKey = await store.getApiKey();
@@ -94,6 +97,9 @@ function createInvalidApiEndpointDescriber(error: unknown): VisionDescriber {
 		id: 'api-endpoint:invalid-configuration',
 		source: 'api-endpoint',
 		async describe(): Promise<string> {
+			if (isVisionProxyError(error)) {
+				throw error;
+			}
 			throw new VisionProxyError(
 				'missing-configuration',
 				t('vision.proxy.error.configurationInvalid'),

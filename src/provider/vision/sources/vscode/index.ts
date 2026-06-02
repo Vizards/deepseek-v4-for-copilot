@@ -1,0 +1,264 @@
+import vscode from 'vscode';
+import { t } from '../../../../i18n';
+import { logger } from '../../../../logger';
+import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../../consts';
+import type {
+	VisionDescriptionRequest,
+	VisionDescriber,
+	VisionLanguageModelOption,
+} from '../../types';
+
+const EXCLUDED_VISION_MODEL_IDS = new Set(['copilot-utility', 'copilot-utility-small']);
+
+type LanguageModelPricingInfo = {
+	readonly pricing?: unknown;
+	readonly inputCost?: unknown;
+	readonly outputCost?: unknown;
+	readonly cacheCost?: unknown;
+	readonly longContextInputCost?: unknown;
+	readonly longContextOutputCost?: unknown;
+	readonly longContextCacheCost?: unknown;
+	readonly priceCategory?: unknown;
+};
+
+export function createVSCodeLanguageModelVisionDescriberGetter(): {
+	get: () => Promise<VisionDescriber | undefined>;
+	reset: () => void;
+} {
+	let describer: VisionDescriber | undefined;
+	let describerPromise: Promise<VisionDescriber | undefined> | undefined;
+	let generation = 0;
+
+	return {
+		async get() {
+			if (describer) {
+				return describer;
+			}
+			if (describerPromise) {
+				return describerPromise;
+			}
+
+			const requestGeneration = generation;
+			describerPromise = (async () => {
+				const models = await listVSCodeVisionModels();
+				if (requestGeneration !== generation) {
+					return undefined;
+				}
+				const model = pickPreferredVSCodeVisionModel(models, getConfiguredVisionModelId());
+				if (model) {
+					logger.info(t('vision.proxyUsing', model.id));
+					describer = new VSCodeLanguageModelVisionDescriber(model);
+					return describer;
+				}
+				logger.warn(t('vision.notFound', getConfiguredVisionModelId() ?? DEFAULT_VISION_MODEL_ID));
+				return undefined;
+			})();
+
+			return describerPromise;
+		},
+
+		reset() {
+			generation += 1;
+			describer = undefined;
+			describerPromise = undefined;
+		},
+	};
+}
+
+export class VSCodeLanguageModelVisionDescriber implements VisionDescriber {
+	readonly source = 'vscode-lm';
+
+	constructor(private readonly model: vscode.LanguageModelChat) {}
+
+	get id(): string {
+		return this.model.id;
+	}
+
+	async describe(request: VisionDescriptionRequest): Promise<string> {
+		const visionMsg = vscode.LanguageModelChatMessage.User([
+			...request.images.map(
+				(image) => new vscode.LanguageModelDataPart(image.data, image.mimeType),
+			),
+			new vscode.LanguageModelTextPart(request.prompt),
+		] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
+
+		const response = await this.model.sendRequest([visionMsg], {}, request.token);
+		let description = '';
+		for await (const chunk of response.stream) {
+			if (chunk instanceof vscode.LanguageModelTextPart) {
+				description += chunk.value;
+			}
+		}
+		return description.trim();
+	}
+}
+
+export function getVisionPrompt(): string {
+	const config = vscode.workspace.getConfiguration('deepseek-copilot');
+	return (
+		config.get<string>('visionPrompt', IMAGE_DESCRIPTION_PROMPT).trim() || IMAGE_DESCRIPTION_PROMPT
+	);
+}
+
+export function getConfiguredVisionModelId(): string | undefined {
+	const config = vscode.workspace.getConfiguration('deepseek-copilot');
+	const id = config.get<string>('visionModel', '');
+	return id.trim() || undefined;
+}
+
+export function getDefaultVisionModelId(): string {
+	return DEFAULT_VISION_MODEL_ID;
+}
+
+export async function saveVSCodeVisionModelId(id: string): Promise<void> {
+	const trimmed = id.trim();
+	if (!trimmed) {
+		throw new Error(t('vision.panel.error.required', t('vision.panel.source.vscodeLm')));
+	}
+	const config = vscode.workspace.getConfiguration('deepseek-copilot');
+	await config.update('visionModel', trimmed, vscode.ConfigurationTarget.Global);
+}
+
+export async function listVSCodeVisionModelOptions(): Promise<VisionLanguageModelOption[]> {
+	const models = await listVSCodeVisionModels();
+	return models.map((model) => {
+		const costDescription = formatLanguageModelCost(model);
+		return {
+			id: model.id,
+			vendor: model.vendor,
+			name: model.name,
+			family: model.family,
+			version: model.version,
+			label: `${model.name && model.name !== model.id ? `${model.name} (${model.id})` : model.id} - ${model.vendor}`,
+			description: `${model.vendor}${model.family ? ` / ${model.family}` : ''}`,
+			...(costDescription ? { costDescription } : {}),
+		};
+	});
+}
+
+export function pickPreferredVSCodeVisionModelId(
+	options: readonly VisionLanguageModelOption[],
+	configuredId: string | undefined,
+): string | undefined {
+	if (configuredId && options.some((model) => model.id === configuredId)) {
+		return configuredId;
+	}
+	if (options.some((model) => model.id === DEFAULT_VISION_MODEL_ID)) {
+		return DEFAULT_VISION_MODEL_ID;
+	}
+	return options[0]?.id;
+}
+
+async function listVSCodeVisionModels(): Promise<vscode.LanguageModelChat[]> {
+	const allModels = await vscode.lm.selectChatModels();
+	return allModels.filter(isVSCodeVisionModel);
+}
+
+function pickPreferredVSCodeVisionModel(
+	models: readonly vscode.LanguageModelChat[],
+	configuredId: string | undefined,
+): vscode.LanguageModelChat | undefined {
+	if (configuredId) {
+		const configured = models.find((model) => model.id === configuredId);
+		if (configured) {
+			return configured;
+		}
+	}
+
+	const preferred = models.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
+	if (preferred) {
+		return preferred;
+	}
+	return models[0];
+}
+
+function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
+	return (
+		model.vendor !== 'deepseek' &&
+		!EXCLUDED_VISION_MODEL_IDS.has(model.id) &&
+		getSupportsImageToText(model)
+	);
+}
+
+function getSupportsImageToText(model: vscode.LanguageModelChat): boolean {
+	const capabilities = (
+		model as {
+			capabilities?: { supportsImageToText?: boolean; imageInput?: boolean };
+		}
+	).capabilities;
+	return capabilities?.supportsImageToText === true || capabilities?.imageInput === true;
+}
+
+function formatLanguageModelCost(model: vscode.LanguageModelChat): string | undefined {
+	const pricingInfo = model as vscode.LanguageModelChat & LanguageModelPricingInfo;
+	const costParts = formatCostParts(
+		toFiniteNumber(pricingInfo.inputCost),
+		toFiniteNumber(pricingInfo.cacheCost),
+		toFiniteNumber(pricingInfo.outputCost),
+	);
+	const priceCategory = formatPriceCategory(asString(pricingInfo.priceCategory));
+	if (costParts) {
+		const parts = [t('vision.panel.cost.tokenCost', costParts)];
+		if (priceCategory) {
+			parts.push(priceCategory);
+		}
+
+		const longContextCostParts = formatCostParts(
+			toFiniteNumber(pricingInfo.longContextInputCost),
+			toFiniteNumber(pricingInfo.longContextCacheCost),
+			toFiniteNumber(pricingInfo.longContextOutputCost),
+		);
+		if (longContextCostParts) {
+			parts.push(t('vision.panel.cost.longContextTokenCost', longContextCostParts));
+		}
+		return parts.join(' · ');
+	}
+
+	if (priceCategory) {
+		return priceCategory;
+	}
+
+	const pricing = asString(pricingInfo.pricing);
+	return pricing ? t('vision.panel.cost.pricing', pricing) : undefined;
+}
+
+function formatCostParts(
+	inputCost: number | undefined,
+	cacheCost: number | undefined,
+	outputCost: number | undefined,
+): string | undefined {
+	const parts: string[] = [];
+	if (inputCost !== undefined) {
+		parts.push(t('vision.panel.cost.input', inputCost));
+	}
+	if (cacheCost !== undefined) {
+		parts.push(t('vision.panel.cost.cachedInput', cacheCost));
+	}
+	if (outputCost !== undefined) {
+		parts.push(t('vision.panel.cost.output', outputCost));
+	}
+	return parts.length > 0 ? parts.join(', ') : undefined;
+}
+
+function formatPriceCategory(priceCategory: string | undefined): string | undefined {
+	switch (priceCategory) {
+		case 'low':
+			return t('vision.panel.cost.category.low');
+		case 'medium':
+			return t('vision.panel.cost.category.medium');
+		case 'high':
+			return t('vision.panel.cost.category.high');
+		case 'very_high':
+			return t('vision.panel.cost.category.veryHigh');
+		default:
+			return priceCategory ? t('vision.panel.cost.category.named', priceCategory) : undefined;
+	}
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function asString(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}

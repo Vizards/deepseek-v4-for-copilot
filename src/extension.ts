@@ -1,1 +1,1 @@
-export { activate, deactivate } from './runtime/index';
+export { activate, deactivate } from './runtime';

@@ -11,7 +11,7 @@ export async function registerProvider(
 		vscode.commands.registerCommand('deepseek-copilot.setApiKey', () => provider.configureApiKey()),
 		vscode.commands.registerCommand('deepseek-copilot.clearApiKey', () => provider.clearApiKey()),
 		vscode.commands.registerCommand('deepseek-copilot.setVisionModel', () =>
-			provider.setVisionProxyModel(),
+			provider.setVisionModel(),
 		),
 		vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
 	);

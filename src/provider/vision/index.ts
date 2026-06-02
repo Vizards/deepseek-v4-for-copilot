@@ -1,3 +1,10 @@
-export { createVisionModelGetter, setVisionProxyModel } from './model';
 export { resolveImageMessages } from './resolve';
-export type { VisionResolutionResult, VisionResolutionStats } from './types';
+export { createVisionService } from './service';
+export type {
+	VisionDescriber,
+	VisionLanguageModelOption,
+	VisionProxyConfig,
+	VisionProxySource,
+	VisionResolutionResult,
+	VisionResolutionStats,
+} from './types';

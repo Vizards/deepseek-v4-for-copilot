@@ -9,7 +9,7 @@ import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
 import type { ActivatePreflightInspection } from '../tools/preflight';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../vision/consts';
-import type { VisionResolutionStats as VisionPipelineStats } from '../vision/index';
+import type { VisionProxySource, VisionResolutionStats as VisionPipelineStats } from '../vision';
 import {
 	classifyDeepSeekRequest,
 	formatModelFields,
@@ -174,6 +174,7 @@ export interface BeginCacheDiagnosticsOptions {
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	visionModelId?: string;
+	visionProxySource?: VisionProxySource;
 	visionStats?: VisionPipelineStats;
 }
 
@@ -295,6 +296,7 @@ interface VisionMessageStats {
 	droppedImageParts: number;
 	historyDescriptionMessages: number;
 	visionModelId?: string;
+	visionProxySource?: VisionProxySource;
 }
 
 interface HostPromptTrace {
@@ -385,6 +387,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 			options.inputMessages,
 			options.resolvedMessages,
 			options.visionModelId,
+			options.visionProxySource,
 		);
 
 		logger.info(
@@ -824,6 +827,7 @@ function summarizeVisionResolution(
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[],
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[],
 	visionModelId: string | undefined,
+	visionProxySource: VisionProxySource | undefined,
 ): VisionMessageStats {
 	const stats: VisionMessageStats = {
 		inputImageParts: 0,
@@ -833,6 +837,7 @@ function summarizeVisionResolution(
 		droppedImageParts: 0,
 		historyDescriptionMessages: 0,
 		visionModelId,
+		visionProxySource,
 	};
 
 	for (const [index, message] of inputMessages.entries()) {
@@ -932,6 +937,9 @@ function formatVisionTrace(
 	}
 
 	parts.push(`model=${visionModel}`);
+	if (stats.visionProxySource) {
+		parts.push(`source=${stats.visionProxySource}`);
+	}
 	appendNumberIfNonZero(parts, 'historyDescriptions', stats.historyDescriptionMessages);
 	return parts.join(' ') + note;
 }

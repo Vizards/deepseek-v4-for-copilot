@@ -157,13 +157,16 @@
         "deepseek-copilot.visionModel": {
           "type": "string",
           "default": "",
-          "description": "%deepseek-copilot.config.visionModel.description%"
+          "tags": [
+            "advanced"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.visionModel.description%"
         },
         "deepseek-copilot.visionPrompt": {
           "type": "string",
           "editPresentation": "multilineText",
           "default": "Describe all image attachments in this message.\n\nIf there is one image, describe it directly.\nIf there are multiple images:\n1. Describe each image separately, preserving their order.\n2. Then provide a combined description explaining the overall context and relationships across the images.\n\nReturn one concise factual description suitable for inserting into a text-only chat prompt. Include visible text, objects, UI elements, people, and relevant context. Do not invent details.",
-          "description": "%deepseek-copilot.config.visionPrompt.description%"
+          "markdownDescription": "%deepseek-copilot.config.visionPrompt.description%"
         },
         "deepseek-copilot.debugMode": {
           "type": "string",

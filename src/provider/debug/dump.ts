@@ -11,7 +11,7 @@ import type { DeepSeekMessage, DeepSeekRequest } from '../../types';
 import { parseReplayMarkerData, REPLAY_MARKER_MIME } from '../replay';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
-import type { VisionResolutionStats } from '../vision/index';
+import type { VisionProxySource, VisionResolutionStats } from '../vision';
 import {
 	classifyDeepSeekRequest,
 	classifyProviderRequest,
@@ -106,6 +106,7 @@ export interface DumpDeepSeekRequestOptions {
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
 	visionModelId?: string;
+	visionProxySource?: VisionProxySource;
 	visionStats?: VisionResolutionStats;
 }
 
@@ -353,6 +354,7 @@ function createPipelineSnapshot(
 			stage === 'resolved'
 				? {
 						modelId: options.visionModelId ?? null,
+						source: options.visionProxySource ?? null,
 						stats: options.visionStats ?? null,
 					}
 				: undefined,

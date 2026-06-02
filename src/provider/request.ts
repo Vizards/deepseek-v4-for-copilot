@@ -17,7 +17,7 @@ import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './m
 import type { ReplayMarkerMetadata } from './replay';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
-import { resolveImageMessages } from './vision/index';
+import { resolveImageMessages, type VisionDescriber } from './vision';
 
 export interface PreparedChatRequest {
 	client: DeepSeekClient;
@@ -30,6 +30,7 @@ export interface PreparedChatRequest {
 	segment: ConversationSegment;
 	replayMarkerMetadata: ReplayMarkerMetadata;
 	visionMarkerTextChars?: number;
+	initialResponseNotice?: string;
 }
 
 export interface PrepareChatRequestOptions {
@@ -41,7 +42,7 @@ export interface PrepareChatRequestOptions {
 	options: vscode.ProvideLanguageModelChatResponseOptions;
 	token: vscode.CancellationToken;
 	cacheDiagnostics: CacheDiagnosticsRecorder;
-	getVisionModel: () => Promise<vscode.LanguageModelChat | undefined>;
+	getVisionDescriber: () => Promise<VisionDescriber | undefined>;
 }
 
 export async function prepareChatRequest({
@@ -53,7 +54,7 @@ export async function prepareChatRequest({
 	options,
 	token,
 	cacheDiagnostics,
-	getVisionModel,
+	getVisionDescriber,
 }: PrepareChatRequestOptions): Promise<PreparedChatRequest> {
 	const apiKey = await authManager.getApiKey();
 	if (!apiKey) {
@@ -66,7 +67,7 @@ export async function prepareChatRequest({
 	const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 	const maxTokens = getMaxTokens();
 
-	const visionResolution = await resolveImageMessages(messages, token, getVisionModel);
+	const visionResolution = await resolveImageMessages(messages, token, getVisionDescriber);
 	const resolvedMessages = visionResolution.messages;
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel);
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
@@ -104,6 +105,7 @@ export async function prepareChatRequest({
 		resolvedMessages,
 		requestOptions: options,
 		visionModelId: visionResolution.visionModelId,
+		visionProxySource: visionResolution.visionProxySource,
 		visionStats: visionResolution.stats,
 	});
 
@@ -118,6 +120,7 @@ export async function prepareChatRequest({
 		inputMessages: messages,
 		resolvedMessages,
 		visionModelId: visionResolution.visionModelId,
+		visionProxySource: visionResolution.visionProxySource,
 		visionStats: visionResolution.stats,
 	});
 
@@ -132,5 +135,6 @@ export async function prepareChatRequest({
 		segment,
 		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
+		initialResponseNotice: visionResolution.initialResponseNotice,
 	};
 }

@@ -21,6 +21,8 @@ const zh: Translations = {
 	// Model descriptions
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
+	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
+	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
@@ -205,6 +207,10 @@ const en: Translations = {
 	// Model descriptions
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
+	'model.flash.tooltip':
+		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
+	'model.pro.tooltip':
+		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',

@@ -10,6 +10,7 @@ import {
 	dumpProviderInput,
 } from './debug';
 import { toChatInfo } from './models';
+import { BalanceCurrencyResolver } from './pricing/currency';
 import { prepareChatRequest } from './request';
 import { resolveConversationSegment } from './segment';
 import { streamChatCompletion } from './stream';
@@ -34,6 +35,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 	/** Vision proxy: internal bridge + VS Code LM fallback. */
 	private readonly vision: ReturnType<typeof createVisionService>;
+	private readonly balanceCurrencyResolver: BalanceCurrencyResolver;
 
 	/**
 	 * Adaptive chars-per-token ratio, calibrated from actual usage data.
@@ -45,13 +47,19 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		this.authManager = new AuthManager(context);
 		this.globalStorageUri = context.globalStorageUri;
 		this.vision = createVisionService(context);
+		this.balanceCurrencyResolver = new BalanceCurrencyResolver(context, this.authManager, () =>
+			this.onDidChangeLanguageModelChatInformationEmitter.fire(),
+		);
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
-			// Settings-based fallback API key + vision model changes.
+			// Settings-based fallback API key + base URL changes.
 			vscode.workspace.onDidChangeConfiguration((e) => {
-				if (e.affectsConfiguration('deepseek-copilot.apiKey')) {
-					this.onDidChangeLanguageModelChatInformationEmitter.fire();
+				if (
+					e.affectsConfiguration('deepseek-copilot.apiKey') ||
+					e.affectsConfiguration('deepseek-copilot.baseUrl')
+				) {
+					this.invalidateCurrencyAndRefreshModels();
 				}
 			}),
 			// Multi-window: SecretStorage changes don't fire onDidChangeConfiguration.
@@ -59,7 +67,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			// model picker so the warning state stays in sync.
 			context.secrets.onDidChange((e) => {
 				if (e.key === 'deepseek-copilot.apiKey') {
-					this.onDidChangeLanguageModelChatInformationEmitter.fire();
+					this.invalidateCurrencyAndRefreshModels();
 				}
 			}),
 		);
@@ -70,13 +78,13 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	async configureApiKey(): Promise<void> {
 		const saved = await this.authManager.promptForApiKey();
 		if (saved) {
-			this.onDidChangeLanguageModelChatInformationEmitter.fire();
+			this.invalidateCurrencyAndRefreshModels();
 		}
 	}
 
 	async clearApiKey(): Promise<void> {
 		await this.authManager.deleteApiKey();
-		this.onDidChangeLanguageModelChatInformationEmitter.fire();
+		this.invalidateCurrencyAndRefreshModels();
 		vscode.window.showInformationMessage(t('auth.removed'));
 	}
 
@@ -87,6 +95,13 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	/** Force Copilot Chat to re-query model information (including configurationSchema). */
 	refreshModelPicker(): void {
 		this.onDidChangeLanguageModelChatInformationEmitter.fire();
+	}
+
+	private invalidateCurrencyAndRefreshModels(): void {
+		void this.balanceCurrencyResolver
+			.invalidate()
+			.catch((error) => logger.warn('Failed to invalidate DeepSeek balance currency', error))
+			.finally(() => this.onDidChangeLanguageModelChatInformationEmitter.fire());
 	}
 
 	async prepareForDeactivate(): Promise<void> {
@@ -120,7 +135,11 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		}
 
 		const hasKey = await this.authManager.hasApiKey();
-		return MODELS.map((model) => toChatInfo(model, hasKey));
+		const pricingCurrency = this.balanceCurrencyResolver.getDisplayCurrency();
+		if (hasKey) {
+			this.balanceCurrencyResolver.refreshInBackground();
+		}
+		return MODELS.map((model) => toChatInfo(model, hasKey, pricingCurrency));
 	}
 
 	async provideLanguageModelChatResponse(

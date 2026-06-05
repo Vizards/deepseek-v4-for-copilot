@@ -7,13 +7,12 @@ import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
-	classifyDeepSeekRequest,
 	dumpDeepSeekRequest,
 	type CacheDiagnosticsRecorder,
 	type CacheDiagnosticsRun,
-	type RequestKind,
 } from './debug';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
+import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ReplayMarkerMetadata } from './replay';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
@@ -64,7 +63,6 @@ export async function prepareChatRequest({
 	const client = new DeepSeekClient(getBaseUrl(), apiKey);
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const isThinkingModel = modelDef?.capabilities.thinking ?? false;
-	const thinkingEffort = getConfiguredThinkingEffort(options as ModelConfigurationOptions);
 	const maxTokens = getMaxTokens();
 
 	const visionResolution = await resolveImageMessages(messages, token, getVisionDescriber);
@@ -73,13 +71,24 @@ export async function prepareChatRequest({
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
-	const request: DeepSeekRequest = {
+	const baseRequest: DeepSeekRequest = {
 		model: getApiModelId(modelInfo.id),
 		messages: deepseekMessages,
 		stream: true,
 		tools,
 		tool_choice: tools && tools.length > 0 ? ('auto' as const) : undefined,
 		max_tokens: maxTokens,
+	};
+	const requestKind = classifyDeepSeekRequest({
+		request: baseRequest,
+		inputMessages: messages,
+	});
+	const configuredThinkingEffort = getConfiguredThinkingEffort(
+		options as ModelConfigurationOptions,
+	);
+	const thinkingEffort = shouldForceThinkingNone(requestKind) ? 'none' : configuredThinkingEffort;
+	const request: DeepSeekRequest = {
+		...baseRequest,
 		...(isThinkingModel
 			? {
 					thinking: {
@@ -89,10 +98,6 @@ export async function prepareChatRequest({
 				}
 			: {}),
 	};
-	const requestKind = classifyDeepSeekRequest({
-		request,
-		inputMessages: messages,
-	});
 	dumpDeepSeekRequest(request, {
 		globalStorageUri,
 		segment,

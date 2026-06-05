@@ -3,11 +3,11 @@ import { createUserFacingError } from '../client';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
-	formatRequestLogLine,
 	observeCancellationToken,
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
 } from './debug';
+import { formatRequestLogLine } from './routing';
 import {
 	createReplayMarkerPart,
 	hasReplayMarkerMetadata,

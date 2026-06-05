@@ -9,9 +9,3 @@ export type {
 	ReplayMarkerReportTrigger,
 } from './diagnostics';
 export { dumpDeepSeekRequest, dumpProviderInput, ensureRequestDumpRoot } from './dump';
-export {
-	classifyDeepSeekRequest,
-	classifyProviderRequest,
-	formatRequestLogLine,
-	type RequestKind,
-} from './classifier';

@@ -4,14 +4,11 @@ import { getStabilizeToolListEnabled } from '../config';
 import { MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import {
-	classifyProviderRequest,
-	createCacheDiagnosticsRecorder,
-	dumpProviderInput,
-} from './debug';
+import { createCacheDiagnosticsRecorder, dumpProviderInput } from './debug';
 import { toChatInfo } from './models';
 import { BalanceCurrencyResolver } from './pricing/currency';
 import { prepareChatRequest } from './request';
+import { classifyProviderRequest } from './routing';
 import { resolveConversationSegment } from './segment';
 import { streamChatCompletion } from './stream';
 import { estimateTokenCount } from './tokens';

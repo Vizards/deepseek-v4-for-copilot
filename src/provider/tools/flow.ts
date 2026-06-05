@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
-import { logToolFlowDiagnostics, type RequestKind } from '../debug';
+import { logToolFlowDiagnostics } from '../debug';
+import type { RequestKind } from '../routing';
 import { ACTIVATE_TOOL_PREFIX, MAX_PREFLIGHT_ROUNDS_PER_USER_REQUEST } from './consts';
 import { createToolDriftNotice, filterProviderNotices } from './notices';
 import {

@@ -7,7 +7,7 @@ import {
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
 } from './debug';
-import { formatRequestLogLine } from './routing';
+import { formatRequestLogLine, type RequestKind } from './routing';
 import {
 	createReplayMarkerPart,
 	hasReplayMarkerMetadata,
@@ -89,7 +89,7 @@ export function streamChatCompletion({
 					);
 					setCharsPerToken(charsPerToken);
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
-					reportCopilotContextUsage(progress, usage);
+					reportCopilotContextUsage(progress, usage, prepared.requestKind);
 				},
 			},
 			token,
@@ -267,6 +267,7 @@ function updateCharsPerToken(
 function reportCopilotContextUsage(
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 	usage: DeepSeekUsage,
+	requestKind: RequestKind,
 ): void {
 	const data = {
 		prompt_tokens: usage.prompt_tokens,
@@ -277,10 +278,14 @@ function reportCopilotContextUsage(
 		},
 	};
 
-	progress.report(
-		new vscode.LanguageModelDataPart(
-			new TextEncoder().encode(JSON.stringify(data)),
-			COPILOT_USAGE_DATA_PART_MIME,
-		),
-	);
+	try {
+		progress.report(
+			new vscode.LanguageModelDataPart(
+				new TextEncoder().encode(JSON.stringify(data)),
+				COPILOT_USAGE_DATA_PART_MIME,
+			),
+		);
+	} catch (error) {
+		logger.warn(formatRequestLogLine(requestKind, 'Failed to report usage data'), error);
+	}
 }

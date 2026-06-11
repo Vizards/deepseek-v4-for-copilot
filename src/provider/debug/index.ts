@@ -8,4 +8,10 @@ export type {
 	CacheDiagnosticsRun,
 	ReplayMarkerReportTrigger,
 } from './diagnostics';
-export { dumpDeepSeekRequest, dumpProviderInput, ensureRequestDumpRoot } from './dump';
+export {
+	createThinkingCompatibilityRetryDump,
+	dumpDeepSeekRequest,
+	dumpProviderInput,
+	dumpThinkingCompatibilityRetryAttempt,
+	ensureRequestDumpRoot,
+} from './dump';

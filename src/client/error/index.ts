@@ -38,7 +38,10 @@ export class DeepSeekRequestError extends Error {
 	readonly diagnosticMessage: string;
 	readonly baseUrl?: string;
 	readonly status?: number;
+	readonly statusText?: string;
 	readonly code?: string;
+	readonly serverMessage?: string;
+	readonly responseText?: string;
 
 	constructor(options: {
 		message: string;
@@ -47,7 +50,10 @@ export class DeepSeekRequestError extends Error {
 		diagnosticMessage?: string;
 		baseUrl?: string;
 		status?: number;
+		statusText?: string;
 		code?: string;
+		serverMessage?: string;
+		responseText?: string;
 		cause?: unknown;
 	}) {
 		super(options.message, { cause: options.cause });
@@ -57,7 +63,10 @@ export class DeepSeekRequestError extends Error {
 		this.diagnosticMessage = options.diagnosticMessage ?? options.message;
 		this.baseUrl = options.baseUrl;
 		this.status = options.status;
+		this.statusText = options.statusText;
 		this.code = options.code;
+		this.serverMessage = options.serverMessage;
+		this.responseText = options.responseText;
 	}
 }
 
@@ -79,7 +88,10 @@ export async function createHttpError(
 		kind: 'http',
 		baseUrl,
 		status: response.status,
+		statusText: response.statusText,
 		code: `HTTP_${response.status}`,
+		serverMessage,
+		responseText,
 		diagnosticMessage: joinDiagnosticParts(
 			`kind=http`,
 			`status=${response.status}`,

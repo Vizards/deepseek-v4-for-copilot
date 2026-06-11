@@ -1,8 +1,9 @@
 import vscode from 'vscode';
 import { createUserFacingError } from '../client';
 import { logger } from '../logger';
-import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
+import type { DeepSeekToolCall, DeepSeekUsage, StreamCallbacks } from '../types';
 import {
+	createThinkingCompatibilityRetryDump,
 	observeCancellationToken,
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
@@ -14,6 +15,10 @@ import {
 	type ReplayMarkerMetadata,
 } from './replay';
 import type { PreparedChatRequest } from './request';
+import {
+	createThinkingCompatibilityPrecheck,
+	type ThinkingCompatibilityPrecheck,
+} from './thinking';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
@@ -48,52 +53,50 @@ export function streamChatCompletion({
 		replayMarkerReported: false,
 	};
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics);
+	const precheck = createThinkingCompatibilityPrecheck({
+		baseUrl: prepared.baseUrl,
+		request: prepared.request,
+		isThinkingModel: prepared.isThinkingModel,
+		thinkingEffort: prepared.thinkingEffort,
+	});
+	const callbacks: StreamCallbacks = {
+		onContent: (content: string) => {
+			reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
+			progress.report(new vscode.LanguageModelTextPart(content));
+		},
 
-	return prepared.client
-		.streamChatCompletion(
-			prepared.request,
-			{
-				onContent: (content: string) => {
-					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					progress.report(new vscode.LanguageModelTextPart(content));
-				},
+		onThinking: (text: string) => {
+			reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
+			handleThinking(text, state, progress);
+		},
 
-				onThinking: (text: string) => {
-					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					handleThinking(text, state, progress);
-				},
+		onToolCall: (toolCall: DeepSeekToolCall) => {
+			reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
+			handleToolCall(toolCall, state, progress);
+		},
 
-				onToolCall: (toolCall: DeepSeekToolCall) => {
-					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
-					handleToolCall(toolCall, state, progress);
-				},
+		onError: (error: Error) => {
+			throw error;
+		},
 
-				onError: (error: Error) => {
-					throw createUserFacingError(error);
-				},
+		onDone: () => {
+			reportReplayMarkerOnce(prepared, progress, state, 'done');
+			finalizeReplayDiagnostics(prepared.trailingToolResultIds, state, prepared.cacheDiagnostics);
+		},
 
-				onDone: () => {
-					reportReplayMarkerOnce(prepared, progress, state, 'done');
-					finalizeReplayDiagnostics(
-						prepared.trailingToolResultIds,
-						state,
-						prepared.cacheDiagnostics,
-					);
-				},
+		onUsage: (usage: DeepSeekUsage) => {
+			const charsPerToken = updateCharsPerToken(
+				prepared.totalRequestChars,
+				usage,
+				getCharsPerToken(),
+			);
+			setCharsPerToken(charsPerToken);
+			prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
+			reportCopilotContextUsage(progress, usage, prepared.requestKind);
+		},
+	};
 
-				onUsage: (usage) => {
-					const charsPerToken = updateCharsPerToken(
-						prepared.totalRequestChars,
-						usage,
-						getCharsPerToken(),
-					);
-					setCharsPerToken(charsPerToken);
-					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
-					reportCopilotContextUsage(progress, usage, prepared.requestKind);
-				},
-			},
-			token,
-		)
+	return streamWithThinkingCompatibility(prepared, callbacks, token, precheck)
 		.then(undefined, (error) => {
 			reportSkippedReplayMarkerIfNeeded(
 				prepared,
@@ -101,7 +104,7 @@ export function streamChatCompletion({
 				token.isCancellationRequested ? 'cancelled' : 'stream-error',
 				error,
 			);
-			throw error;
+			throw createUserFacingError(toError(error));
 		})
 		.then(() => {
 			if (token.isCancellationRequested) {
@@ -110,6 +113,52 @@ export function streamChatCompletion({
 		})
 		.finally(() => {
 			cancelListener.dispose();
+		});
+}
+
+function streamWithThinkingCompatibility(
+	prepared: PreparedChatRequest,
+	callbacks: StreamCallbacks,
+	token: vscode.CancellationToken,
+	precheck: ThinkingCompatibilityPrecheck,
+): Promise<void> {
+	return prepared.client
+		.streamChatCompletion(precheck.initialRequest, callbacks, token)
+		.then(undefined, (error) => {
+			const retryAttempt = token.isCancellationRequested
+				? undefined
+				: precheck.createRetryAttempt(error);
+			if (!retryAttempt) {
+				throw error;
+			}
+			const retryDump = createThinkingCompatibilityRetryDump({
+				globalStorageUri: prepared.globalStorageUri,
+				segment: prepared.segment,
+				requestKind: prepared.requestKind,
+				endpoint: prepared.baseUrl,
+				strategy: retryAttempt.strategy,
+				sourceStatus: retryAttempt.sourceStatus,
+				request: retryAttempt.request,
+				callbacks,
+			});
+			retryAttempt.logStart();
+			return prepared.client
+				.streamChatCompletion(retryAttempt.request, retryDump.callbacks, token)
+				.then(
+					() => {
+						if (token.isCancellationRequested) {
+							retryDump.dumpFailure(new Error('DeepSeek retry cancelled'));
+							return;
+						}
+						retryAttempt.recordSuccess();
+						retryDump.dumpSuccess();
+					},
+					(retryError) => {
+						retryAttempt.logFailure(retryError);
+						retryDump.dumpFailure(retryError);
+						throw error;
+					},
+				);
 		});
 }
 
@@ -288,4 +337,8 @@ function reportCopilotContextUsage(
 	} catch (error) {
 		logger.warn(formatRequestLogLine(requestKind, 'Failed to report usage data'), error);
 	}
+}
+
+function toError(error: unknown): Error {
+	return error instanceof Error ? error : new Error(String(error));
 }

@@ -89,6 +89,7 @@ export interface StreamCallbacks {
 	onError: (error: Error) => void;
 	onDone: () => void;
 	onUsage?: (usage: DeepSeekUsage) => void;
+	onRawResponseData?: (data: string) => void;
 }
 
 // ---- Model definitions ----

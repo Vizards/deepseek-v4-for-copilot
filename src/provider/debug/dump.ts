@@ -3,11 +3,18 @@ import { appendFile, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import vscode from 'vscode';
+import { DeepSeekRequestError } from '../../client/error';
 import { getRequestDumpEnabled } from '../../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { safeStringify, toWellFormedString } from '../../json';
 import { logger } from '../../logger';
-import type { DeepSeekMessage, DeepSeekRequest } from '../../types';
+import type {
+	DeepSeekMessage,
+	DeepSeekRequest,
+	DeepSeekToolCall,
+	DeepSeekUsage,
+	StreamCallbacks,
+} from '../../types';
 import {
 	classifyDeepSeekRequest,
 	classifyProviderRequest,
@@ -22,12 +29,14 @@ import type { VisionProxySource, VisionResolutionStats } from '../vision';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
+let thinkingRetryDumpCounter = 0;
 let dumpWriteQueue: Promise<void> = Promise.resolve();
 
 const REQUEST_OBSERVATIONS_FILE = '_request-observations.jsonl';
 const HASH_WINDOW_CHARS = 2_048;
+const THINKING_COMPAT_LOG_PREFIX = '[reasoning-effort-compat]';
 
-type DumpEvent = 'provider-input' | 'deepseek-request';
+type DumpEvent = 'provider-input' | 'deepseek-request' | 'thinking-compat-retry';
 type DumpStage = 'provider-input' | 'input' | 'resolved';
 
 interface DumpContext {
@@ -48,6 +57,12 @@ interface RequestDumpPaths {
 	resolved: string;
 	request: string;
 	msg0?: string;
+}
+
+interface ThinkingRetryDumpPaths {
+	directory: string;
+	request: string;
+	response: string;
 }
 
 interface ToolSummary {
@@ -117,6 +132,44 @@ export interface DumpProviderInputOptions {
 	modelInfo: vscode.LanguageModelChatInformation;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
 	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
+}
+
+export interface DumpThinkingCompatibilityRetryAttemptOptions {
+	globalStorageUri: vscode.Uri;
+	segment: ConversationSegment;
+	requestKind: RequestKind;
+	endpoint: string;
+	strategy: string;
+	sourceStatus: number;
+	request: object;
+	response: object;
+}
+
+export interface CreateThinkingCompatibilityRetryDumpOptions {
+	globalStorageUri: vscode.Uri;
+	segment: ConversationSegment;
+	requestKind: RequestKind;
+	endpoint: string;
+	strategy: string;
+	sourceStatus: number;
+	request: object;
+	callbacks: StreamCallbacks;
+}
+
+interface ThinkingCompatibilityRetryDumpRecorder {
+	callbacks: StreamCallbacks;
+	dumpSuccess(): void;
+	dumpFailure(error: unknown): void;
+}
+
+interface CapturedRetryResponse {
+	rawResponseParts: string[];
+	contentParts: string[];
+	reasoningParts: string[];
+	toolCalls: DeepSeekToolCall[];
+	usage?: DeepSeekUsage;
+	done: boolean;
+	error?: object;
 }
 
 /**
@@ -242,6 +295,199 @@ export function dumpDeepSeekRequest(
 	});
 }
 
+export function dumpThinkingCompatibilityRetryAttempt(
+	options: DumpThinkingCompatibilityRetryAttemptOptions,
+): void {
+	if (!getRequestDumpEnabled()) return;
+
+	const context = createDumpContext(
+		options.globalStorageUri,
+		options.segment,
+		'thinking-compat-retry',
+		(thinkingRetryDumpCounter += 1),
+		options.requestKind,
+	);
+	const paths = createThinkingRetryDumpPaths(context);
+
+	enqueueDumpWrite(`${THINKING_COMPAT_LOG_PREFIX} retryDump`, async () => {
+		await mkdir(context.root, { recursive: true });
+		const requestJson = await writeJsonFile(paths.request, options.request, (value) =>
+			JSON.stringify(value, null, 2),
+		);
+		const responseJson = await writeJsonFile(paths.response, options.response, (value) =>
+			JSON.stringify(value, null, 2),
+		);
+
+		await writeDumpObservation(
+			options.globalStorageUri,
+			createDumpObservation({
+				event: 'thinking-compat-retry',
+				context,
+				segment: options.segment,
+				paths,
+				model: {},
+				requestKind: options.requestKind,
+				requestOptions: undefined,
+				messages: undefined,
+				toolSummary: undefined,
+				retry: {
+					endpoint: options.endpoint,
+					strategy: options.strategy,
+					sourceStatus: options.sourceStatus,
+				},
+			}),
+		);
+		logThinkingCompatibilityRetryDump(options, paths, requestJson.length, responseJson.length);
+	});
+}
+
+export function createThinkingCompatibilityRetryDump(
+	options: CreateThinkingCompatibilityRetryDumpOptions,
+): ThinkingCompatibilityRetryDumpRecorder {
+	const captured: CapturedRetryResponse = {
+		rawResponseParts: [],
+		contentParts: [],
+		reasoningParts: [],
+		toolCalls: [],
+		done: false,
+	};
+
+	return {
+		callbacks: {
+			onContent: (content) => {
+				captured.contentParts.push(content);
+				options.callbacks.onContent(content);
+			},
+			onThinking: (text) => {
+				captured.reasoningParts.push(text);
+				options.callbacks.onThinking(text);
+			},
+			onToolCall: (toolCall) => {
+				captured.toolCalls.push(toolCall);
+				options.callbacks.onToolCall(toolCall);
+			},
+			onError: (error) => {
+				captured.error = createErrorSnapshot(error);
+				options.callbacks.onError(error);
+			},
+			onDone: () => {
+				captured.done = true;
+				options.callbacks.onDone();
+			},
+			onUsage: (usage) => {
+				captured.usage = usage;
+				options.callbacks.onUsage?.(usage);
+			},
+			onRawResponseData: (data) => {
+				captured.rawResponseParts.push(data);
+				options.callbacks.onRawResponseData?.(data);
+			},
+		},
+		dumpSuccess: () => {
+			dumpThinkingCompatibilityRetry(options, createSuccessResponseSnapshot(captured));
+		},
+		dumpFailure: (error) => {
+			captured.error ??= createErrorSnapshot(error);
+			dumpThinkingCompatibilityRetry(options, createFailureResponseSnapshot(captured));
+		},
+	};
+}
+
+function dumpThinkingCompatibilityRetry(
+	options: CreateThinkingCompatibilityRetryDumpOptions,
+	response: object,
+): void {
+	dumpThinkingCompatibilityRetryAttempt({
+		globalStorageUri: options.globalStorageUri,
+		segment: options.segment,
+		requestKind: options.requestKind,
+		endpoint: options.endpoint,
+		strategy: options.strategy,
+		sourceStatus: options.sourceStatus,
+		request: createSentRequestBody(options.request),
+		response,
+	});
+}
+
+function createSentRequestBody(request: object): object {
+	return {
+		...request,
+		stream_options: { include_usage: true },
+	};
+}
+
+function createSuccessResponseSnapshot(captured: CapturedRetryResponse): object {
+	return {
+		ok: true,
+		stream: true,
+		done: captured.done,
+		rawResponseText: joinIfAny(captured.rawResponseParts),
+		content: joinIfAny(captured.contentParts),
+		reasoning_content: joinIfAny(captured.reasoningParts),
+		tool_calls: captured.toolCalls.length > 0 ? captured.toolCalls : undefined,
+		usage: captured.usage,
+		summary: createResponseSummary(captured),
+	};
+}
+
+function createFailureResponseSnapshot(captured: CapturedRetryResponse): object {
+	return {
+		ok: false,
+		stream: true,
+		done: captured.done,
+		rawResponseText: joinIfAny(captured.rawResponseParts),
+		partial_content: joinIfAny(captured.contentParts),
+		partial_reasoning_content: joinIfAny(captured.reasoningParts),
+		partial_tool_calls: captured.toolCalls.length > 0 ? captured.toolCalls : undefined,
+		usage: captured.usage,
+		error: captured.error,
+		summary: createResponseSummary(captured),
+	};
+}
+
+function createResponseSummary(captured: CapturedRetryResponse): object {
+	return {
+		contentChars: captured.contentParts.reduce((total, part) => total + part.length, 0),
+		reasoningChars: captured.reasoningParts.reduce((total, part) => total + part.length, 0),
+		rawResponseChars: captured.rawResponseParts.reduce((total, part) => total + part.length, 0),
+		toolCallCount: captured.toolCalls.length,
+		hasUsage: Boolean(captured.usage),
+	};
+}
+
+function joinIfAny(parts: readonly string[]): string | undefined {
+	return parts.length > 0 ? parts.join('') : undefined;
+}
+
+function createErrorSnapshot(error: unknown): object {
+	if (error instanceof DeepSeekRequestError) {
+		return {
+			name: error.name,
+			message: error.message,
+			kind: error.kind,
+			status: error.status,
+			statusText: error.statusText,
+			code: error.code,
+			baseUrl: error.baseUrl,
+			serverMessage: error.serverMessage,
+			responseText: error.responseText,
+			userSummary: error.userSummary,
+			diagnosticMessage: error.diagnosticMessage,
+			stack: error.stack,
+		};
+	}
+	if (error instanceof Error) {
+		return {
+			name: error.name,
+			message: error.message,
+			stack: error.stack,
+		};
+	}
+	return {
+		value: String(error),
+	};
+}
+
 export async function ensureRequestDumpRoot(globalStorageUri: vscode.Uri): Promise<vscode.Uri> {
 	const root = getRequestDumpBaseRootUri(globalStorageUri);
 	await mkdir(root.fsPath, { recursive: true });
@@ -281,16 +527,29 @@ function createRequestDumpPaths(context: DumpContext, hasMsg0: boolean): Request
 	};
 }
 
+function createThinkingRetryDumpPaths(context: DumpContext): ThinkingRetryDumpPaths {
+	return {
+		directory: context.root,
+		request: join(context.root, `${context.basename}.request.json`),
+		response: join(context.root, `${context.basename}.response.json`),
+	};
+}
+
 function createDumpObservation(options: {
 	event: DumpEvent;
 	context: DumpContext;
 	segment: ConversationSegment;
-	paths: ProviderInputDumpPaths | RequestDumpPaths;
+	paths: ProviderInputDumpPaths | RequestDumpPaths | ThinkingRetryDumpPaths;
 	model: object;
 	requestKind: RequestKind;
-	requestOptions: vscode.ProvideLanguageModelChatResponseOptions;
-	messages: readonly vscode.LanguageModelChatRequestMessage[];
-	toolSummary: ToolSummary;
+	requestOptions?: vscode.ProvideLanguageModelChatResponseOptions;
+	messages?: readonly vscode.LanguageModelChatRequestMessage[];
+	toolSummary?: ToolSummary;
+	retry?: {
+		endpoint: string;
+		strategy: string;
+		sourceStatus: number;
+	};
 }): object {
 	return {
 		event: options.event,
@@ -300,11 +559,14 @@ function createDumpObservation(options: {
 		paths: options.paths,
 		model: options.model,
 		requestKind: options.requestKind,
-		options: summarizeRequestOptions(options.requestOptions),
+		options: options.requestOptions ? summarizeRequestOptions(options.requestOptions) : undefined,
 		hostSettings: summarizeHostSettings(),
-		systemPromptSummary: summarizeVscodeSystemPrompt(options.messages),
-		messageStats: summarizeMessagesFromInput(options.messages),
+		systemPromptSummary: options.messages
+			? summarizeVscodeSystemPrompt(options.messages)
+			: undefined,
+		messageStats: options.messages ? summarizeMessagesFromInput(options.messages) : undefined,
 		toolStats: options.toolSummary,
+		retry: options.retry,
 	};
 }
 
@@ -1018,6 +1280,25 @@ function logRequestDump(
 				`~${(requestJsonLength / 1024).toFixed(0)} KB) ` +
 				formatHostSettingsSummary(summarizeHostSettings()) +
 				` ${formatSystemPromptSummary(systemPromptSummary)}`,
+		),
+	);
+}
+
+function logThinkingCompatibilityRetryDump(
+	options: DumpThinkingCompatibilityRetryAttemptOptions,
+	paths: ThinkingRetryDumpPaths,
+	requestJsonLength: number,
+	responseJsonLength: number,
+): void {
+	logger.info(
+		formatRequestLogLine(
+			options.requestKind,
+			`${THINKING_COMPAT_LOG_PREFIX} retry-dump-written ` +
+				`${formatDumpSegment(options.segment)} endpoint=${safeStringify(options.endpoint)}` +
+				` strategy=${options.strategy} sourceStatus=${options.sourceStatus}` +
+				` request=${formatFileUri(paths.request)} response=${formatFileUri(paths.response)}` +
+				` requestKB=${(requestJsonLength / 1024).toFixed(0)}` +
+				` responseKB=${(responseJsonLength / 1024).toFixed(0)}`,
 		),
 	);
 }

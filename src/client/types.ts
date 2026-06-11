@@ -1,4 +1,4 @@
-import type { DeepSeekRequest } from '../types';
+import type { ChatCompletionRequestBody } from '../provider/thinking';
 
 export interface ErrorActionUrls {
 	configureApiKey?: string;
@@ -7,7 +7,7 @@ export interface ErrorActionUrls {
 
 export interface RequestErrorContext {
 	baseUrl: string;
-	request: DeepSeekRequest;
+	request: ChatCompletionRequestBody;
 }
 
 export interface ErrorActionLink {

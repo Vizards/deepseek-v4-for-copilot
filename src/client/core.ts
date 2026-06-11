@@ -1,8 +1,8 @@
 import type { CancellationToken } from 'vscode';
 import { safeStringify } from '../json';
 import { logger } from '../logger';
+import type { ChatCompletionRequestBody } from '../provider/thinking';
 import type {
-	DeepSeekRequest,
 	DeepSeekStreamChunk,
 	DeepSeekToolCall,
 	DeepSeekUsage,
@@ -25,7 +25,7 @@ export class DeepSeekClient {
 	 * Parses SSE chunks and dispatches callbacks for content, thinking, and tool calls.
 	 */
 	async streamChatCompletion(
-		request: DeepSeekRequest,
+		request: ChatCompletionRequestBody,
 		callbacks: StreamCallbacks,
 		cancellationToken?: CancellationToken,
 	): Promise<void> {
@@ -81,7 +81,9 @@ export class DeepSeekClient {
 					break;
 				}
 
-				buffer += decoder.decode(value, { stream: true });
+				const decoded = decoder.decode(value, { stream: true });
+				callbacks.onRawResponseData?.(decoded);
+				buffer += decoded;
 
 				const lines = buffer.split('\n');
 				buffer = lines.pop() || '';

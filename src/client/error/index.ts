@@ -1,10 +1,7 @@
+import { isOfficialDeepSeekBaseUrl } from '../../endpoint';
 import { t } from '../../i18n';
 import { safeStringify } from '../../json';
-import {
-	API_PROVIDER_HTTP_ERROR_LINKS,
-	MAX_DIAGNOSTIC_FIELD_LENGTH,
-	OFFICIAL_DEEPSEEK_API_HOST,
-} from '../consts';
+import { API_PROVIDER_HTTP_ERROR_LINKS, MAX_DIAGNOSTIC_FIELD_LENGTH } from '../consts';
 import { getNetworkErrorCauseInfo, getNetworkErrorCode, getNetworkErrorMessage } from './network';
 import type {
 	ApiProviderId,
@@ -322,12 +319,7 @@ function escapeBoldText(value: string): string {
 }
 
 function identifyApiProvider(baseUrl: string): ApiProviderId | undefined {
-	try {
-		const hostname = new URL(baseUrl).hostname.toLowerCase();
-		return hostname === OFFICIAL_DEEPSEEK_API_HOST ? 'deepseek' : undefined;
-	} catch {
-		return undefined;
-	}
+	return isOfficialDeepSeekBaseUrl(baseUrl) ? 'deepseek' : undefined;
 }
 
 function getHttpErrorLinkStatusKey(status: number): HttpErrorLinkStatusKey | undefined {

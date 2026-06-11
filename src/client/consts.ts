@@ -6,7 +6,6 @@ import type {
 } from './types';
 import { EXTERNAL_URLS } from '../consts';
 
-export const OFFICIAL_DEEPSEEK_API_HOST = 'api.deepseek.com';
 export const MAX_DIAGNOSTIC_FIELD_LENGTH = 300;
 
 export const API_PROVIDER_HTTP_ERROR_LINKS: Readonly<

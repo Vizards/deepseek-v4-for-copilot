@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AuthManager } from '../../auth';
-import { OFFICIAL_DEEPSEEK_API_HOST } from '../../client/consts';
 import { getBaseUrl } from '../../config';
+import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../../endpoint';
 import { logger } from '../../logger';
 import type { PricingCurrency } from '../../types';
 
@@ -131,18 +131,6 @@ export class BalanceCurrencyResolver {
 		}
 		return value;
 	}
-}
-
-export function isOfficialDeepSeekBaseUrl(baseUrl: string): boolean {
-	try {
-		return new URL(baseUrl).hostname.toLowerCase() === OFFICIAL_DEEPSEEK_API_HOST;
-	} catch {
-		return false;
-	}
-}
-
-export function normalizeBaseUrl(baseUrl: string): string {
-	return baseUrl.trim().replace(/\/+$/u, '');
 }
 
 function getLocaleFallbackCurrency(): PricingCurrency {

@@ -3,6 +3,7 @@ import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
 import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
+import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
@@ -60,7 +61,8 @@ export async function prepareChatRequest({
 		throw new Error(t('auth.notConfigured'));
 	}
 
-	const client = new DeepSeekClient(getBaseUrl(), apiKey);
+	const baseUrl = getBaseUrl();
+	const client = new DeepSeekClient(baseUrl, apiKey);
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const isThinkingModel = modelDef?.capabilities.thinking ?? false;
 	const maxTokens = getMaxTokens();
@@ -86,7 +88,11 @@ export async function prepareChatRequest({
 	const configuredThinkingEffort = getConfiguredThinkingEffort(
 		options as ModelConfigurationOptions,
 	);
-	const thinkingEffort = shouldForceThinkingNone(requestKind) ? 'none' : configuredThinkingEffort;
+	// Only force helper requests into disabled thinking on the official API.
+	// Custom endpoints keep their configured effort to preserve pre-#137 request shape.
+	const forceNoneThinking =
+		shouldForceThinkingNone(requestKind) && isOfficialDeepSeekBaseUrl(baseUrl);
+	const thinkingEffort = forceNoneThinking ? 'none' : configuredThinkingEffort;
 	const request: DeepSeekRequest = {
 		...baseRequest,
 		...(isThinkingModel

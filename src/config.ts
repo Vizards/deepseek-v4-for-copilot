@@ -37,6 +37,15 @@ export function getMaxTokens(): number | undefined {
 }
 
 /**
+ * Get the configured context window size in tokens.
+ * Returns the value set by the user (200K or 1M), defaulting to 1M.
+ */
+export function getContextSize(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<number>('contextSize', 1000000);
+}
+
+/**
  * Diagnostic mode. `verbose` also enables metadata logs.
  *
  * The legacy boolean `debug` setting is still read as a fallback so old

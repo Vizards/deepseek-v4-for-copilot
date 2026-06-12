@@ -42,6 +42,13 @@ const zh: Translations = {
 	'thinking.max': '深度',
 	'thinking.max.desc': '深度推理，适合复杂任务',
 
+	// Context Size — model picker dropdown
+	'contextSize.title': '上下文窗口',
+	'contextSize.200k': '200K',
+	'contextSize.200k.desc': '200K token 上下文（更快）',
+	'contextSize.1m': '1M',
+	'contextSize.1m.desc': '1M token 上下文（更大容量）',
+
 	// Vision
 	'vision.proxyUsing': '视觉代理：{0}',
 	'vision.notFound': '未找到视觉模型 "{0}"',
@@ -231,6 +238,13 @@ const en: Translations = {
 	'thinking.high.desc': 'Recommended for most tasks',
 	'thinking.max': 'Max',
 	'thinking.max.desc': 'Maximum reasoning depth for complex agent tasks',
+
+	// Context Size — model picker dropdown
+	'contextSize.title': 'Context Window',
+	'contextSize.200k': '200K',
+	'contextSize.200k.desc': '200K token context (faster)',
+	'contextSize.1m': '1M',
+	'contextSize.1m.desc': '1M token context (larger capacity)',
 
 	// Vision
 	// NOTE: vision.unableToDescribe has been moved to consts.ts as

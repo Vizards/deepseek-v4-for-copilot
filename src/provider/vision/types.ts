@@ -8,6 +8,7 @@ export type VisionProxyProviderFamily = 'anthropic-compatible' | 'openai-compati
 export type VisionProxyApiType = 'messages' | 'chat-completions' | 'responses';
 
 export interface VisionLanguageModelOption {
+	key: string;
 	id: string;
 	vendor: string;
 	name: string;

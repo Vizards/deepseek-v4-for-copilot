@@ -10,7 +10,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 		const sourceField = document.getElementById('sourceField');
 		const sourceInputs = Array.from(document.querySelectorAll('input[name="source"]'));
 		const lmSection = document.getElementById('lmSection');
-		const lmModelId = document.getElementById('lmModelId');
+		const lmModelKey = document.getElementById('lmModelKey');
 		const lmModelCost = document.getElementById('lmModelCost');
 		const endpointSection = document.getElementById('endpointSection');
 		const url = document.getElementById('url');
@@ -37,7 +37,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			currentState = state;
 			const config = state.config || {};
 			renderSummary(state);
-			renderLmModels(state.lmModels || [], state.selectedLmModelId);
+			renderLmModels(state.lmModels || [], state.selectedLmModelKey);
 			setSelectedSource((state.lmModels || []).length > 0 ? state.source : 'api-endpoint');
 			url.value = config.url || '';
 			endpointType.value = getEndpointTypeValue(config);
@@ -51,7 +51,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			renderApiKeyHint(state.hasApiKey);
 			syncSourceVisibility();
 			if (getSelectedSource() === 'vscode-lm') {
-				setStatus(lmModelId.value ? strings.statusVscodeLmSelected : '', false);
+				setStatus(lmModelKey.value ? strings.statusVscodeLmSelected : '', false);
 			} else {
 				setStatus(state.hasApiKey ? strings.statusApiKeySet : strings.statusApiKeyNotSet, false);
 			}
@@ -70,7 +70,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 		function getSummaryState(state) {
 			const source = state.source || 'api-endpoint';
 			if (source === 'vscode-lm') {
-				const model = (state.lmModels || []).find((item) => item.id === state.selectedLmModelId);
+				const model = (state.lmModels || []).find((item) => item.key === state.selectedLmModelKey);
 				if (!model) {
 					return {
 						tone: 'error',
@@ -227,28 +227,28 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			);
 		}
 
-		function renderLmModels(models, selectedId) {
-			lmModelId.textContent = '';
+		function renderLmModels(models, selectedKey) {
+			lmModelKey.textContent = '';
 			for (const model of models) {
 				const option = document.createElement('option');
-				option.value = model.id;
+				option.value = model.key;
 				option.textContent = model.label || model.id;
 				option.title = [model.description || model.vendor || '', model.costDescription || '']
 					.filter(Boolean)
 					.join(' · ');
-				if (model.id === selectedId) {
+				if (model.key === selectedKey) {
 					option.selected = true;
 				}
-				lmModelId.appendChild(option);
+				lmModelKey.appendChild(option);
 			}
-			if (!lmModelId.value && models[0]) {
-				lmModelId.value = models[0].id;
+			if (!lmModelKey.value && models[0]) {
+				lmModelKey.value = models[0].key;
 			}
 			updateLanguageModelCost();
 		}
 
 		function updateLanguageModelCost() {
-			const model = (currentState.lmModels || []).find((item) => item.id === lmModelId.value);
+			const model = (currentState.lmModels || []).find((item) => item.key === lmModelKey.value);
 			const costDescription = model ? model.costDescription || '' : '';
 			lmModelCost.textContent = costDescription;
 			lmModelCost.hidden = !costDescription;
@@ -308,7 +308,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			if (source === 'vscode-lm') {
 				return {
 					source,
-					lmModelId: lmModelId.value,
+					lmModelKey: lmModelKey.value,
 				};
 			}
 			return {
@@ -440,10 +440,10 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 				setStatus('', false);
 			});
 		}
-		lmModelId.addEventListener('change', () => {
+		lmModelKey.addEventListener('change', () => {
 			invalidateTestStatus();
 			updateLanguageModelCost();
-			setStatus(lmModelId.value ? strings.statusVscodeLmSelected : '', false);
+			setStatus(lmModelKey.value ? strings.statusVscodeLmSelected : '', false);
 		});
 		url.addEventListener('input', () => {
 			invalidateTestStatus();

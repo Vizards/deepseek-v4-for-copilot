@@ -1,11 +1,9 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
 import { toWellFormedString } from '../../json';
-import { logger } from '../../logger';
 import { parseFirstReplayMarker } from '../replay';
 import { createVisionProxyFailureNotice, createVisionProxyMissingNotice } from '../tools/notices';
 import {
-	formatVisionProxyError,
 	formatVisionProxyErrorCode,
 	getVisionProxyErrorDisplayCode,
 	isVisionProxyError,
@@ -22,6 +20,7 @@ import type {
 	VisionResolutionStats,
 } from './types';
 import { getVisionPrompt } from './sources/vscode';
+import { logVisionProxyDescribeFailed, logVisionProxyUnavailable } from './log';
 
 interface CurrentVisionResolution {
 	text: string;
@@ -238,7 +237,7 @@ async function resolveCurrentVisionText(
 ): Promise<CurrentVisionResolution> {
 	if (!visionDescriber || token.isCancellationRequested) {
 		if (!visionDescriber) {
-			logger.warn(t('vision.unavailable'));
+			logVisionProxyUnavailable();
 		}
 		stats.unavailableImageMessages += 1;
 		return { text: createVisionReplayText(IMAGE_DESCRIPTION_UNAVAILABLE, nonImageParts) };
@@ -262,7 +261,7 @@ async function resolveCurrentVisionText(
 		stats.generatedImageMessages += 1;
 		return { text: createVisionReplayText(createImageDescriptionText(description), nonImageParts) };
 	} catch (error) {
-		logger.error(t('vision.proxyError'), formatVisionProxyError(error));
+		logVisionProxyDescribeFailed(error);
 		stats.failedImageMessages += 1;
 		return createFailedVisionResolution(
 			getVisionProxyErrorDisplayCode(error),

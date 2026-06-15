@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
-import { logger } from '../../logger';
+import { logInvalidVisionProxyApiEndpointConfig, logVisionApiEndpointSelected } from './log';
 import { VISION_PROXY_API_KEY_SECRET, VisionProxyConfigStore } from './sources/endpoint/config';
 import { createEndpointVisionDescriber } from './sources/endpoint';
 import { openVisionProxyPanel } from './ui/panel';
@@ -55,7 +55,7 @@ export function createVisionService(context: vscode.ExtensionContext): {
 				}
 				const apiKey = await store.getApiKey();
 				const describer = createEndpointVisionDescriber(result.config, apiKey);
-				logger.info(`Vision proxy: ${describer.id} source=api-endpoint`);
+				logVisionApiEndpointSelected(describer.id);
 				return describer;
 			}
 
@@ -63,7 +63,7 @@ export function createVisionService(context: vscode.ExtensionContext): {
 			if (result.config) {
 				const apiKey = await store.getApiKey();
 				const describer = createEndpointVisionDescriber(result.config, apiKey);
-				logger.info(`Vision proxy: ${describer.id} source=api-endpoint`);
+				logVisionApiEndpointSelected(describer.id);
 				return describer;
 			}
 			return vscodeLm.get();
@@ -84,10 +84,7 @@ function getApiEndpointConfig(
 	try {
 		return { config: store.getConfig() };
 	} catch (error) {
-		logger.warn(
-			`Invalid vision proxy API endpoint configuration; source=${store.getSource() ?? 'unset'} fallback=${explicitApiEndpointSource ? 'none' : 'vscode-lm'}`,
-			error,
-		);
+		logInvalidVisionProxyApiEndpointConfig(store.getSource(), explicitApiEndpointSource, error);
 		return { error };
 	}
 }

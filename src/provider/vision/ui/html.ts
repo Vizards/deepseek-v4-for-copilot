@@ -10,7 +10,7 @@ export interface VisionProxyPanelState {
 	config?: VisionProxyConfig;
 	hasApiKey: boolean;
 	lmModels: VisionLanguageModelOption[];
-	selectedLmModelId?: string;
+	selectedLmModelKey?: string;
 }
 
 export function getVisionProxyPanelHtml(
@@ -66,8 +66,8 @@ export function getVisionProxyPanelHtml(
 				</div>
 				<div id="lmSection" class="section">
 					<div class="field">
-						<label for="lmModelId">${escapeHtml(strings.fieldVisionModel)}</label>
-						<select id="lmModelId"></select>
+						<label for="lmModelKey">${escapeHtml(strings.fieldVisionModel)}</label>
+						<select id="lmModelKey"></select>
 						<div id="lmModelCost" class="hint" hidden></div>
 					</div>
 				</div>

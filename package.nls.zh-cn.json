@@ -28,6 +28,6 @@
   "deepseek-copilot.config.modelIdOverrides.description": "覆盖各 DeepSeek 模型实际使用的 API 模型 ID，默认使用官方 DeepSeek ID，仅在对接不同模型名称的第三方 API 时需要修改。",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "DeepSeek V4 Flash 的 API 模型 ID。",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "DeepSeek V4 Pro 的 API 模型 ID。",
-  "deepseek-copilot.config.visionModel.description": "由[配置视觉代理](command:deepseek-copilot.setVisionModel)管理的兼容设置；当选择 VS Code 视觉模型来源时，用于保存所选模型。",
+  "deepseek-copilot.config.visionModel.description": "由[配置视觉代理](command:deepseek-copilot.setVisionModel)管理的兼容设置；当选择 VS Code 视觉模型来源时，以 `vendor/id` 保存所选模型。旧版裸模型 ID 仍会兼容读取。",
   "deepseek-copilot.config.visionPrompt.description": "在将图片附件转发给 DeepSeek 之前，发送给视觉代理模型的提示词。\n\n[配置视觉代理](command:deepseek-copilot.setVisionModel)"
 }

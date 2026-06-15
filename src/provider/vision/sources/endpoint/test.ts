@@ -1,13 +1,8 @@
 import vscode from 'vscode';
 import { t } from '../../../../i18n';
-import { safeStringify } from '../../../../json';
-import { logger } from '../../../../logger';
+import { logVisionProxyTestFailed, logVisionProxyTestSucceeded } from '../../log';
 import { VisionProxyClient } from '../../protocols/client';
-import {
-	formatVisionProxyError,
-	getVisionProxyErrorDisplayCode,
-	isVisionProxyError,
-} from '../../protocols/errors';
+import { getVisionProxyErrorDisplayCode, isVisionProxyError } from '../../protocols/errors';
 import type { VisionProxyConfig } from '../../types';
 
 export interface VisionProxyTestResult {
@@ -42,13 +37,10 @@ export async function testVisionProxyConnection(
 			],
 			token: tokenSource.token,
 		});
-		logger.info(
-			'Vision proxy test succeeded:',
-			formatVisionProxyTestDiagnostics(config, apiKey, description),
-		);
+		logVisionProxyTestSucceeded(config, apiKey, description);
 		return { ok: true, imageDataUrl: TEST_IMAGE_DATA_URL, response: description };
 	} catch (error) {
-		logger.error('Vision proxy test failed:', formatVisionProxyError(error));
+		logVisionProxyTestFailed(error);
 		if (isVisionProxyError(error)) {
 			return {
 				ok: false,
@@ -64,26 +56,4 @@ export async function testVisionProxyConnection(
 	} finally {
 		tokenSource.dispose();
 	}
-}
-
-function formatVisionProxyTestDiagnostics(
-	config: VisionProxyConfig,
-	apiKey: string | undefined,
-	description: string,
-): string {
-	return joinDiagnosticParts(
-		`kind=vision`,
-		`phase=describe`,
-		`providerFamily=${safeStringify(config.providerFamily)}`,
-		`apiType=${safeStringify(config.apiType)}`,
-		`model=${safeStringify(config.modelId)}`,
-		`endpoint=${safeStringify(config.url)}`,
-		`hasApiKey=${Boolean(apiKey?.trim())}`,
-		`responseChars=${description.length}`,
-		config.headers ? `headerNames=${safeStringify(Object.keys(config.headers).sort())}` : undefined,
-	);
-}
-
-function joinDiagnosticParts(...parts: (string | undefined)[]): string {
-	return parts.filter(Boolean).join(' ');
 }

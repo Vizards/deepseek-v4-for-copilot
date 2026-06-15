@@ -1,14 +1,18 @@
 import vscode from 'vscode';
 import { t } from '../../../../i18n';
-import { logger } from '../../../../logger';
+import { logVSCodeVisionModelNotFound, logVSCodeVisionModelSelected } from '../../log';
 import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../../consts';
 import type {
 	VisionDescriptionRequest,
 	VisionDescriber,
 	VisionLanguageModelOption,
 } from '../../types';
+import { getVSCodeVisionTargetChatSessionType } from './model';
 
 const EXCLUDED_VISION_MODEL_IDS = new Set(['copilot-utility', 'copilot-utility-small']);
+const EXCLUDED_VISION_MODEL_VENDORS = new Set(['deepseek', 'claude-code', 'copilotcli']);
+const EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES = new Set(['claude-code', 'copilotcli']);
+const VSCODE_VISION_MODEL_KEY_SEPARATOR = '/';
 
 type LanguageModelPricingInfo = {
 	readonly pricing?: unknown;
@@ -41,16 +45,17 @@ export function createVSCodeLanguageModelVisionDescriberGetter(): {
 			const requestGeneration = generation;
 			const currentPromise = (async () => {
 				const models = await listVSCodeVisionModels();
+				const configuredKey = getConfiguredVisionModelKey();
 				if (requestGeneration !== generation) {
 					return undefined;
 				}
-				const model = pickPreferredVSCodeVisionModel(models, getConfiguredVisionModelId());
+				const model = pickPreferredVSCodeVisionModel(models, configuredKey);
 				if (model) {
-					logger.info(t('vision.proxyUsing', model.id));
+					logVSCodeVisionModelSelected(model);
 					describer = new VSCodeLanguageModelVisionDescriber(model);
 					return describer;
 				}
-				logger.warn(t('vision.notFound', getConfiguredVisionModelId() ?? DEFAULT_VISION_MODEL_ID));
+				logVSCodeVisionModelNotFound(configuredKey ?? DEFAULT_VISION_MODEL_ID);
 				return undefined;
 			})();
 			describerPromise = currentPromise;
@@ -116,23 +121,23 @@ export function getVisionPrompt(): string {
 	);
 }
 
-export function getConfiguredVisionModelId(): string | undefined {
+export function getConfiguredVisionModelKey(): string | undefined {
 	const config = vscode.workspace.getConfiguration('deepseek-copilot');
-	const id = config.get<string>('visionModel', '');
-	return id.trim() || undefined;
+	const key = config.get<string>('visionModel', '');
+	return key.trim() || undefined;
 }
 
 export function getDefaultVisionModelId(): string {
 	return DEFAULT_VISION_MODEL_ID;
 }
 
-export async function saveVSCodeVisionModelId(id: string): Promise<void> {
-	const trimmed = id.trim();
-	if (!trimmed) {
+export async function saveVSCodeVisionModelKey(key: string): Promise<void> {
+	const normalizedKey = await normalizeVSCodeVisionModelKeyForSave(key);
+	if (!normalizedKey) {
 		throw new Error(t('vision.panel.error.required', t('vision.panel.source.vscodeLm')));
 	}
 	const config = vscode.workspace.getConfiguration('deepseek-copilot');
-	await config.update('visionModel', trimmed, vscode.ConfigurationTarget.Global);
+	await config.update('visionModel', normalizedKey, vscode.ConfigurationTarget.Global);
 }
 
 export async function listVSCodeVisionModelOptions(): Promise<VisionLanguageModelOption[]> {
@@ -140,6 +145,7 @@ export async function listVSCodeVisionModelOptions(): Promise<VisionLanguageMode
 	return models.map((model) => {
 		const costDescription = formatLanguageModelCost(model);
 		return {
+			key: getVSCodeVisionModelKey(model),
 			id: model.id,
 			vendor: model.vendor,
 			name: model.name,
@@ -152,17 +158,21 @@ export async function listVSCodeVisionModelOptions(): Promise<VisionLanguageMode
 	});
 }
 
-export function pickPreferredVSCodeVisionModelId(
+export function pickPreferredVSCodeVisionModelKey(
 	options: readonly VisionLanguageModelOption[],
-	configuredId: string | undefined,
+	configuredKey: string | undefined,
 ): string | undefined {
-	if (configuredId && options.some((model) => model.id === configuredId)) {
-		return configuredId;
+	if (configuredKey) {
+		const configured = pickConfiguredVSCodeVisionModelEntry(options, configuredKey);
+		if (configured) {
+			return configured.key;
+		}
 	}
-	if (options.some((model) => model.id === DEFAULT_VISION_MODEL_ID)) {
-		return DEFAULT_VISION_MODEL_ID;
+	const preferred = options.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
+	if (preferred) {
+		return preferred.key;
 	}
-	return options[0]?.id;
+	return options[0]?.key;
 }
 
 async function listVSCodeVisionModels(): Promise<vscode.LanguageModelChat[]> {
@@ -172,10 +182,10 @@ async function listVSCodeVisionModels(): Promise<vscode.LanguageModelChat[]> {
 
 function pickPreferredVSCodeVisionModel(
 	models: readonly vscode.LanguageModelChat[],
-	configuredId: string | undefined,
+	configuredKey: string | undefined,
 ): vscode.LanguageModelChat | undefined {
-	if (configuredId) {
-		const configured = models.find((model) => model.id === configuredId);
+	if (configuredKey) {
+		const configured = pickConfiguredVSCodeVisionModelEntry(models, configuredKey);
 		if (configured) {
 			return configured;
 		}
@@ -190,10 +200,71 @@ function pickPreferredVSCodeVisionModel(
 
 function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
 	return (
-		model.vendor !== 'deepseek' &&
+		!EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor) &&
 		!EXCLUDED_VISION_MODEL_IDS.has(model.id) &&
+		!EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES.has(
+			getVSCodeVisionTargetChatSessionType(model) ?? '',
+		) &&
 		getSupportsImageToText(model)
 	);
+}
+
+function getVSCodeVisionModelKey(model: Pick<vscode.LanguageModelChat, 'vendor' | 'id'>): string {
+	return `${model.vendor}${VSCODE_VISION_MODEL_KEY_SEPARATOR}${model.id}`;
+}
+
+async function normalizeVSCodeVisionModelKeyForSave(key: string): Promise<string | undefined> {
+	const trimmed = key.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	const model = pickConfiguredVSCodeVisionModelEntry(await listVSCodeVisionModels(), trimmed);
+	if (!model) {
+		throw new Error(t('vision.notFound', trimmed));
+	}
+	return getVSCodeVisionModelKey(model);
+}
+
+function pickConfiguredVSCodeVisionModelEntry<T extends { id: string; vendor: string }>(
+	models: readonly T[],
+	configuredKey: string,
+): T | undefined {
+	const legacyId = configuredKey.trim();
+	const parsed = parseVSCodeVisionModelKey(configuredKey);
+	if (!parsed) {
+		return legacyId ? pickLegacyVSCodeVisionModelById(models, legacyId) : undefined;
+	}
+	if (parsed.vendor) {
+		const exact = models.find((model) => model.vendor === parsed.vendor && model.id === parsed.id);
+		// VS Code model ids are opaque and may contain "/", so preserve legacy bare-id
+		// settings by retrying the whole value when no provider-qualified key matches.
+		return exact ?? pickLegacyVSCodeVisionModelById(models, legacyId);
+	}
+	return pickLegacyVSCodeVisionModelById(models, parsed.id);
+}
+
+function pickLegacyVSCodeVisionModelById<T extends { id: string; vendor: string }>(
+	models: readonly T[],
+	id: string,
+): T | undefined {
+	const matches = models.filter((model) => model.id === id);
+	return matches.find((model) => model.vendor === 'copilot') ?? matches[0];
+}
+
+function parseVSCodeVisionModelKey(
+	value: string,
+): { vendor: string | undefined; id: string } | undefined {
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+	const separatorIndex = trimmed.indexOf(VSCODE_VISION_MODEL_KEY_SEPARATOR);
+	if (separatorIndex <= 0) {
+		return { vendor: undefined, id: trimmed };
+	}
+	const vendor = trimmed.slice(0, separatorIndex).trim();
+	const id = trimmed.slice(separatorIndex + VSCODE_VISION_MODEL_KEY_SEPARATOR.length).trim();
+	return vendor && id ? { vendor, id } : undefined;
 }
 
 function getSupportsImageToText(model: vscode.LanguageModelChat): boolean {
@@ -202,6 +273,8 @@ function getSupportsImageToText(model: vscode.LanguageModelChat): boolean {
 			capabilities?: { supportsImageToText?: boolean; imageInput?: boolean };
 		}
 	).capabilities;
+	// VS Code providers declare imageInput, while selected LanguageModelChat
+	// instances expose it as supportsImageToText in VS Code 1.116+.
 	return capabilities?.supportsImageToText === true || capabilities?.imageInput === true;
 }
 

@@ -1,24 +1,23 @@
 import vscode from 'vscode';
 import { t } from '../../../i18n';
-import { logger } from '../../../logger';
 import {
 	VisionProxyConfigStore,
 	normalizeVisionProxyConfig,
 	normalizeVisionProxySource,
 } from '../sources/endpoint/config';
 import {
-	formatVisionProxyError,
 	formatVisionProxyDisplayMessage,
 	getVisionProxyErrorDisplayCode,
 	isVisionProxyError,
 } from '../protocols/errors';
+import { logVisionProxyTestFailed, showVisionLogs } from '../log';
 import { testVisionProxyConnection, type VisionProxyTestResult } from '../sources/endpoint/test';
 import type { VisionLanguageModelOption, VisionProxyConfig, VisionProxySource } from '../types';
 import {
-	getConfiguredVisionModelId,
+	getConfiguredVisionModelKey,
 	listVSCodeVisionModelOptions,
-	pickPreferredVSCodeVisionModelId,
-	saveVSCodeVisionModelId,
+	pickPreferredVSCodeVisionModelKey,
+	saveVSCodeVisionModelKey,
 } from '../sources/vscode';
 import { getVisionProxyPanelHtml, type VisionProxyPanelState } from './html';
 
@@ -81,13 +80,13 @@ async function handleMessage(
 	}
 
 	if (message.type === 'showLogs') {
-		logger.show();
+		showVisionLogs();
 		return;
 	}
 
 	if (message.type === 'logVisionProxyTestFailure') {
 		const errorMessage = getClientErrorMessage(message.value);
-		logger.error('Vision proxy test failed:', formatVisionProxyError(new Error(errorMessage)));
+		logVisionProxyTestFailed(new Error(errorMessage));
 		return;
 	}
 
@@ -105,8 +104,8 @@ async function handleMessage(
 		if (message.type === 'saveConfig') {
 			const payload = getWebviewPayload(message.value);
 			if (payload.source === 'vscode-lm') {
-				await saveVSCodeVisionModelId(
-					getRequiredString(payload.lmModelId, t('vision.panel.source.vscodeLm')),
+				await saveVSCodeVisionModelKey(
+					getRequiredString(payload.lmModelKey, t('vision.panel.source.vscodeLm')),
 				);
 				await store.saveSource('vscode-lm');
 			} else {
@@ -154,7 +153,7 @@ async function handleMessage(
 	} catch (error) {
 		const isTestError = message.type === 'testConnection';
 		if (isTestError) {
-			logger.error('Vision proxy test failed:', formatVisionProxyError(error));
+			logVisionProxyTestFailed(error);
 		}
 		postStatus(
 			panel,
@@ -180,9 +179,9 @@ async function postState(panel: vscode.WebviewPanel, store: VisionProxyConfigSto
 async function getState(store: VisionProxyConfigStore): Promise<VisionProxyPanelState> {
 	const lmModels = await listVSCodeVisionModelOptions();
 	const config = getConfigForPanel(store);
-	const selectedLmModelId = pickPreferredVSCodeVisionModelId(
+	const selectedLmModelKey = pickPreferredVSCodeVisionModelKey(
 		lmModels,
-		getConfiguredVisionModelId(),
+		getConfiguredVisionModelKey(),
 	);
 
 	return {
@@ -190,7 +189,7 @@ async function getState(store: VisionProxyConfigStore): Promise<VisionProxyPanel
 		config,
 		hasApiKey: await store.hasApiKey(),
 		lmModels,
-		selectedLmModelId,
+		selectedLmModelKey,
 	};
 }
 
@@ -302,7 +301,7 @@ type WebviewPayload = {
 	source: VisionProxySource;
 	config: Record<string, unknown>;
 	apiKey: string | undefined;
-	lmModelId: string | undefined;
+	lmModelKey: string | undefined;
 	testId: number | undefined;
 };
 
@@ -311,12 +310,12 @@ function getWebviewPayload(value: unknown): WebviewPayload {
 	const config = asRecord(payload.config);
 	const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey.trim() : '';
 	const source = normalizeVisionProxySource(payload.source) ?? 'api-endpoint';
-	const lmModelId = typeof payload.lmModelId === 'string' ? payload.lmModelId.trim() : '';
+	const lmModelKey = typeof payload.lmModelKey === 'string' ? payload.lmModelKey.trim() : '';
 	return {
 		source,
 		config,
 		apiKey: apiKey || undefined,
-		lmModelId: lmModelId || undefined,
+		lmModelKey: lmModelKey || undefined,
 		testId: toPositiveInteger(payload.testId),
 	};
 }

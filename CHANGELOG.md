@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.6.1...v0.6.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* **provider:** mark DeepSeek models as BYOK ([#162](https://github.com/Vizards/deepseek-v4-for-copilot/issues/162)) ([50ff6ba](https://github.com/Vizards/deepseek-v4-for-copilot/commit/50ff6ba85b2c8d7911d7f6dddb6492c2ebdb1b17))
+* **vision:** disambiguate VS Code LM model selection ([#161](https://github.com/Vizards/deepseek-v4-for-copilot/issues/161)) ([1d7b668](https://github.com/Vizards/deepseek-v4-for-copilot/commit/1d7b6685649b1ee05f3f49f7cd2008b237734c18)), closes [#149](https://github.com/Vizards/deepseek-v4-for-copilot/issues/149)
+
 ## [0.6.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.6.0...v0.6.1) (2026-06-12)
 
 

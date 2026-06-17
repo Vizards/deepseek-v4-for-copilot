@@ -49,8 +49,7 @@ export function toChatInfo(
 		detail: hasApiKey ? modelDetail : t('auth.apiKeyRequiredDetail'),
 		tooltip: hasApiKey ? modelTooltip : t('auth.apiKeyRequiredDetail'),
 		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
-		maxInputTokens: contextSize ?? m.maxInputTokens,
-		maxOutputTokens: m.maxOutputTokens,
+		...resolveContextWindow(m, contextSize),
 		isBYOK: true,
 		isUserSelectable: true,
 		capabilities: {
@@ -75,6 +74,34 @@ export function getConfiguredThinkingEffort(options: ModelConfigurationOptions):
 	}
 
 	return configuredEffort === 'max' ? 'max' : 'high';
+}
+
+/**
+ * Token split for the selectable 200K context window.
+ *
+ * VS Code/Copilot derives the displayed context window from
+ * `maxInputTokens + maxOutputTokens`, so each selectable window must split its
+ * *total* budget into input + output. The default 1M window keeps the
+ * accounting fixed in #71 (655,360 + 393,216 = 1,048,576 = DeepSeek's official
+ * combined input+output limit). The 200K option mirrors that same 5:3
+ * input:output reservation, scaled to a 200,000-token total, so the reported
+ * window stays honest (~200K) instead of input + a separate output reservation.
+ */
+const CONTEXT_WINDOW_200K = { maxInputTokens: 125000, maxOutputTokens: 75000 } as const;
+
+/**
+ * Resolve the (input, output) token split for the selected context window.
+ * Unknown / unset values fall back to the model's own metadata, which encodes
+ * DeepSeek's official 1M (input + output) window.
+ */
+function resolveContextWindow(
+	m: ModelDefinition,
+	contextSize?: number,
+): { maxInputTokens: number; maxOutputTokens: number } {
+	if (contextSize === 200000) {
+		return { ...CONTEXT_WINDOW_200K };
+	}
+	return { maxInputTokens: m.maxInputTokens, maxOutputTokens: m.maxOutputTokens };
 }
 
 /**

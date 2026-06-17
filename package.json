@@ -77,6 +77,23 @@
         "title": "%deepseek-copilot.command.openRequestDumpsFolder%"
       }
     ],
+    "views": {
+      "deepseek-copilot": [
+        {
+          "id": "deepseek-copilot.panelView",
+          "name": "DeepSeek",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "deepseek-copilot",
+          "title": "DeepSeek"
+        }
+      ]
+    },
     "walkthroughs": [
       {
         "id": "deepseekGettingStarted",

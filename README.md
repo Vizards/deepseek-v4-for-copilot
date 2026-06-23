@@ -131,6 +131,20 @@ Example `settings.json` override for compatible API proxies:
 | One-click install | ✅ | ❌ | ✅ |
 | API key in OS keychain | ✅ | ❌ | ⚠️ varies |
 
+## Custom Agents (.agent.md)
+
+- Use this exact syntax for the `model` field, with the lowercase vendor name 'deepseek' in parenthesis
+
+```yaml
+model: 'DeepSeek V4 Flash (deepseek)'
+```
+
+- If using both Pro and Flash
+
+```yaml
+model: ['DeepSeek V4 Flash (deepseek)', 'DeepSeek V4 Pro (deepseek)']
+```
+
 ## License
 
 [MIT](LICENSE)

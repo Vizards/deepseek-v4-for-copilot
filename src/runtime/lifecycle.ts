@@ -1,14 +1,14 @@
 import vscode from 'vscode';
 import { t } from '../i18n';
 import { logger } from '../logger';
-import { DeepSeekChatProvider } from '../provider';
+import { DnovaChatProvider } from '../provider';
 import { registerActionUrls } from './actions';
 import { registerCommands } from './commands';
 import { initializeDiagnostics } from './diagnostics';
 import { registerProvider } from './provider';
 import { showWelcomeIfNeeded } from './welcome';
 
-let activeProvider: DeepSeekChatProvider | undefined;
+let activeProvider: DnovaChatProvider | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	await initializeDiagnostics(context);
@@ -26,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		logger.info(`Extension activated version=${context.extension.packageJSON.version}`);
 	} catch (error) {
 		activeProvider = undefined;
-		logger.error('Failed to activate DeepSeek extension', error);
+		logger.error('Failed to activate DNova extension', error);
 		void vscode.window.showErrorMessage(t('extension.activateFailed'));
 		throw error;
 	}

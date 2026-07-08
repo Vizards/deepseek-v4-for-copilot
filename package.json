@@ -1,14 +1,14 @@
 {
-  "name": "deepseek-v4-for-copilot",
-  "displayName": "DeepSeek V4 for Copilot Chat",
-  "description": "Pick DeepSeek V4 Pro & Flash from the Copilot Chat model picker. Vision, thinking mode, agent tools — zero config, BYOK.",
+  "name": "dnova-for-copilot",
+  "displayName": "DNova for Copilot Chat",
+  "description": "Use DNova GLM-5.2 in Copilot Chat. Zero config, BYOK.",
   "icon": "resources/icon.png",
   "version": "0.6.2",
-  "publisher": "Vizards",
+  "publisher": "luke",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Vizards/deepseek-v4-for-copilot"
+    "url": "https://github.com/luke/dnova-for-copilot"
   },
   "engines": {
     "vscode": "^1.116.0",
@@ -20,17 +20,15 @@
     "Programming Languages"
   ],
   "keywords": [
-    "deepseek",
-    "deepseek v4",
-    "deepseek-v4",
+    "dnova",
+    "deloitte",
+    "glm-5.2",
+    "glm",
     "copilot",
     "github copilot",
     "copilot chat",
-    "vision",
     "byok",
     "language model",
-    "thinking",
-    "reasoning",
     "ai",
     "chat"
   ],
@@ -43,69 +41,65 @@
   "contributes": {
     "languageModelChatProviders": [
       {
-        "vendor": "deepseek",
-        "displayName": "DeepSeek"
+        "vendor": "dnova",
+        "displayName": "DNova"
       }
     ],
     "commands": [
       {
-        "command": "deepseek-copilot.setApiKey",
-        "title": "%deepseek-copilot.command.setApiKey%"
+        "command": "dnova-copilot.setApiKey",
+        "title": "%dnova-copilot.command.setApiKey%"
       },
       {
-        "command": "deepseek-copilot.getApiKey",
-        "title": "%deepseek-copilot.command.getApiKey%"
+        "command": "dnova-copilot.getApiKey",
+        "title": "%dnova-copilot.command.getApiKey%"
       },
       {
-        "command": "deepseek-copilot.clearApiKey",
-        "title": "%deepseek-copilot.command.clearApiKey%"
+        "command": "dnova-copilot.clearApiKey",
+        "title": "%dnova-copilot.command.clearApiKey%"
       },
       {
-        "command": "deepseek-copilot.setVisionModel",
-        "title": "%deepseek-copilot.command.setVisionModel%"
+        "command": "dnova-copilot.openSettings",
+        "title": "%dnova-copilot.command.openSettings%"
       },
       {
-        "command": "deepseek-copilot.openSettings",
-        "title": "%deepseek-copilot.command.openSettings%"
+        "command": "dnova-copilot.showLogs",
+        "title": "%dnova-copilot.command.showLogs%"
       },
       {
-        "command": "deepseek-copilot.showLogs",
-        "title": "%deepseek-copilot.command.showLogs%"
-      },
-      {
-        "command": "deepseek-copilot.openRequestDumpsFolder",
-        "title": "%deepseek-copilot.command.openRequestDumpsFolder%"
+        "command": "dnova-copilot.openRequestDumpsFolder",
+        "title": "%dnova-copilot.command.openRequestDumpsFolder%"
       }
     ],
     "walkthroughs": [
       {
-        "id": "deepseekGettingStarted",
-        "title": "%deepseek-copilot.walkthrough.title%",
-        "description": "%deepseek-copilot.walkthrough.description%",
+        "id": "dnovaGettingStarted",
+        "title": "%dnova-copilot.walkthrough.title%",
+        "description": "%dnova-copilot.walkthrough.description%",
         "steps": [
           {
             "id": "setApiKey",
-            "title": "%deepseek-copilot.walkthrough.setApiKey.title%",
-            "description": "%deepseek-copilot.walkthrough.setApiKey.description%",
+            "title": "%dnova-copilot.walkthrough.setApiKey.title%",
+            "description": "%dnova-copilot.walkthrough.setApiKey.description%",
             "media": {
               "markdown": "resources/walkthrough/set-api-key.md"
             },
             "completionEvents": [
-              "onCommand:deepseek-copilot.setApiKey"
+              "onCommand:dnova-copilot.setApiKey"
             ]
           },
           {
             "id": "showModels",
-            "title": "%deepseek-copilot.walkthrough.showModels.title%",
-            "description": "%deepseek-copilot.walkthrough.showModels.description%",
+            "title": "%dnova-copilot.walkthrough.showModels.title%",
+            "description": "%dnova-copilot.walkthrough.showModels.description%",
             "media": {
               "markdown": "resources/walkthrough/show-models.md"
             }
           },
           {
             "id": "advancedSettings",
-            "title": "%deepseek-copilot.walkthrough.advancedSettings.title%",
-            "description": "%deepseek-copilot.walkthrough.advancedSettings.description%",
+            "title": "%dnova-copilot.walkthrough.advancedSettings.title%",
+            "description": "%dnova-copilot.walkthrough.advancedSettings.description%",
             "media": {
               "markdown": "resources/walkthrough/advanced-settings.md"
             }
@@ -114,61 +108,34 @@
       }
     ],
     "configuration": {
-      "title": "%deepseek-copilot.config.title%",
+      "title": "%dnova-copilot.config.title%",
       "properties": {
-        "deepseek-copilot.baseUrl": {
+        "dnova-copilot.baseUrl": {
           "type": "string",
-          "default": "https://api.deepseek.com",
-          "description": "%deepseek-copilot.config.baseUrl.description%"
+          "default": "https://nova.deloitte.com.cn/del/v1",
+          "description": "%dnova-copilot.config.baseUrl.description%"
         },
-        "deepseek-copilot.maxTokens": {
+        "dnova-copilot.maxTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,
-          "description": "%deepseek-copilot.config.maxTokens.description%"
+          "description": "%dnova-copilot.config.maxTokens.description%"
         },
-        "deepseek-copilot.experimental.stabilizeToolList": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "%deepseek-copilot.config.experimental.stabilizeToolList.description%",
-          "tags": [
-            "experimental"
-          ]
-        },
-        "deepseek-copilot.modelIdOverrides": {
+        "dnova-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
-            "deepseek-v4-flash": "deepseek-v4-flash",
-            "deepseek-v4-pro": "deepseek-v4-pro"
+            "glm-5.2": "glm-5.2"
           },
-          "description": "%deepseek-copilot.config.modelIdOverrides.description%",
+          "description": "%dnova-copilot.config.modelIdOverrides.description%",
           "additionalProperties": false,
           "properties": {
-            "deepseek-v4-flash": {
+            "glm-5.2": {
               "type": "string",
-              "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description%"
-            },
-            "deepseek-v4-pro": {
-              "type": "string",
-              "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description%"
+              "description": "%dnova-copilot.config.modelIdOverrides.glm-5.2.description%"
             }
           }
         },
-        "deepseek-copilot.visionModel": {
-          "type": "string",
-          "default": "",
-          "tags": [
-            "advanced"
-          ],
-          "markdownDescription": "%deepseek-copilot.config.visionModel.description%"
-        },
-        "deepseek-copilot.visionPrompt": {
-          "type": "string",
-          "editPresentation": "multilineText",
-          "default": "Describe all image attachments in this message.\n\nIf there is one image, describe it directly.\nIf there are multiple images:\n1. Describe each image separately, preserving their order.\n2. Then provide a combined description explaining the overall context and relationships across the images.\n\nReturn one concise factual description suitable for inserting into a text-only chat prompt. Include visible text, objects, UI elements, people, and relevant context. Do not invent details.",
-          "markdownDescription": "%deepseek-copilot.config.visionPrompt.description%"
-        },
-        "deepseek-copilot.debugMode": {
+        "dnova-copilot.debugMode": {
           "type": "string",
           "default": "minimal",
           "enum": [
@@ -177,16 +144,16 @@
             "verbose"
           ],
           "enumItemLabels": [
-            "%deepseek-copilot.config.debugMode.minimal.label%",
-            "%deepseek-copilot.config.debugMode.metadata.label%",
-            "%deepseek-copilot.config.debugMode.verbose.label%"
+            "%dnova-copilot.config.debugMode.minimal.label%",
+            "%dnova-copilot.config.debugMode.metadata.label%",
+            "%dnova-copilot.config.debugMode.verbose.label%"
           ],
           "markdownEnumDescriptions": [
-            "%deepseek-copilot.config.debugMode.minimal.description%",
-            "%deepseek-copilot.config.debugMode.metadata.description%",
-            "%deepseek-copilot.config.debugMode.verbose.description%"
+            "%dnova-copilot.config.debugMode.minimal.description%",
+            "%dnova-copilot.config.debugMode.metadata.description%",
+            "%dnova-copilot.config.debugMode.verbose.description%"
           ],
-          "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
+          "markdownDescription": "%dnova-copilot.config.debugMode.description%"
         }
       }
     }

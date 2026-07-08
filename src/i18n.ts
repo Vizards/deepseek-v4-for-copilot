@@ -19,28 +19,17 @@ type Translations = Record<string, string>;
 
 const zh: Translations = {
 	// Model descriptions
-	'model.flash.detail': '快速高效',
-	'model.pro.detail': '深度推理',
-	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
-	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
+	'model.5.2.detail': 'DNova GLM-5.2 模型',
+	'model.5.2.tooltip': 'DNova GLM-5.2 模型',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
-	'auth.prompt': '请输入 DeepSeek API Key 或兼容服务令牌。官方 DeepSeek Key 通常以 "sk-" 开头。',
-	'auth.placeholder': 'sk-... 或服务商令牌',
+	'auth.prompt': '请输入 DNova API Key。',
+	'auth.placeholder': 'ak-... 或服务商令牌',
 	'auth.emptyValidation': 'API Key 不能为空',
 	'auth.saved': 'API Key 已安全保存。',
 	'auth.removed': 'API Key 已移除。',
-	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DeepSeek: 设置 API Key"。',
-
-	// Thinking Effort — short labels for model picker dropdown
-	'status.thinking': '思考模式',
-	'thinking.none': '停用',
-	'thinking.none.desc': '停用思考，响应更快',
-	'thinking.high': '标准',
-	'thinking.high.desc': '推荐日常使用',
-	'thinking.max': '深度',
-	'thinking.max.desc': '深度推理，适合复杂任务',
+	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DNova: 设置 API Key"。',
 
 	// Vision
 	'vision.proxyUsing': '视觉代理：{0}',
@@ -48,9 +37,9 @@ const zh: Translations = {
 	'vision.unavailable': '无可用视觉模型，图片已忽略。',
 	'vision.proxyError': '视觉代理异常：',
 	'vision.action.configureProxy': '配置视觉代理',
-	'vision.panel.title': 'DeepSeek 视觉代理',
+	'vision.panel.title': 'DNova 视觉代理',
 	'vision.panel.description':
-		'配置一个支持图片输入的模型，用来先把图片转换成文字描述，再把描述随消息发送给 DeepSeek。图片本身不会发送给 DeepSeek。',
+		'配置一个支持图片输入的模型，用来先把图片转换成文字描述，再把描述随消息发送给 DNova。图片本身不会发送给 DNova。',
 	'vision.panel.source.vscodeLm': 'VS Code 模型',
 	'vision.panel.source.apiEndpoint': 'API 端点',
 	'vision.panel.field.source': '视觉代理来源',
@@ -155,13 +144,13 @@ const zh: Translations = {
 
 	// Request
 	'request.toolsLimitExceeded':
-		'DeepSeek 单次 tools 请求最多支持 {0} 个 functions，当前请求包含 {1} 个。请先用 VS Code 的 Configure Tools 关闭不常用的工具；如果正在使用实验性稳定工具列表设置，请关闭它。',
+		'DNova 单次 tools 请求最多支持 {0} 个 functions，当前请求包含 {1} 个。请先用 VS Code 的 Configure Tools 关闭不常用的工具；如果正在使用实验性稳定工具列表设置，请关闭它。',
 	'request.preflightRoundLimitExceeded':
 		'实验性稳定工具列表设置已尝试 {0} 轮，仍无法得到稳定的已启用工具列表。请关闭该实验性设置，或先用 VS Code 的 Configure Tools 关闭不常用的工具。',
-	'notice.visionProxyMissing': '⚠️ 视觉代理不可用，DeepSeek 无法看到图片。[配置视觉代理]({0})',
+	'notice.visionProxyMissing': '⚠️ 视觉代理不可用，DNova 无法看到图片。[配置视觉代理]({0})',
 	'notice.visionProxyFailure': '**⚠️ {0}**\\\n\\\n**{1} · {2}**',
 	'notice.toolDrift':
-		'⚠️ 工具列表不稳定，缓存命中率可能下降。[了解更多](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.zh.md)',
+		'⚠️ 工具列表不稳定，缓存命中率可能下降。',
 
 	// Errors
 	'error.http.400': '[{0}] 请求体格式错误。请根据错误信息提示修改请求体。',
@@ -178,7 +167,7 @@ const zh: Translations = {
 	'error.action.setApiKey': '设置 API Key',
 	'error.action.createApiKey': '创建 API Key',
 	'error.action.viewUsage': '用量',
-	'error.action.checkDeepSeekStatus': 'DeepSeek 状态',
+	'error.action.checkDeepSeekStatus': 'DNova 状态',
 	'error.action.viewDetails': '错误详情',
 	'error.network.dns': '[{0}] DNS 解析失败。请检查网络连接、防火墙或代理设置，以及自定义 baseUrl。',
 	'error.network.unreachable':
@@ -193,35 +182,31 @@ const zh: Translations = {
 	'error.network.configuration': '[{0}] 请求配置无效。请检查自定义 baseUrl 或扩展设置。',
 	'error.network.generic':
 		'[{0}] 网络请求失败。请检查网络连接、防火墙或代理设置，以及自定义 baseUrl。',
-	'error.unknown': 'DeepSeek 请求失败：{0}',
+	'error.unknown': 'DNova 请求失败：{0}',
 
 	// Extension
-	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
-	'extension.deactivateFailed': 'DeepSeek 停用异常',
+	'extension.activateFailed': 'DNova 激活失败，请运行 "DNova: 显示日志" 查看详情。',
+	'extension.deactivateFailed': 'DNova 停用异常',
 	'extension.welcomeFailed': '欢迎引导加载异常',
 	'extension.openRequestDumpsFolderFailed':
-		'打开请求 dump 目录失败，请运行 "DeepSeek: 显示日志" 查看详情。',
+		'打开请求 dump 目录失败，请运行 "DNova: 显示日志" 查看详情。',
 };
 
 const en: Translations = {
 	// Model descriptions
-	'model.flash.detail': 'Fast, general-purpose model',
-	'model.pro.detail': 'Most capable reasoning model',
-	'model.flash.tooltip':
-		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
-	'model.pro.tooltip':
-		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
+	'model.5.2.detail': 'DNova GLM-5.2 model',
+	'model.5.2.tooltip': 'DNova GLM-5.2 model',
 
 	// API Key
-	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',
+	'auth.apiKeyRequiredDetail': 'Please run DNova: Set API Key to configure.',
 	'auth.prompt':
-		'Enter your DeepSeek API key or compatible provider token. Official DeepSeek keys usually start with "sk-".',
-	'auth.placeholder': 'sk-... or provider token',
+		'Enter your DNova API key.',
+	'auth.placeholder': 'ak-... or provider token',
 	'auth.emptyValidation': 'API key cannot be empty',
-	'auth.saved': 'DeepSeek API key saved.',
-	'auth.removed': 'DeepSeek API key removed.',
+	'auth.saved': 'DNova API key saved.',
+	'auth.removed': 'DNova API key removed.',
 	'auth.notConfigured':
-		'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
+		'DNova API key not configured. Run "DNova: Set API Key" from the Command Palette.',
 
 	// Thinking Effort
 	'status.thinking': 'Thinking Effort',
@@ -240,9 +225,9 @@ const en: Translations = {
 	'vision.unavailable': 'No vision models available, image(s) ignored',
 	'vision.proxyError': 'Vision proxy error:',
 	'vision.action.configureProxy': 'Configure Vision Proxy',
-	'vision.panel.title': 'DeepSeek Vision Proxy',
+	'vision.panel.title': 'DNova Vision Proxy',
 	'vision.panel.description':
-		'Configure a vision-capable model to turn image attachments into text before DeepSeek receives the request. DeepSeek receives the description, not the original images.',
+		'Configure a vision-capable model to turn image attachments into text before DNova receives the request. DNova receives the description, not the original images.',
 	'vision.panel.source.vscodeLm': 'VS Code model',
 	'vision.panel.source.apiEndpoint': 'API endpoint',
 	'vision.panel.field.source': 'Vision proxy source',
@@ -361,14 +346,14 @@ const en: Translations = {
 
 	// Request
 	'request.toolsLimitExceeded':
-		'DeepSeek supports at most {0} functions in a single `tools` request, but this request contains {1}. Use VS Code Configure Tools to disable tools you rarely use. If the experimental tool-list stabilization setting is enabled, turn it off.',
+		'DNova supports at most {0} functions in a single `tools` request, but this request contains {1}. Use VS Code Configure Tools to disable tools you rarely use. If the experimental tool-list stabilization setting is enabled, turn it off.',
 	'request.preflightRoundLimitExceeded':
 		'Experimental tool-list stabilization tried {0} rounds but still could not get a stable enabled-tools list. Turn this experimental setting off, or use VS Code Configure Tools to disable tools you rarely use first.',
 	'notice.visionProxyMissing':
-		'⚠️ Vision Proxy is unavailable. DeepSeek cannot see images. [Configure Vision Proxy]({0})',
+		'⚠️ Vision Proxy is unavailable. DNova cannot see images. [Configure Vision Proxy]({0})',
 	'notice.visionProxyFailure': '**⚠️ {0}**\\\n\\\n**{1} · {2}**',
 	'notice.toolDrift':
-		'⚠️ Tool list is unstable; cache hit rate may drop. [Learn more](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/notices/tool-drift.en.md)',
+		'⚠️ Tool list is unstable; cache hit rate may drop.',
 
 	// Errors
 	'error.http.400':
@@ -391,7 +376,7 @@ const en: Translations = {
 	'error.action.setApiKey': 'Set API Key',
 	'error.action.createApiKey': 'Create API Key',
 	'error.action.viewUsage': 'Usage',
-	'error.action.checkDeepSeekStatus': 'DeepSeek Status',
+	'error.action.checkDeepSeekStatus': 'DNova Status',
 	'error.action.viewDetails': 'Error Details',
 	'error.network.dns':
 		'[{0}] DNS lookup failed. Check your network connection, firewall, or proxy settings, and your custom baseUrl.',
@@ -411,14 +396,14 @@ const en: Translations = {
 		'[{0}] The request configuration is invalid. Check your custom baseUrl or extension settings.',
 	'error.network.generic':
 		'[{0}] Network request failed. Check your network connection, firewall, or proxy settings, and your custom baseUrl.',
-	'error.unknown': 'DeepSeek request failed: {0}',
+	'error.unknown': 'DNova request failed: {0}',
 
 	// Extension
-	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',
-	'extension.deactivateFailed': 'Failed to prepare DeepSeek provider for deactivate',
-	'extension.welcomeFailed': 'Failed to show DeepSeek welcome prompt',
+	'extension.activateFailed': 'DNova failed to activate. Run "DNova: Show Logs" for details.',
+	'extension.deactivateFailed': 'Failed to prepare DNova provider for deactivate',
+	'extension.welcomeFailed': 'Failed to show DNova welcome prompt',
 	'extension.openRequestDumpsFolderFailed':
-		'Failed to open request dumps folder. Run "DeepSeek: Show Logs" for details.',
+		'Failed to open request dumps folder. Run "DNova: Show Logs" for details.',
 };
 
 /**

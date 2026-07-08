@@ -1,8 +1,8 @@
-export const OFFICIAL_DEEPSEEK_API_HOST = 'api.deepseek.com';
+export const OFFICIAL_DNOVA_API_HOST = 'nova.deloitte.com.cn';
 
-export function isOfficialDeepSeekBaseUrl(baseUrl: string): boolean {
+export function isOfficialDnovaBaseUrl(baseUrl: string): boolean {
 	try {
-		return new URL(baseUrl).hostname.toLowerCase() === OFFICIAL_DEEPSEEK_API_HOST;
+		return new URL(baseUrl).hostname.toLowerCase() === OFFICIAL_DNOVA_API_HOST;
 	} catch {
 		return false;
 	}

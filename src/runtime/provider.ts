@@ -1,19 +1,16 @@
 import vscode from 'vscode';
 import { logger } from '../logger';
-import { DeepSeekChatProvider } from '../provider';
+import { DnovaChatProvider } from '../provider';
 
 export async function registerProvider(
 	context: vscode.ExtensionContext,
-): Promise<DeepSeekChatProvider> {
-	const provider = new DeepSeekChatProvider(context);
+): Promise<DnovaChatProvider> {
+	const provider = new DnovaChatProvider(context);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('deepseek-copilot.setApiKey', () => provider.configureApiKey()),
-		vscode.commands.registerCommand('deepseek-copilot.clearApiKey', () => provider.clearApiKey()),
-		vscode.commands.registerCommand('deepseek-copilot.setVisionModel', () =>
-			provider.setVisionModel(),
-		),
-		vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
+		vscode.commands.registerCommand('dnova-copilot.setApiKey', () => provider.configureApiKey()),
+		vscode.commands.registerCommand('dnova-copilot.clearApiKey', () => provider.clearApiKey()),
+		vscode.lm.registerLanguageModelChatProvider('dnova', provider),
 	);
 
 	// Copilot Chat can serve cached model info without configurationSchema.

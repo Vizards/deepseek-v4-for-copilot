@@ -1,11 +1,11 @@
 import vscode from 'vscode';
 import { AuthManager } from '../../auth';
 import { getBaseUrl } from '../../config';
-import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../../endpoint';
+import { isOfficialDnovaBaseUrl, normalizeBaseUrl } from '../../endpoint';
 import { logger } from '../../logger';
 import type { PricingCurrency } from '../../types';
 
-const CACHE_KEY = 'deepseek-copilot.balanceCurrency.cache';
+const CACHE_KEY = 'dnova-copilot.balanceCurrency.cache';
 const BALANCE_TIMEOUT_MS = 5000;
 
 interface CachedBalanceCurrency {
@@ -38,7 +38,7 @@ export class BalanceCurrencyResolver {
 
 	getDisplayCurrency(): PricingCurrency | undefined {
 		const baseUrl = normalizeBaseUrl(getBaseUrl());
-		if (!isOfficialDeepSeekBaseUrl(baseUrl)) {
+		if (!isOfficialDnovaBaseUrl(baseUrl)) {
 			return undefined;
 		}
 
@@ -89,7 +89,7 @@ export class BalanceCurrencyResolver {
 
 	private needsRefresh(): boolean {
 		const baseUrl = normalizeBaseUrl(getBaseUrl());
-		if (!isOfficialDeepSeekBaseUrl(baseUrl)) {
+		if (!isOfficialDnovaBaseUrl(baseUrl)) {
 			return false;
 		}
 
@@ -102,7 +102,7 @@ export class BalanceCurrencyResolver {
 
 	private async refreshFromBalance(controller: AbortController, generation: number): Promise<void> {
 		const baseUrl = normalizeBaseUrl(getBaseUrl());
-		if (!isOfficialDeepSeekBaseUrl(baseUrl)) {
+		if (!isOfficialDnovaBaseUrl(baseUrl)) {
 			return;
 		}
 

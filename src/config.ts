@@ -4,12 +4,12 @@ import { CONFIG_SECTION } from './consts';
 export type DebugMode = 'minimal' | 'metadata' | 'verbose';
 
 /**
- * Get DeepSeek API base URL from settings.
+ * Get DNova API base URL from settings.
  * Falls back to the official endpoint when not configured.
  */
 export function getBaseUrl(): string {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	return config.get<string>('baseUrl') || 'https://api.deepseek.com';
+	return config.get<string>('baseUrl') || 'https://nova.deloitte.com.cn/del/v1';
 }
 
 /**

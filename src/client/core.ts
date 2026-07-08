@@ -1,3 +1,6 @@
+import { appendFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { CancellationToken } from 'vscode';
 import { safeStringify } from '../json';
 import { logger } from '../logger';
@@ -38,11 +41,12 @@ export class DeepSeekClient {
 		}
 
 		try {
-			// Request usage stats in streaming responses so we can calibrate token counting.
 			const requestBody = {
 				...request,
-				stream_options: { include_usage: true },
 			};
+
+			const requestJson = safeStringify(requestBody);
+			logger.info(`API request: ${this.baseUrl}/chat/completions model=${request.model} messages=${request.messages.length} chars=${requestJson.length}`);
 
 			const response = await fetch(`${this.baseUrl}/chat/completions`, {
 				method: 'POST',
@@ -50,7 +54,7 @@ export class DeepSeekClient {
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${this.apiKey}`,
 				},
-				body: safeStringify(requestBody),
+				body: requestJson,
 				signal: controller.signal,
 			});
 
@@ -62,12 +66,15 @@ export class DeepSeekClient {
 				throw new Error('No response body received');
 			}
 
+			logger.info(`API response: status=${response.status} contentType=${response.headers.get('content-type') || 'unknown'}`);
+
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';
 			let latestUsage: DeepSeekUsage | undefined;
+			let contentReported = false;
+			const allRawChunks: string[] = [];
 
-			// Accumulate tool call deltas by index, then emit on finish_reason=stop/tool_calls
 			const pendingToolCalls = new Map<number, DeepSeekToolCall>();
 
 			while (true) {
@@ -81,7 +88,9 @@ export class DeepSeekClient {
 					break;
 				}
 
-				buffer += decoder.decode(value, { stream: true });
+				const text = decoder.decode(value, { stream: true });
+				allRawChunks.push(text);
+				buffer += text;
 
 				const lines = buffer.split('\n');
 				buffer = lines.pop() || '';
@@ -93,8 +102,7 @@ export class DeepSeekClient {
 						continue;
 					}
 
-					if (trimmed === 'data: [DONE]') {
-						// Flush any remaining tool calls
+					if (trimmed === 'data: [DONE]' || trimmed === 'data:[DONE]') {
 						for (const tc of pendingToolCalls.values()) {
 							callbacks.onToolCall(tc);
 						}
@@ -104,17 +112,18 @@ export class DeepSeekClient {
 						return;
 					}
 
-					if (!trimmed.startsWith('data: ')) {
+					// Support both "data:{...}" (DNova) and "data: {...}" (standard SSE)
+					if (!trimmed.startsWith('data:') || trimmed.length < 6) {
 						continue;
 					}
 
-					const jsonStr = trimmed.slice(6);
+					// data:prefix → the JSON starts after 'data:'
+					const prefixLength = trimmed[5] === ' ' ? 6 : 5;
+					const jsonStr = trimmed.slice(prefixLength);
 					try {
 						const chunk: DeepSeekStreamChunk = JSON.parse(jsonStr);
 						const choice = chunk.choices?.[0];
 
-						// Some OpenAI-compatible providers emit usage on every streaming chunk.
-						// Keep only the latest value and report it once when the stream completes.
 						if (chunk.usage) {
 							latestUsage = chunk.usage;
 						}
@@ -123,18 +132,17 @@ export class DeepSeekClient {
 							continue;
 						}
 
-						// Thinking content → report with correct field name so VS Code renders collapsible blocks
 						const reasoning = choice.delta.reasoning_content;
 						if (reasoning) {
 							callbacks.onThinking(reasoning);
 						}
 
-						// Regular content
-						if (choice.delta.content) {
-							callbacks.onContent(choice.delta.content);
+						const contentValue = choice.delta.content;
+						if (contentValue) {
+							contentReported = true;
+							callbacks.onContent(contentValue);
 						}
 
-						// Tool calls — accumulate deltas by index
 						if (choice.delta.tool_calls) {
 							for (const tc of choice.delta.tool_calls) {
 								let pending = pendingToolCalls.get(tc.index);
@@ -157,7 +165,6 @@ export class DeepSeekClient {
 							}
 						}
 
-						// Flush pending tool calls on finish
 						if (choice.finish_reason === 'tool_calls' || choice.finish_reason === 'stop') {
 							for (const tc of pendingToolCalls.values()) {
 								callbacks.onToolCall(tc);
@@ -171,6 +178,20 @@ export class DeepSeekClient {
 			}
 
 			reportFinalUsage(callbacks, latestUsage);
+
+			if (!contentReported) {
+				const rawContent = allRawChunks.join('');
+				const rawBytes = Buffer.byteLength(rawContent, 'utf-8');
+				logger.info(`No content reported. Raw response: ${rawBytes} bytes`);
+
+				// Save raw response to temp file for inspection
+				try {
+					const filePath = join(tmpdir(), `dnova-response-${Date.now()}.txt`);
+					await appendFile(filePath, rawContent, 'utf-8');
+					logger.info(`Raw response saved to: ${filePath}`);
+				} catch {}
+			}
+
 			callbacks.onDone();
 		} catch (error) {
 			if (isAbortError(error) && cancellationToken?.isCancellationRequested) {

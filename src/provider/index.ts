@@ -16,10 +16,10 @@ import { processToolFlow } from './tools/flow';
 import { createVisionService } from './vision';
 
 /**
- * DeepSeek Chat Provider — implements vscode.LanguageModelChatProvider so
- * DeepSeek V4 models appear directly in the Copilot Chat model picker.
+ * DNova Chat Provider — implements vscode.LanguageModelChatProvider so
+ * DNova models appear directly in the Copilot Chat model picker.
  */
-export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
+export class DnovaChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly authManager: AuthManager;
 	private readonly globalStorageUri: vscode.Uri;
 	private readonly onDidChangeLanguageModelChatInformationEmitter = new vscode.EventEmitter<void>();
@@ -53,8 +53,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			// Settings-based fallback API key + base URL changes.
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (
-					e.affectsConfiguration('deepseek-copilot.apiKey') ||
-					e.affectsConfiguration('deepseek-copilot.baseUrl')
+					e.affectsConfiguration('dnova-copilot.apiKey') ||
+					e.affectsConfiguration('dnova-copilot.baseUrl')
 				) {
 					this.invalidateCurrencyAndRefreshModels();
 				}
@@ -63,7 +63,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			// When another window sets/clears the API key, refresh this window's
 			// model picker so the warning state stays in sync.
 			context.secrets.onDidChange((e) => {
-				if (e.key === 'deepseek-copilot.apiKey') {
+				if (e.key === 'dnova-copilot.apiKey') {
 					this.invalidateCurrencyAndRefreshModels();
 				}
 			}),
@@ -111,7 +111,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		// instead of leaving stale entries behind after deactivate. The returned
 		// model list itself is unused — we only call this for its side effect.
 		try {
-			await vscode.lm.selectChatModels({ vendor: 'deepseek' });
+			await vscode.lm.selectChatModels({ vendor: 'dnova' });
 		} catch (error) {
 			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
 		}

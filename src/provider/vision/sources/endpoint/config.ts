@@ -10,9 +10,9 @@ import { VisionProxyError } from '../../protocols/errors';
 import { normalizeCustomHeaders } from '../../protocols/headers';
 import { validateVisionEndpointUrl } from '../../protocols/url';
 
-export const VISION_PROXY_CONFIG_KEY = 'deepseek-copilot.visionProxy.config';
-export const VISION_PROXY_SOURCE_KEY = 'deepseek-copilot.visionProxy.source';
-export const VISION_PROXY_API_KEY_SECRET = 'deepseek-copilot.visionProxy.apiKey';
+export const VISION_PROXY_CONFIG_KEY = 'dnova-copilot.visionProxy.config';
+export const VISION_PROXY_SOURCE_KEY = 'dnova-copilot.visionProxy.source';
+export const VISION_PROXY_API_KEY_SECRET = 'dnova-copilot.visionProxy.apiKey';
 
 const PROTECTED_EXTRA_BODY_KEYS = new Set(['model', 'messages', 'input', 'stream']);
 

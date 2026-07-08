@@ -4,7 +4,7 @@ let channel: vscode.LogOutputChannel | undefined;
 
 function getChannel(): vscode.LogOutputChannel {
 	if (!channel) {
-		channel = vscode.window.createOutputChannel('DeepSeek', { log: true });
+		channel = vscode.window.createOutputChannel('DNova', { log: true });
 	}
 	return channel;
 }

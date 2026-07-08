@@ -2,14 +2,10 @@ import vscode from 'vscode';
 import { setErrorActionUrl, type ErrorActionUrls } from '../client';
 import {
 	CONFIGURE_API_KEY_URI_PATH,
-	SET_VISION_MODEL_URI_PATH,
 	SHOW_LOGS_URI_PATH,
 } from '../consts';
 import { logger } from '../logger';
-import {
-	setProviderNoticeShowLogsUrl,
-	setVisionProxyConfigurationUrl,
-} from '../provider/tools/notices';
+import { setProviderNoticeShowLogsUrl } from '../provider/tools/notices';
 
 interface ActionUrlDefinition {
 	key?: keyof ErrorActionUrls;
@@ -24,21 +20,15 @@ const ACTION_URLS: readonly ActionUrlDefinition[] = [
 	{
 		key: 'configureApiKey',
 		path: CONFIGURE_API_KEY_URI_PATH,
-		handle: () => vscode.commands.executeCommand('deepseek-copilot.setApiKey'),
-		resolveFailureMessage: 'Failed to resolve DeepSeek set API key URI',
+		handle: () => vscode.commands.executeCommand('dnova-copilot.setApiKey'),
+		resolveFailureMessage: 'Failed to resolve DNova set API key URI',
 	},
 	{
 		key: 'showLogs',
 		path: SHOW_LOGS_URI_PATH,
 		handle: () => logger.show(),
-		resolveFailureMessage: 'Failed to resolve DeepSeek show logs URI',
+		resolveFailureMessage: 'Failed to resolve DNova show logs URI',
 		setUrl: setProviderNoticeShowLogsUrl,
-	},
-	{
-		path: SET_VISION_MODEL_URI_PATH,
-		handle: () => vscode.commands.executeCommand('deepseek-copilot.setVisionModel'),
-		resolveFailureMessage: 'Failed to resolve DeepSeek set vision model URI',
-		setUrl: setVisionProxyConfigurationUrl,
 	},
 ];
 
@@ -49,11 +39,11 @@ export function registerActionUrls(context: vscode.ExtensionContext): void {
 				const action = ACTION_URLS.find((item) => item.path === uri.path);
 				if (action) {
 					void Promise.resolve(action.handle()).catch((error) => {
-						logger.warn(`Failed to handle DeepSeek URI action: ${uri.path}`, error);
+						logger.warn(`Failed to handle DNova URI action: ${uri.path}`, error);
 					});
 					return;
 				}
-				logger.warn(`Unhandled DeepSeek URI: ${uri.toString(true)}`);
+				logger.warn(`Unhandled DNova URI: ${uri.toString(true)}`);
 			},
 		}),
 	);

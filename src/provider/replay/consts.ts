@@ -1,7 +1,7 @@
 import { MODELS } from '../../consts';
 
 export const REPLAY_MARKER_MIME = 'stateful_marker';
-export const REPLAY_MARKER_WRITER_ID = 'deepseek-copilot';
+export const REPLAY_MARKER_WRITER_ID = 'dnova-copilot';
 export const REPLAY_MARKER_PREFIXES = new Set([
 	REPLAY_MARKER_WRITER_ID,
 	...MODELS.map((model) => model.id),

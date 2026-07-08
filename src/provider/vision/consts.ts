@@ -5,7 +5,7 @@ export const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
  * Prompt sent to the vision proxy model when describing image attachments
  * before forwarding them to text-only DeepSeek models.
  *
- * Keep in sync with `deepseek-copilot.visionPrompt.default` in package.json.
+ * Keep in sync with `dnova-copilot.visionPrompt.default` in package.json.
  */
 export const IMAGE_DESCRIPTION_PROMPT =
 	'Describe all image attachments in this message.\n\n' +

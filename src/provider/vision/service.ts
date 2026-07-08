@@ -27,7 +27,7 @@ export function createVisionService(context: vscode.ExtensionContext): {
 
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration((event) => {
-			if (event.affectsConfiguration('deepseek-copilot.visionModel')) {
+			if (event.affectsConfiguration('dnova-copilot.visionModel')) {
 				reset();
 			}
 		}),

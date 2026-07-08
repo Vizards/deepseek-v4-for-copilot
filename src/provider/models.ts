@@ -95,7 +95,7 @@ function buildThinkingEffortSchema() {
 }
 
 function resolveModelText(m: ModelDefinition, field: 'detail' | 'tooltip'): string | undefined {
-	const suffix = m.id.startsWith('deepseek-v4-') ? m.id.slice('deepseek-v4-'.length) : m.id;
+	const suffix = m.id.startsWith('glm-') ? m.id.slice('glm-'.length) : m.id;
 	const key = `model.${suffix}.${field}`;
 	const translated = t(key);
 	return translated !== key ? translated : undefined;

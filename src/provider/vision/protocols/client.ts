@@ -46,7 +46,7 @@ export class VisionProxyClient {
 			context,
 			headers,
 			body,
-			timeoutMs: DEFAULT_TIMEOUT_MS,
+			timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 			token: request.token,
 		});
 
@@ -184,13 +184,14 @@ function createVisionProxyRequestDiagnostics(
 	request: VisionDescriptionRequest,
 	apiKey: string | undefined,
 ): VisionProxyRequestDiagnostics {
+	const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	return {
 		phase,
 		providerFamily: config.providerFamily,
 		apiType: config.apiType,
 		modelId: config.modelId,
 		endpoint,
-		timeoutMs: DEFAULT_TIMEOUT_MS,
+		timeoutMs,
 		hasApiKey: Boolean(apiKey?.trim()),
 		headerNames: Object.keys(headers).sort(),
 		imageCount: request.images.length,

@@ -8,13 +8,13 @@ import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
-	dumpDeepSeekRequest,
-	type CacheDiagnosticsRecorder,
-	type CacheDiagnosticsRun,
+    dumpDeepSeekRequest,
+    type CacheDiagnosticsRecorder,
+    type CacheDiagnosticsRun,
 } from './debug';
-import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
-import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
+import { getConfiguredContextSize, getConfiguredThinkingEffort, type ContextSize, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';
+import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
 import { resolveImageMessages, type VisionDescriber } from './vision';
@@ -31,6 +31,8 @@ export interface PreparedChatRequest {
 	replayMarkerMetadata: ReplayMarkerMetadata;
 	visionMarkerTextChars?: number;
 	initialResponseNotice?: string;
+	/** The context size selected via the model-picker dropdown (if any). */
+	configuredContextSize: ContextSize;
 }
 
 export interface PrepareChatRequestOptions {
@@ -88,6 +90,7 @@ export async function prepareChatRequest({
 	const configuredThinkingEffort = getConfiguredThinkingEffort(
 		options as ModelConfigurationOptions,
 	);
+	const configuredContextSize = getConfiguredContextSize(options as ModelConfigurationOptions);
 	// Only force helper requests into disabled thinking on the official API.
 	// Custom endpoints keep their configured effort to preserve pre-#137 request shape.
 	const forceNoneThinking =
@@ -147,5 +150,6 @@ export async function prepareChatRequest({
 		replayMarkerMetadata: visionResolution.replayMarkerMetadata,
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 		initialResponseNotice: visionResolution.initialResponseNotice,
+		configuredContextSize,
 	};
 }

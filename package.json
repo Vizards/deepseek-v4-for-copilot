@@ -127,6 +127,20 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
+        "deepseek-copilot.contextSize": {
+          "type": "number",
+          "default": 1000000,
+          "enum": [200000, 1000000],
+          "enumItemLabels": [
+            "%deepseek-copilot.config.contextSize.200k.label%",
+            "%deepseek-copilot.config.contextSize.1m.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%deepseek-copilot.config.contextSize.200k.description%",
+            "%deepseek-copilot.config.contextSize.1m.description%"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.contextSize.description%"
+        },
         "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",
           "default": false,

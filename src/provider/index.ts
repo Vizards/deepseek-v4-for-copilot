@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getStabilizeToolListEnabled } from '../config';
-import { MODELS } from '../consts';
+import { getContextSize, getStabilizeToolListEnabled } from '../config';
+import { CONFIG_SECTION, MODELS } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import { createCacheDiagnosticsRecorder, dumpProviderInput } from './debug';
@@ -133,10 +133,11 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 		const hasKey = await this.authManager.hasApiKey();
 		const pricingCurrency = this.balanceCurrencyResolver.getDisplayCurrency();
+		const contextSize = getContextSize();
 		if (hasKey) {
 			this.balanceCurrencyResolver.refreshInBackground();
 		}
-		return MODELS.map((model) => toChatInfo(model, hasKey, pricingCurrency));
+		return MODELS.map((model) => toChatInfo(model, hasKey, pricingCurrency, contextSize));
 	}
 
 	async provideLanguageModelChatResponse(
@@ -183,6 +184,17 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			cacheDiagnostics: this.cacheDiagnostics,
 			getVisionDescriber: () => this.vision.get(),
 		});
+
+		// Sync context size back to VS Code setting when user changes it via the
+		// model-picker dropdown. The updated maxInputTokens takes effect on the
+		// next request after Copilot Chat re-queries model information.
+		const currentContextSize = getContextSize();
+		if (prepared.configuredContextSize !== currentContextSize) {
+			await vscode.workspace
+				.getConfiguration(CONFIG_SECTION)
+				.update('contextSize', prepared.configuredContextSize, vscode.ConfigurationTarget.Global);
+			this.onDidChangeLanguageModelChatInformationEmitter.fire();
+		}
 
 		return streamChatCompletion({
 			prepared,

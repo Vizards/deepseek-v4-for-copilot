@@ -6,6 +6,7 @@ import { registerActionUrls } from './actions';
 import { registerCommands } from './commands';
 import { initializeDiagnostics } from './diagnostics';
 import { registerProvider } from './provider';
+import { BalanceStatusBar } from './statusbar';
 import { showWelcomeIfNeeded } from './welcome';
 
 let activeProvider: DeepSeekChatProvider | undefined;
@@ -14,6 +15,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	await initializeDiagnostics(context);
 	registerCommands(context);
 	registerActionUrls(context);
+	new BalanceStatusBar(context);
 
 	try {
 		const provider = await registerProvider(context);

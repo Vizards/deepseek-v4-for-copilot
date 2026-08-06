@@ -1,4 +1,5 @@
 .vscode/**
+.claude/**
 README.md
 README.zh-cn.md
 src/**

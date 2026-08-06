@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.6.2...v0.7.0) (2026-08-06)
+
+
+### Features
+
+* **provider:** add low reasoning effort for DeepSeek V4 Flash ([#224](https://github.com/Vizards/deepseek-v4-for-copilot/issues/224)) ([3ce1912](https://github.com/Vizards/deepseek-v4-for-copilot/commit/3ce1912c75e1ffaf6e803eec0516660a39edbe6e)), closes [#220](https://github.com/Vizards/deepseek-v4-for-copilot/issues/220)
+
+
+### Bug Fixes
+
+* **vision:** improve Vision Proxy system prompt to raise utility/usability ([#206](https://github.com/Vizards/deepseek-v4-for-copilot/issues/206)) ([00fded7](https://github.com/Vizards/deepseek-v4-for-copilot/commit/00fded758f358d438d9527aba63a57cde487245a))
+
 ## [0.6.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.6.1...v0.6.2) (2026-06-16)
 
 

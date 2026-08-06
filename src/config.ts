@@ -69,6 +69,34 @@ export function getStabilizeToolListEnabled(): boolean {
 	return config.get<boolean>('experimental.stabilizeToolList', false);
 }
 
+// ---- Inline completion (FIM) settings ----
+
+/** Whether FIM inline code completion is enabled. Read per-request so toggles apply live. */
+export function getCompletionEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('completion.enabled', true);
+}
+
+/** API model ID used for FIM completion requests. */
+export function getCompletionModelId(): string {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<string>('completion.modelId', 'deepseek-v4-pro').trim() || 'deepseek-v4-pro';
+}
+
+/** Maximum tokens generated per completion request. */
+export function getCompletionMaxTokens(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<number>('completion.maxTokens', 128);
+	return value > 0 ? value : 128;
+}
+
+/** Delay in milliseconds before a completion request fires after typing pauses. */
+export function getCompletionDebounceDelay(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<number>('completion.debounceDelay', 300);
+	return value >= 0 ? value : 300;
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

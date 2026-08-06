@@ -18,7 +18,7 @@
 **Pick DeepSeek V4 from the Copilot Chat model picker — and keep everything else Copilot already gives you.**
 
 <p align="center">
-  <img src="resources/screenshots/01-picker.png" alt="DeepSeek V4 Pro and Flash in the Copilot Chat model picker, with the per-model Thinking Effort dropdown (None / High / Max)" width="800">
+  <img src="resources/screenshots/01-picker.png" alt="DeepSeek V4 Pro and Flash in the Copilot Chat model picker, with a per-model Thinking Effort dropdown" width="800">
 </p>
 
 Love DeepSeek's price-performance but don't want to give up GitHub Copilot's agent mode, tool calling, and polished UI? This extension drops **DeepSeek V4 Pro & Flash** straight into the Copilot Chat model selector — with **vision**, **thinking mode**, and your own API key.
@@ -45,7 +45,7 @@ This proxy is a compatibility bridge; if DeepSeek native vision becomes availabl
 </p>
 
 ### Thinking Mode with Reasoning Effort Control
-Full support for DeepSeek V4's `reasoning_content`. Use Copilot Chat's native model picker menu to choose `none` (off), `high` (balanced, default), or `max` (deep reasoning for hard agent tasks).
+Full support for DeepSeek V4's `reasoning_content`. DeepSeek V4 Flash offers `none` (off), `low` (light reasoning), `high` (balanced, default), and `max` (deep reasoning for hard agent tasks). DeepSeek V4 Pro currently offers `none`, `high`, and `max`, matching the effort levels implemented by the official API.
 
 ### Inherits Every Copilot Capability
 Because this plugs into Copilot's native provider API, you get the full stack for free:
@@ -88,10 +88,10 @@ Install from the registry used by your editor:
 
 ## Models
 
-| Model | Best For |
-|---|---|
-| **DeepSeek V4 Flash** | Fast everyday coding, quick edits, cheap iteration |
-| **DeepSeek V4 Pro** | Complex refactors, agent tasks, deep reasoning |
+| Model | Thinking Effort | Best For |
+|---|---|---|
+| **DeepSeek V4 Flash** | `none` / `low` / `high` / `max` | Fast everyday coding, quick edits, cheap iteration |
+| **DeepSeek V4 Pro** | `none` / `high` / `max` | Complex refactors, agent tasks, deep reasoning |
 
 Both support optional thinking mode, tool calling, and 1M token context.
 

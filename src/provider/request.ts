@@ -64,7 +64,8 @@ export async function prepareChatRequest({
 	const baseUrl = getBaseUrl();
 	const client = new DeepSeekClient(baseUrl, apiKey);
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
-	const isThinkingModel = modelDef?.capabilities.thinking ?? false;
+	const thinkingCapability = modelDef?.capabilities.thinking;
+	const isThinkingModel = Boolean(thinkingCapability);
 	const maxTokens = getMaxTokens();
 
 	const visionResolution = await resolveImageMessages(messages, token, getVisionDescriber);
@@ -85,9 +86,9 @@ export async function prepareChatRequest({
 		request: baseRequest,
 		inputMessages: messages,
 	});
-	const configuredThinkingEffort = getConfiguredThinkingEffort(
-		options as ModelConfigurationOptions,
-	);
+	const configuredThinkingEffort = thinkingCapability
+		? getConfiguredThinkingEffort(options as ModelConfigurationOptions, thinkingCapability)
+		: 'none';
 	// Only force helper requests into disabled thinking on the official API.
 	// Custom endpoints keep their configured effort to preserve pre-#137 request shape.
 	const forceNoneThinking =

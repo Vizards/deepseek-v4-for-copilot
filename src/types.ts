@@ -4,6 +4,9 @@
 
 // ---- API request/response types ----
 
+/** API-level reasoning efforts. Disabling thinking is modeled separately. */
+export type ReasoningEffort = 'low' | 'high' | 'max';
+
 export interface DeepSeekMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool';
 	content: string;
@@ -48,7 +51,7 @@ export interface DeepSeekRequest {
 	tools?: DeepSeekTool[];
 	tool_choice?: 'none' | 'auto' | 'required';
 	thinking?: { type: 'enabled' | 'disabled' };
-	reasoning_effort?: 'high' | 'max';
+	reasoning_effort?: ReasoningEffort;
 	stream_options?: {
 		include_usage: boolean;
 	};
@@ -103,6 +106,13 @@ export interface ModelPricing {
 	output: number;
 }
 
+export interface ThinkingCapability {
+	/** Effort values this model implements and may receive in API requests. */
+	supportedEfforts: readonly ReasoningEffort[];
+	defaultEffort: ReasoningEffort;
+	canDisable: boolean;
+}
+
 export interface ModelDefinition {
 	id: string;
 	name: string;
@@ -114,7 +124,7 @@ export interface ModelDefinition {
 	capabilities: {
 		toolCalling: boolean | number;
 		imageInput: boolean;
-		thinking: boolean;
+		thinking: ThinkingCapability | false;
 	};
 	requiresThinkingParam: boolean;
 	pricing?: Readonly<Record<PricingCurrency, ModelPricing>>;

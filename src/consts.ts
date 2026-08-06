@@ -59,7 +59,11 @@ export const MODELS: ModelDefinition[] = [
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
-			thinking: true,
+			thinking: {
+				supportedEfforts: ['low', 'high', 'max'],
+				defaultEffort: 'high',
+				canDisable: true,
+			},
 		},
 		requiresThinkingParam: true,
 		pricing: {
@@ -79,7 +83,11 @@ export const MODELS: ModelDefinition[] = [
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
-			thinking: true,
+			thinking: {
+				supportedEfforts: ['high', 'max'],
+				defaultEffort: 'high',
+				canDisable: true,
+			},
 		},
 		requiresThinkingParam: true,
 		pricing: {

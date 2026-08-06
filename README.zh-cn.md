@@ -18,7 +18,7 @@
 **在 Copilot Chat 模型选择器中直接使用 DeepSeek V4——无需离开你熟悉的 Copilot 工作流。**
 
 <p align="center">
-  <img src="resources/screenshots/01-picker.png" alt="DeepSeek V4 Pro 和 Flash 出现在 Copilot Chat 模型选择器中，带有可按模型独立设置的思考深度下拉菜单（停用 / 标准 / 深度）" width="800">
+  <img src="resources/screenshots/01-picker.png" alt="DeepSeek V4 Pro 和 Flash 出现在 Copilot Chat 模型选择器中，带有可按模型独立设置的思考深度下拉菜单" width="800">
 </p>
 
 喜欢 DeepSeek 的性价比，但不想放弃 GitHub Copilot 的 Agent 模式、工具调用和成熟的交互体验？本扩展将 **DeepSeek V4 Pro 和 Flash** 直接接入 Copilot Chat 模型选择器，支持**视觉识别**、**思考模式**，使用你自己的 API Key。
@@ -45,7 +45,7 @@ DeepSeek V4 是纯文本模型。将截图拖入聊天，本扩展会自动将�
 </p>
 
 ### 思考模式与推理深度控制
-完整支持 DeepSeek V4 的 `reasoning_content`。通过 Copilot Chat 模型选择器的菜单选择 `停用`、`标准`（均衡，默认）或 `深度`（适用于复杂 Agent 任务）。
+完整支持 DeepSeek V4 的 `reasoning_content`。DeepSeek V4 Flash 可选择 `停用`、`轻量`、`标准`（均衡，默认）或 `深度`（适用于复杂 Agent 任务）；DeepSeek V4 Pro 目前提供 `停用`、`标准` 和 `深度`，与官方 API 已实现的推理档位保持一致。
 
 ### 继承全部 Copilot 能力
 由于本扩展接入的是 Copilot 的原生 provider API，你免费获得完整能力栈：
@@ -88,10 +88,10 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 ## 模型
 
-| 模型 | 适用场景 |
-|---|---|
-| **DeepSeek V4 Flash** | 日常快速编码、小改动、低成本迭代 |
-| **DeepSeek V4 Pro** | 复杂重构、Agent 任务、深度推理 |
+| 模型 | 思考深度 | 适用场景 |
+|---|---|---|
+| **DeepSeek V4 Flash** | `停用` / `轻量` / `标准` / `深度` | 日常快速编码、小改动、低成本迭代 |
+| **DeepSeek V4 Pro** | `停用` / `标准` / `深度` | 复杂重构、Agent 任务、深度推理 |
 
 两者均支持可选的思考模式、工具调用和 1M Token 上下文。
 

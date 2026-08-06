@@ -63,9 +63,11 @@ const zh: Translations = {
 	'vision.panel.field.modelId': '模型 ID',
 	'vision.panel.field.customHeaders': '自定义 headers JSON',
 	'vision.panel.field.extraBody': '额外请求体 JSON',
+	'vision.panel.field.timeoutMs': '请求超时 (毫秒)',
 	'vision.panel.hint.customHeaders':
 		'Header 会随配置保存。建议尽量把服务商 token 放在 API Key 输入框中。',
 	'vision.panel.hint.extraBody': '会合并进请求体，不能覆盖 model、messages、input 或 stream。',
+	'vision.panel.hint.timeoutMs': '留空使用默认 30 秒。值必须大于 0。',
 	'vision.panel.placeholder.openaiEndpoint': 'https://api.example.com/v1/chat/completions',
 	'vision.panel.placeholder.openaiResponsesEndpoint': 'https://api.example.com/v1/responses',
 	'vision.panel.placeholder.anthropicEndpoint': 'https://api.example.com/v1/messages',
@@ -257,10 +259,12 @@ const en: Translations = {
 	'vision.panel.field.modelId': 'Model ID',
 	'vision.panel.field.customHeaders': 'Custom headers JSON',
 	'vision.panel.field.extraBody': 'Additional request body JSON',
+	'vision.panel.field.timeoutMs': 'Request timeout (ms)',
 	'vision.panel.hint.customHeaders':
 		'Header values are stored with the profile. Put provider tokens in the API key field when possible.',
 	'vision.panel.hint.extraBody':
 		'Merged into the request body. Cannot override model, messages, input, or stream.',
+	'vision.panel.hint.timeoutMs': 'Leave empty for the default 30 seconds. Must be greater than 0.',
 	'vision.panel.placeholder.openaiEndpoint': 'https://api.example.com/v1/chat/completions',
 	'vision.panel.placeholder.openaiResponsesEndpoint': 'https://api.example.com/v1/responses',
 	'vision.panel.placeholder.anthropicEndpoint': 'https://api.example.com/v1/messages',

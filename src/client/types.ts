@@ -20,7 +20,7 @@ export interface HttpErrorLinkDefinition {
 	url: string;
 }
 
-export type ApiProviderId = 'deepseek';
+export type ApiProviderId = 'deepseek' | 'novita';
 export type HttpErrorLinkStatusKey = 401 | 402 | '5xx';
 
 export type DeepSeekRequestErrorKind = 'http' | 'network' | 'unknown';

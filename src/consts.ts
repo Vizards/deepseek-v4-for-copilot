@@ -17,6 +17,11 @@ export const EXTERNAL_URLS = {
 		usage: 'https://platform.deepseek.com/usage',
 		status: 'https://status.deepseek.com',
 	},
+	novita: {
+		apiKeys: 'https://novita.ai/settings/key-management',
+		usage: 'https://novita.ai/billing',
+		status: 'https://status.novita.ai',
+	},
 } as const;
 
 /** URI path handled by this extension to reveal the output log. */

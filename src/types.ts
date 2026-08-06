@@ -80,6 +80,29 @@ export interface DeepSeekStreamChunk {
 	usage?: DeepSeekUsage;
 }
 
+// ---- FIM (Fill-In-the-Middle) completion types ----
+
+/**
+ * Request body for the DeepSeek FIM completion endpoint.
+ * https://api-docs.deepseek.com/guides/fim_completion
+ */
+export interface DeepSeekFimRequest {
+	model: string;
+	prompt: string;
+	suffix?: string;
+	max_tokens?: number;
+	temperature?: number;
+}
+
+export interface DeepSeekFimResponse {
+	choices: Array<{
+		index: number;
+		text: string;
+		finish_reason: string | null;
+	}>;
+	usage?: DeepSeekUsage;
+}
+
 // ---- Stream callbacks ----
 
 export interface StreamCallbacks {

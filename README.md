@@ -45,7 +45,7 @@ This proxy is a compatibility bridge; if DeepSeek native vision becomes availabl
 </p>
 
 ### Thinking Mode with Reasoning Effort Control
-Full support for DeepSeek V4's `reasoning_content`. DeepSeek V4 Flash offers `none` (off), `low` (light reasoning), `high` (balanced, default), and `max` (deep reasoning for hard agent tasks). DeepSeek V4 Pro currently offers `none`, `high`, and `max`, matching the effort levels implemented by the official API.
+Full support for DeepSeek V4's `reasoning_content`. DeepSeek V4 Flash and Pro both offer `none` (off), `low` (light reasoning), `high` (balanced, default), and `max` (deep reasoning for hard agent tasks), matching the effort levels implemented by the official API.
 
 ### Inherits Every Copilot Capability
 Because this plugs into Copilot's native provider API, you get the full stack for free:
@@ -91,7 +91,7 @@ Install from the registry used by your editor:
 | Model | Thinking Effort | Best For |
 |---|---|---|
 | **DeepSeek V4 Flash** | `none` / `low` / `high` / `max` | Fast everyday coding, quick edits, cheap iteration |
-| **DeepSeek V4 Pro** | `none` / `high` / `max` | Complex refactors, agent tasks, deep reasoning |
+| **DeepSeek V4 Pro** | `none` / `low` / `high` / `max` | Complex refactors, agent tasks, deep reasoning |
 
 Both support optional thinking mode, tool calling, and 1M token context.
 

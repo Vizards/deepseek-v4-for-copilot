@@ -45,7 +45,7 @@ DeepSeek V4 是纯文本模型。将截图拖入聊天，本扩展会自动将�
 </p>
 
 ### 思考模式与推理深度控制
-完整支持 DeepSeek V4 的 `reasoning_content`。DeepSeek V4 Flash 可选择 `停用`、`轻量`、`标准`（均衡，默认）或 `深度`（适用于复杂 Agent 任务）；DeepSeek V4 Pro 目前提供 `停用`、`标准` 和 `深度`，与官方 API 已实现的推理档位保持一致。
+完整支持 DeepSeek V4 的 `reasoning_content`。DeepSeek V4 Flash 和 Pro 均可选择 `停用`、`轻量`、`标准`（均衡，默认）或 `深度`（适用于复杂 Agent 任务），与官方 API 已实现的推理档位保持一致。
 
 ### 继承全部 Copilot 能力
 由于本扩展接入的是 Copilot 的原生 provider API，你免费获得完整能力栈：
@@ -91,7 +91,7 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 | 模型 | 思考深度 | 适用场景 |
 |---|---|---|
 | **DeepSeek V4 Flash** | `停用` / `轻量` / `标准` / `深度` | 日常快速编码、小改动、低成本迭代 |
-| **DeepSeek V4 Pro** | `停用` / `标准` / `深度` | 复杂重构、Agent 任务、深度推理 |
+| **DeepSeek V4 Pro** | `停用` / `轻量` / `标准` / `深度` | 复杂重构、Agent 任务、深度推理 |
 
 两者均支持可选的思考模式、工具调用和 1M Token 上下文。
 

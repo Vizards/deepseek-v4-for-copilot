@@ -121,11 +121,22 @@
           "default": "https://api.deepseek.com",
           "description": "%deepseek-copilot.config.baseUrl.description%"
         },
+        "deepseek-copilot.maxInputTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "%deepseek-copilot.config.maxInputTokens.description%"
+        },
         "deepseek-copilot.maxTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
+        },
+        "deepseek-copilot.maxTokensAsOutputReserve": {
+          "type": "boolean",
+          "default": false,
+          "description": "%deepseek-copilot.config.maxTokensAsOutputReserve.description%"
         },
         "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",

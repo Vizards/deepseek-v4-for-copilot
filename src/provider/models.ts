@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { getMaxInputTokens, getMaxTokens, getMaxTokensAsOutputReserveEnabled } from '../config';
 import { t } from '../i18n';
 import type {
 	ModelDefinition,
@@ -44,16 +45,37 @@ export function toChatInfo(
 	const modelDetail = resolveModelText(m, 'detail') ?? m.detail;
 	const modelTooltip = resolveModelText(m, 'tooltip');
 	const thinkingCapability = m.capabilities.thinking;
+	// `maxInputTokens` is a context window override (input + output). The
+	// advertised input budget is the window minus the output reserve
+	// (`maxTokens` when `maxTokensAsOutputReserve` is enabled, otherwise the
+	// model maximum), mirroring how Copilot advertises its own models.
+	// Copilot Chat computes auto-compact thresholds against this value, so a
+	// smaller window compacts sooner.
+	//
+	// Advertised invariants: output ≤ input, and input + output ≤ window.
+	// The output reserve is capped at half the window so that when the window
+	// override is smaller than the model's maximum output, the reserve shrinks
+	// and input keeps the other half instead of collapsing to 1.
+	const fullWindow = m.maxInputTokens + m.maxOutputTokens;
+	const window = getMaxInputTokens() ?? fullWindow;
+	const configuredReserve = getMaxTokensAsOutputReserveEnabled()
+		? (getMaxTokens() ?? m.maxOutputTokens)
+		: m.maxOutputTokens;
+	const maxOutputReserve = Math.max(1, Math.floor(window / 2));
+	const outputReserve = Math.min(configuredReserve, m.maxOutputTokens, maxOutputReserve);
+	const maxInputTokens = Math.max(1, window - outputReserve);
 	return {
 		id: m.id,
 		name: m.name,
 		family: m.family,
-		version: m.version,
+		// Include the effective limits in the version so VS Code refreshes
+		// stale picker metadata after settings change.
+		version: `${m.version}-${maxInputTokens}-${outputReserve}`,
 		detail: hasApiKey ? modelDetail : t('auth.apiKeyRequiredDetail'),
 		tooltip: hasApiKey ? modelTooltip : t('auth.apiKeyRequiredDetail'),
 		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
-		maxInputTokens: m.maxInputTokens,
-		maxOutputTokens: m.maxOutputTokens,
+		maxInputTokens,
+		maxOutputTokens: outputReserve,
 		isBYOK: true,
 		isUserSelectable: true,
 		capabilities: {

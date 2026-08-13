@@ -27,13 +27,41 @@ export function getApiModelId(vscodeModelId: string): string {
 }
 
 /**
- * Get the configured max output tokens limit.
+ * Get the configured max output tokens limit (`max_tokens` sent to the API).
  * Returns `undefined` when set to 0 (API default — no limit).
+ * When `maxTokensAsOutputReserve` is enabled, this value is also the output
+ * reserve subtracted from the context window advertised to VS Code (see
+ * `toChatInfo` in `provider/models.ts`).
  */
 export function getMaxTokens(): number | undefined {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 	const value = config.get<number>('maxTokens', 0);
 	return value > 0 ? value : undefined;
+}
+
+/**
+ * Get the configured context window override (input + output tokens).
+ * Returns `undefined` when set to 0 (use each model's configured window —
+ * 1M for DeepSeek V4). The advertised input budget is the window minus the
+ * output reserve, and Copilot Chat computes auto-compact thresholds against
+ * it, so lower values compact conversation history sooner.
+ */
+export function getMaxInputTokens(): number | undefined {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<number>('maxInputTokens', 0);
+	return value > 0 ? value : undefined;
+}
+
+/**
+ * Whether `maxTokens` is also advertised to VS Code as the output token
+ * reserve. When enabled, the advertised input budget becomes the context
+ * window minus `maxTokens`, so Copilot Chat auto-compacts against the
+ * remaining input budget. When disabled, the model's maximum output is
+ * reserved instead.
+ */
+export function getMaxTokensAsOutputReserveEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('maxTokensAsOutputReserve', false);
 }
 
 /**

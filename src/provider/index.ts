@@ -57,6 +57,14 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 					e.affectsConfiguration('deepseek-copilot.baseUrl')
 				) {
 					this.invalidateCurrencyAndRefreshModels();
+				} else if (
+					e.affectsConfiguration('deepseek-copilot.maxInputTokens') ||
+					e.affectsConfiguration('deepseek-copilot.maxTokens') ||
+					e.affectsConfiguration('deepseek-copilot.maxTokensAsOutputReserve')
+				) {
+					// Token-limit settings change advertised model info; refresh the
+					// picker directly (no currency invalidation needed).
+					this.refreshModelPicker();
 				}
 			}),
 			// Multi-window: SecretStorage changes don't fire onDidChangeConfiguration.

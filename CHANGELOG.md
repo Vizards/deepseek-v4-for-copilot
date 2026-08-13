@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.7.0...v0.7.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **provider:** expose low reasoning effort for DeepSeek V4 Pro ([#230](https://github.com/Vizards/deepseek-v4-for-copilot/issues/230)) ([73821ba](https://github.com/Vizards/deepseek-v4-for-copilot/commit/73821ba7a2b6e1c973cbfd428e770ebbe5f0b7fe))
+
 ## [0.7.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.6.2...v0.7.0) (2026-08-06)
 
 

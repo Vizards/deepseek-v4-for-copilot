@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { createUserFacingError } from '../client';
 import { logger } from '../logger';
+import { recordUsage } from '../tracker';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
 	observeCancellationToken,
@@ -88,6 +89,7 @@ export function streamChatCompletion({
 						getCharsPerToken(),
 					);
 					setCharsPerToken(charsPerToken);
+					recordUsage(usage, prepared.modelId);
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
 					reportCopilotContextUsage(progress, usage, prepared.requestKind);
 				},

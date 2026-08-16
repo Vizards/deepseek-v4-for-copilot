@@ -17,6 +17,10 @@ export const EXTERNAL_URLS = {
 		usage: 'https://platform.deepseek.com/usage',
 		status: 'https://status.deepseek.com',
 	},
+	orcarouter: {
+		apiKeys: 'https://www.orcarouter.ai/console/api-keys',
+		usage: 'https://www.orcarouter.ai/console',
+	},
 } as const;
 
 /** URI path handled by this extension to reveal the output log. */

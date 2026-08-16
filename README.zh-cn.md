@@ -70,7 +70,7 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 - VS Code 1.116 及以上版本。本扩展依赖非公开的 Copilot Chat API，较新的 VS Code 版本可能存在兼容性问题——如遇到请[提交 Issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues)。
 - GitHub Copilot 订阅（Free / Pro / Enterprise——免费版即可使用）
-- DeepSeek API Key，从 [platform.deepseek.com](https://platform.deepseek.com) 获取；使用自定义 `deepseek-copilot.baseUrl` 时也可使用兼容的 provider token
+- DeepSeek API Key，从 [platform.deepseek.com](https://platform.deepseek.com) 获取；使用自定义 `deepseek-copilot.baseUrl` 时也可使用兼容的 provider token，或在使用 `orcarouter` provider 时使用 [OrcaRouter API Key](https://www.orcarouter.ai/console/api-keys)
 
 ### 安装方式
 
@@ -99,9 +99,10 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 | 设置项 | 默认值 | 说明 |
 |---|---|---|
-| `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API 端点——可改为自托管或代理部署地址 |
+| `deepseek-copilot.provider` | `deepseek` | 为 DeepSeek V4 模型提供服务的 API 后端。`deepseek` 使用官方 API（或自定义 `baseUrl`）；`orcarouter` 则通过 [OrcaRouter](https://www.orcarouter.ai) 模型网关路由——只需设置此项并填写 OrcaRouter API Key，模型 ID 会自动使用命名空间形式（`deepseek/deepseek-v4-flash`、`deepseek/deepseek-v4-pro`） |
+| `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API 端点——可改为自托管或代理部署地址。当 `deepseek-copilot.provider` 为 `orcarouter` 时忽略此项 |
 | `deepseek-copilot.maxTokens` | `0` | 最大输出 Token 数（`0` = 不限制）。可用于成本控制 |
-| `deepseek-copilot.modelIdOverrides` | 预填官方 ID 映射 | DeepSeek V4 Flash / Pro 对应的 API 模型 ID。仅在使用模型名不同的兼容第三方 API 时修改 |
+| `deepseek-copilot.modelIdOverrides` | 预填官方 ID 映射 | DeepSeek V4 Flash / Pro 对应的 API 模型 ID。仅在使用模型名不同的兼容第三方 API 时修改。当 `deepseek-copilot.provider` 为 `orcarouter` 时忽略此项 |
 | `deepseek-copilot.debugMode` | `minimal` | 诊断模式：`minimal` 仅上报 token 用量，`metadata` 输出隐私安全日志，`verbose` 将完整请求 dump 和 pipeline snapshot 写入扩展 global storage。完整 dump 可能包含敏感提示词文本、工具定义、文件片段和图片描述。使用 `DeepSeek: 打开请求 Dump 目录` 打开 dump 位置 |
 | `deepseek-copilot.visionModel` | *(自动)* | 用作图片代理的 VS Code 视觉模型。请通过 `DeepSeek: 配置视觉代理` 设置；新版保存为 `vendor/id`，旧版裸模型 ID 仍兼容读取 |
 | `deepseek-copilot.visionPrompt` | *(内置)* | 用于描述图片附件的提示词 |
@@ -119,6 +120,18 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
   }
 }
 ```
+
+### 使用 OrcaRouter 作为后端
+
+将 `deepseek-copilot.provider` 设为 `orcarouter`，即可通过 [OrcaRouter](https://www.orcarouter.ai) 调用 DeepSeek V4。OrcaRouter 是一个 OpenAI 兼容的模型网关，可路由到最优模型，并在网关层为 AI Agent 提供零信任安全——对每个提示词/响应进行筛查、对每次工具调用进行默认拒绝的管控，且无需改动任何应用代码。
+
+```json
+{
+  "deepseek-copilot.provider": "orcarouter"
+}
+```
+
+然后用 **DeepSeek: 设置 API Key** 保存你的 [OrcaRouter API Key](https://www.orcarouter.ai/console/api-keys)。请求将发送到 `https://api.orcarouter.ai/v1`，模型 ID 自动使用命名空间形式（`deepseek/deepseek-v4-flash`、`deepseek/deepseek-v4-pro`），认证失败时错误提示会链接到 OrcaRouter 控制台。此模式下 `deepseek-copilot.baseUrl` 与 `deepseek-copilot.modelIdOverrides` 设置会被忽略。
 
 ## 方案对比
 

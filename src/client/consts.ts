@@ -16,11 +16,19 @@ export const API_PROVIDER_HTTP_ERROR_LINKS: Readonly<
 			labelKey: 'error.action.createApiKey',
 			url: EXTERNAL_URLS.deepseek.apiKeys,
 		},
+		orcarouter: {
+			labelKey: 'error.action.createApiKey',
+			url: EXTERNAL_URLS.orcarouter.apiKeys,
+		},
 	},
 	402: {
 		deepseek: {
 			labelKey: 'error.action.viewUsage',
 			url: EXTERNAL_URLS.deepseek.usage,
+		},
+		orcarouter: {
+			labelKey: 'error.action.viewUsage',
+			url: EXTERNAL_URLS.orcarouter.usage,
 		},
 	},
 	'5xx': {

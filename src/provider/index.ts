@@ -54,7 +54,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (
 					e.affectsConfiguration('deepseek-copilot.apiKey') ||
-					e.affectsConfiguration('deepseek-copilot.baseUrl')
+					e.affectsConfiguration('deepseek-copilot.baseUrl') ||
+					e.affectsConfiguration('deepseek-copilot.provider')
 				) {
 					this.invalidateCurrencyAndRefreshModels();
 				}

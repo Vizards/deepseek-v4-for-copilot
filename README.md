@@ -70,7 +70,7 @@ Pure VS Code API + Node.js built-ins. No Python, no Docker, no local proxy serve
 
 - VS Code 1.116 or later. This extension relies on non-public Copilot Chat APIs that may break on newer VS Code versions — [report an issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues) if you hit one.
 - GitHub Copilot subscription (Free / Pro / Enterprise — the free tier works)
-- DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com), or a compatible provider token when using a custom `deepseek-copilot.baseUrl`
+- DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com), a compatible provider token when using a custom `deepseek-copilot.baseUrl`, or an [OrcaRouter API key](https://www.orcarouter.ai/console/api-keys) when using the `orcarouter` provider
 
 ### Installation
 
@@ -99,9 +99,10 @@ Both support optional thinking mode, tool calling, and 1M token context.
 
 | Setting | Default | Description |
 |---|---|---|
-| `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
+| `deepseek-copilot.provider` | `deepseek` | API backend that serves the DeepSeek V4 models. `deepseek` uses the official API (or a custom `baseUrl`); `orcarouter` routes through the [OrcaRouter](https://www.orcarouter.ai) model gateway — set it and an OrcaRouter API key, and namespaced model IDs (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`) are sent automatically |
+| `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments. Ignored when `deepseek-copilot.provider` is `orcarouter` |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = no limit). Useful for cost control |
-| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
+| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names. Ignored when `deepseek-copilot.provider` is `orcarouter` |
 | `deepseek-copilot.debugMode` | `minimal` | Diagnostic mode: `minimal` for token usage only, `metadata` for privacy-preserving logs, or `verbose` for full request dumps and pipeline snapshots under extension global storage. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the dump location |
 | `deepseek-copilot.visionModel` | *(auto)* | VS Code vision model used to proxy images. Configure from `DeepSeek: Configure Vision Proxy`; new saves use `vendor/id`, while legacy bare model IDs are still read |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |
@@ -119,6 +120,18 @@ Example `settings.json` override for compatible API proxies:
   }
 }
 ```
+
+### Use OrcaRouter as the backend
+
+Set `deepseek-copilot.provider` to `orcarouter` to serve DeepSeek V4 through [OrcaRouter](https://www.orcarouter.ai), an OpenAI-compatible model gateway that routes to the best available model and runs gateway-level, zero-trust security for AI agents — screening every prompt/response and governing every tool call on a default-deny basis, with no application code changes.
+
+```json
+{
+  "deepseek-copilot.provider": "orcarouter"
+}
+```
+
+Then store your [OrcaRouter API key](https://www.orcarouter.ai/console/api-keys) with **DeepSeek: Set API Key**. Requests go to `https://api.orcarouter.ai/v1` with namespaced model IDs (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`) and authentication failures link to the OrcaRouter console. The `deepseek-copilot.baseUrl` and `deepseek-copilot.modelIdOverrides` settings are ignored in this mode.
 
 ## Compared to alternatives
 

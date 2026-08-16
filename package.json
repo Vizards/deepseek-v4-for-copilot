@@ -31,6 +31,7 @@
     "language model",
     "thinking",
     "reasoning",
+    "orcarouter",
     "ai",
     "chat"
   ],
@@ -120,6 +121,23 @@
           "type": "string",
           "default": "https://api.deepseek.com",
           "description": "%deepseek-copilot.config.baseUrl.description%"
+        },
+        "deepseek-copilot.provider": {
+          "type": "string",
+          "default": "deepseek",
+          "enum": [
+            "deepseek",
+            "orcarouter"
+          ],
+          "enumItemLabels": [
+            "%deepseek-copilot.config.provider.deepseek.label%",
+            "%deepseek-copilot.config.provider.orcarouter.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%deepseek-copilot.config.provider.deepseek.description%",
+            "%deepseek-copilot.config.provider.orcarouter.description%"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.provider.description%"
         },
         "deepseek-copilot.maxTokens": {
           "type": "number",

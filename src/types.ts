@@ -106,6 +106,12 @@ export interface ModelPricing {
 	output: number;
 }
 
+/** Current DeepSeek prices for the peak and off-peak billing periods. */
+export interface ModelPricingSchedule {
+	offPeak: ModelPricing;
+	peak: ModelPricing;
+}
+
 export interface ThinkingCapability {
 	/** Effort values this model implements and may receive in API requests. */
 	supportedEfforts: readonly ReasoningEffort[];
@@ -127,6 +133,6 @@ export interface ModelDefinition {
 		thinking: ThinkingCapability | false;
 	};
 	requiresThinkingParam: boolean;
-	pricing?: Readonly<Record<PricingCurrency, ModelPricing>>;
+	pricing?: Readonly<Record<PricingCurrency, ModelPricingSchedule>>;
 	priceCategory?: PriceCategory;
 }

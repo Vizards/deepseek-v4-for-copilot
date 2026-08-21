@@ -7,13 +7,13 @@ import {
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
 } from './debug';
-import { formatRequestLogLine, type RequestKind } from './routing';
 import {
 	createReplayMarkerPart,
 	hasReplayMarkerMetadata,
 	type ReplayMarkerMetadata,
 } from './replay';
 import type { PreparedChatRequest } from './request';
+import { formatRequestLogLine, type RequestKind } from './routing';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
@@ -82,12 +82,12 @@ export function streamChatCompletion({
 				},
 
 				onUsage: (usage) => {
-					const charsPerToken = updateCharsPerToken(
-						prepared.totalRequestChars,
-						usage,
-						getCharsPerToken(),
-					);
-					setCharsPerToken(charsPerToken);
+					const charsPerToken = prepared.hasNativeImages
+						? getCharsPerToken()
+						: updateCharsPerToken(prepared.totalRequestChars, usage, getCharsPerToken());
+					if (!prepared.hasNativeImages) {
+						setCharsPerToken(charsPerToken);
+					}
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
 					reportCopilotContextUsage(progress, usage, prepared.requestKind);
 				},

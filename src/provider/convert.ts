@@ -202,7 +202,9 @@ function getMessageContentChars(content: DeepSeekMessage['content']): number {
 		if (part.type === 'text') {
 			total += part.text.length;
 		} else if (part.type === 'image_url') {
-			total += part.image_url.url.length;
+			// Do not count base64 URL chars. Native-image requests are excluded from
+			// adaptive charsPerToken updates, and image cost is handled separately.
+			total += 0;
 		}
 	}
 	return total;

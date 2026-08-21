@@ -5,7 +5,7 @@ import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
-import type { DeepSeekRequest } from '../types';
+import type { DeepSeekMessage, DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
 	dumpDeepSeekRequest,
@@ -24,6 +24,7 @@ export interface PreparedChatRequest {
 	request: DeepSeekRequest;
 	isThinkingModel: boolean;
 	totalRequestChars: number;
+	hasNativeImages: boolean;
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
 	requestKind: RequestKind;
@@ -93,6 +94,7 @@ export async function prepareChatRequest({
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
+	const hasNativeImages = hasNativeImageParts(deepseekMessages);
 	const baseRequest: DeepSeekRequest = {
 		model: getApiModelId(modelInfo.id),
 		messages: deepseekMessages,
@@ -160,6 +162,7 @@ export async function prepareChatRequest({
 		request,
 		isThinkingModel,
 		totalRequestChars,
+		hasNativeImages,
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,
 		requestKind,
@@ -168,4 +171,18 @@ export async function prepareChatRequest({
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 		initialResponseNotice: visionResolution.initialResponseNotice,
 	};
+}
+
+function hasNativeImageParts(messages: DeepSeekMessage[]): boolean {
+	for (const message of messages) {
+		if (typeof message.content === 'string') {
+			continue;
+		}
+		for (const part of message.content) {
+			if (part.type === 'image_url') {
+				return true;
+			}
+		}
+	}
+	return false;
 }

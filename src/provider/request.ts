@@ -78,7 +78,7 @@ export async function prepareChatRequest({
 		: await resolveImageMessages(messages, token, getVisionDescriber);
 
 	const resolvedMessages = visionResolution.messages;
-	
+
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
 	if (nativeImageInput) {
 		// For native-image models, count images after conversion so diagnostics reflect

@@ -3,13 +3,13 @@ import { t } from '../../i18n';
 import { safeStringify } from '../../json';
 import { API_PROVIDER_HTTP_ERROR_LINKS, MAX_DIAGNOSTIC_FIELD_LENGTH } from '../consts';
 import type {
-    ApiProviderId,
-    DeepSeekRequestErrorKind,
-    ErrorActionLink,
-    ErrorActionUrls,
-    HttpErrorLinkDefinition,
-    HttpErrorLinkStatusKey,
-    RequestErrorContext,
+	ApiProviderId,
+	DeepSeekRequestErrorKind,
+	ErrorActionLink,
+	ErrorActionUrls,
+	HttpErrorLinkDefinition,
+	HttpErrorLinkStatusKey,
+	RequestErrorContext,
 } from '../types';
 import { getNetworkErrorCauseInfo, getNetworkErrorCode, getNetworkErrorMessage } from './network';
 export type { DeepSeekRequestErrorKind, ErrorActionUrls } from '../types';

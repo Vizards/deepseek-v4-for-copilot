@@ -4,6 +4,7 @@ import { getDebugLoggingEnabled } from '../../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { logger } from '../../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../../types';
+import { deepSeekContentToText } from '../content';
 import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
 import {
     classifyDeepSeekRequest,
@@ -1948,21 +1949,7 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 }
 
 function toDiagnosticContentText(content: DeepSeekMessage['content']): string {
-	if (typeof content === 'string') {
-		return content;
-	}
-
-	return content
-		.map((part) => {
-			if (part.type === 'text') {
-				return part.text;
-			}
-			if (part.type === 'image_url') {
-				return part.image_url.url;
-			}
-			return '';
-		})
-		.join('\n');
+	return deepSeekContentToText(content, { includeImageUrls: true, separator: '\n' });
 }
 
 function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): string {

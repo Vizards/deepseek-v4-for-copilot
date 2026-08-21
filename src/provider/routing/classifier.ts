@@ -1,5 +1,6 @@
 import vscode from 'vscode';
-import type { DeepSeekContentPart, DeepSeekRequest, DeepSeekTool } from '../../types';
+import type { DeepSeekRequest, DeepSeekTool } from '../../types';
+import { deepSeekContentToText } from '../content';
 
 export type RequestKind =
 	| 'main-agent'
@@ -72,7 +73,7 @@ export function classifyDeepSeekRequest(input: {
 }): RequestKind {
 	return classifyRequest({
 		firstText:
-			toDeepSeekMessageText(input.request.messages[0]?.content) ||
+			deepSeekContentToText(input.request.messages[0]?.content) ||
 			(input.inputMessages ? getFirstVscodeText(input.inputMessages) : ''),
 		latestUserText:
 			(input.inputMessages ? getLatestVscodeUserText(input.inputMessages) : '') ||
@@ -181,22 +182,8 @@ function getLatestDeepSeekUserText(request: DeepSeekRequest): string {
 	for (let index = request.messages.length - 1; index >= 0; index -= 1) {
 		const message = request.messages[index];
 		if (message.role === 'user') {
-			return toDeepSeekMessageText(message.content);
+			return deepSeekContentToText(message.content);
 		}
 	}
 	return '';
-}
-
-function toDeepSeekMessageText(content: string | DeepSeekContentPart[] | undefined): string {
-	if (!content) {
-		return '';
-	}
-	if (typeof content === 'string') {
-		return content;
-	}
-
-	return content
-		.filter((part) => part.type === 'text')
-		.map((part) => part.text)
-		.join('');
 }

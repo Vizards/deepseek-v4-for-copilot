@@ -8,13 +8,14 @@ import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { safeStringify, toWellFormedString } from '../../json';
 import { logger } from '../../logger';
 import type { DeepSeekMessage, DeepSeekRequest } from '../../types';
+import { deepSeekMessageToText } from '../content';
 import { parseReplayMarkerData, REPLAY_MARKER_MIME } from '../replay';
 import {
-	classifyDeepSeekRequest,
-	classifyProviderRequest,
-	formatModelFields,
-	formatRequestLogLine,
-	type RequestKind,
+    classifyDeepSeekRequest,
+    classifyProviderRequest,
+    formatModelFields,
+    formatRequestLogLine,
+    type RequestKind,
 } from '../routing';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
@@ -218,7 +219,10 @@ export function dumpDeepSeekRequest(
 		);
 
 		if (msg0 && paths.msg0) {
-			await writeTextFile(paths.msg0, getDeepSeekMessageText(msg0));
+			await writeTextFile(
+				paths.msg0,
+				deepSeekMessageToText(msg0, { includeImageUrls: true, separator: '\n' }),
+			);
 		}
 
 		await writeDumpObservation(
@@ -672,7 +676,12 @@ function summarizeDeepSeekSystemPrompt(messages: readonly DeepSeekMessage[]): Sy
 		return createSystemPromptSummary(null, null, '', customizations);
 	}
 
-	return createSystemPromptSummary(0, message.role, getDeepSeekMessageText(message), customizations);
+	return createSystemPromptSummary(
+		0,
+		message.role,
+		deepSeekMessageToText(message, { includeImageUrls: true, separator: '\n' }),
+		customizations,
+	);
 }
 
 function createSystemPromptSummary(
@@ -729,7 +738,7 @@ function summarizeDeepSeekCustomizations(
 	let latestUserHasCustomizationsUpdate = false;
 
 	for (const [index, message] of messages.entries()) {
-		const text = getDeepSeekMessageText(message);
+		const text = deepSeekMessageToText(message, { includeImageUrls: true, separator: '\n' });
 		customizationsUpdateCountInHistory += countLiteral(text, '<customizationsUpdate>');
 		if (message.role === 'user') {
 			latestUserMessageIndex = index;
@@ -742,24 +751,6 @@ function summarizeDeepSeekCustomizations(
 		latestUserMessageIndex,
 		latestUserHasCustomizationsUpdate,
 	};
-}
-
-function getDeepSeekMessageText(message: DeepSeekMessage): string {
-	if (typeof message.content === 'string') {
-		return message.content;
-	}
-
-	return message.content
-		.map((part) => {
-			if (part.type === 'text') {
-				return part.text;
-			}
-			if (part.type === 'image_url') {
-				return part.image_url.url;
-			}
-			return '';
-		})
-		.join('\n');
 }
 
 function summarizeHostSettings(): HostSettingsSummary {

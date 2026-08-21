@@ -4,18 +4,18 @@ import { getDebugLoggingEnabled } from '../../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { logger } from '../../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../../types';
-import {
-	classifyDeepSeekRequest,
-	formatModelFields,
-	formatRequestLogLine,
-	type RequestKind,
-} from '../routing';
 import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
+import {
+    classifyDeepSeekRequest,
+    formatModelFields,
+    formatRequestLogLine,
+    type RequestKind,
+} from '../routing';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
 import type { ActivatePreflightInspection } from '../tools/preflight';
+import type { VisionResolutionStats as VisionPipelineStats, VisionProxySource } from '../vision';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../vision/consts';
-import type { VisionProxySource, VisionResolutionStats as VisionPipelineStats } from '../vision';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
@@ -1599,6 +1599,7 @@ function summarizeMessage(
 	index: number,
 	followsToolResult: boolean,
 ): CacheTraceMessageSummary {
+	const contentText = toDiagnosticContentText(message.content);
 	const toolCallArgumentChars =
 		message.tool_calls?.reduce((sum, toolCall) => sum + toolCall.function.arguments.length, 0) ?? 0;
 	const reasoningChars = message.reasoning_content?.length ?? 0;
@@ -1611,21 +1612,21 @@ function summarizeMessage(
 		: ('none' as const);
 	const hasReasoningContent = message.reasoning_content !== undefined;
 	const hasEmptyReasoningContent = hasReasoningContent && reasoningChars === 0;
-	const imageDescriptionCount = countLiteral(message.content, '[Image Description:');
-	const unableImageCount = countLiteral(message.content, IMAGE_DESCRIPTION_UNAVAILABLE);
-	const urlCount = countRegex(message.content, /https?:\/\//g);
-	const codeFenceCount = countLiteral(message.content, '```');
-	const likelyPathCount = countLikelyPaths(message.content);
+	const imageDescriptionCount = countLiteral(contentText, '[Image Description:');
+	const unableImageCount = countLiteral(contentText, IMAGE_DESCRIPTION_UNAVAILABLE);
+	const urlCount = countRegex(contentText, /https?:\/\//g);
+	const codeFenceCount = countLiteral(contentText, '```');
+	const likelyPathCount = countLikelyPaths(contentText);
 
 	return {
 		index,
 		role: message.role,
 		hash: hashString(stableStringify(message)),
-		contentHash: hashString(message.content),
-		contentHeadHash: hashString(message.content.slice(0, HASH_WINDOW_CHARS)),
-		contentTailHash: hashString(message.content.slice(-HASH_WINDOW_CHARS)),
-		contentChars: message.content.length,
-		contentLines: countLines(message.content),
+		contentHash: hashString(contentText),
+		contentHeadHash: hashString(contentText.slice(0, HASH_WINDOW_CHARS)),
+		contentTailHash: hashString(contentText.slice(-HASH_WINDOW_CHARS)),
+		contentChars: contentText.length,
+		contentLines: countLines(contentText),
 		imageDescriptionCount,
 		unableImageCount,
 		urlCount,
@@ -1641,7 +1642,7 @@ function summarizeMessage(
 		missingPostToolReasoning: assistantAfterToolResult && !hasReasoningContent,
 		missingPostToolCallReasoning: afterToolResultKind === 'tool-call' && !hasReasoningContent,
 		missingPostToolFinalReasoning: afterToolResultKind === 'final' && !hasReasoningContent,
-		contentSections: index === 0 ? summarizeSystemPromptSections(message.content) : undefined,
+		contentSections: index === 0 ? summarizeSystemPromptSections(contentText) : undefined,
 	};
 }
 
@@ -1807,6 +1808,7 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 	let followsToolResult = false;
 
 	for (const message of messages) {
+		const contentText = toDiagnosticContentText(message.content);
 		if (message.role === 'user') {
 			userMessages += 1;
 		} else if (message.role === 'assistant') {
@@ -1817,33 +1819,33 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 			systemMessages += 1;
 		}
 
-		totalContentChars += message.content.length;
-		if (message.content.length > LARGE_MESSAGE_CHARS) {
+		totalContentChars += contentText.length;
+		if (contentText.length > LARGE_MESSAGE_CHARS) {
 			largeMessages += 1;
 		}
 
-		const imageDescriptions = countLiteral(message.content, '[Image Description:');
+		const imageDescriptions = countLiteral(contentText, '[Image Description:');
 		if (imageDescriptions > 0) {
 			imageDescriptionMessages += 1;
 			imageDescriptionParts += imageDescriptions;
 		}
-		if (message.content.includes(IMAGE_DESCRIPTION_UNAVAILABLE)) {
+		if (contentText.includes(IMAGE_DESCRIPTION_UNAVAILABLE)) {
 			unableImageMessages += 1;
 		}
 
-		const messageUrlCount = countRegex(message.content, /https?:\/\//g);
+		const messageUrlCount = countRegex(contentText, /https?:\/\//g);
 		if (messageUrlCount > 0) {
 			urlMessages += 1;
 			urlCount += messageUrlCount;
 		}
 
-		const messageCodeFenceCount = countLiteral(message.content, '```');
+		const messageCodeFenceCount = countLiteral(contentText, '```');
 		if (messageCodeFenceCount > 0) {
 			codeFenceMessages += 1;
 			codeFenceCount += messageCodeFenceCount;
 		}
 
-		const messageLikelyPathCount = countLikelyPaths(message.content);
+		const messageLikelyPathCount = countLikelyPaths(contentText);
 		if (messageLikelyPathCount > 0) {
 			likelyPathMessages += 1;
 			likelyPathCount += messageLikelyPathCount;
@@ -1943,6 +1945,24 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 		likelyPathMessages,
 		likelyPathCount,
 	};
+}
+
+function toDiagnosticContentText(content: DeepSeekMessage['content']): string {
+	if (typeof content === 'string') {
+		return content;
+	}
+
+	return content
+		.map((part) => {
+			if (part.type === 'text') {
+				return part.text;
+			}
+			if (part.type === 'image_url') {
+				return part.image_url.url;
+			}
+			return '';
+		})
+		.join('\n');
 }
 
 function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): string {

@@ -8,13 +8,13 @@ import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
-	dumpDeepSeekRequest,
-	type CacheDiagnosticsRecorder,
-	type CacheDiagnosticsRun,
+    dumpDeepSeekRequest,
+    type CacheDiagnosticsRecorder,
+    type CacheDiagnosticsRun,
 } from './debug';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
-import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ReplayMarkerMetadata } from './replay';
+import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
 import { resolveImageMessages, type VisionDescriber } from './vision';
@@ -66,11 +66,30 @@ export async function prepareChatRequest({
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const thinkingCapability = modelDef?.capabilities.thinking;
 	const isThinkingModel = Boolean(thinkingCapability);
+	const nativeImageInput = modelDef?.capabilities.nativeImageInput === true;
 	const maxTokens = getMaxTokens();
 
-	const visionResolution = await resolveImageMessages(messages, token, getVisionDescriber);
+	const visionResolution = nativeImageInput
+		? {
+				messages,
+				stats: {
+					inputImageParts: 0,
+					inputImageMessages: 0,
+					currentImageMessages: 0,
+					generatedImageMessages: 0,
+					replayedImageMessages: 0,
+					omittedImageMessages: 0,
+					unavailableImageMessages: 0,
+					failedImageMessages: 0,
+					droppedImageParts: 0,
+					markerVisionTextChars: 0,
+					invalidMarkerVisionMetadata: 0,
+				},
+				replayMarkerMetadata: {},
+			}
+		: await resolveImageMessages(messages, token, getVisionDescriber);
 	const resolvedMessages = visionResolution.messages;
-	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel);
+	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
 	const totalRequestChars = countMessageChars(deepseekMessages);

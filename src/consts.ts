@@ -96,4 +96,29 @@ export const MODELS: ModelDefinition[] = [
 		},
 		priceCategory: 'low',
 	},
+	{
+		id: 'deepseek-v4-flash-vision-exp',
+		name: 'DeepSeek V4 Flash Vision Exp',
+		family: 'deepseek',
+		version: 'v4',
+		detail: 'Experimental native vision model',
+		maxInputTokens: 655360,
+		maxOutputTokens: 393216,
+		capabilities: {
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
+			imageInput: true,
+			nativeImageInput: true,
+			thinking: {
+				supportedEfforts: ['low', 'high', 'max'],
+				defaultEffort: 'high',
+				canDisable: true,
+			},
+		},
+		requiresThinkingParam: true,
+		pricing: {
+			USD: { cacheHitInput: 0.0028, cacheMissInput: 0.14, output: 0.28 },
+			CNY: { cacheHitInput: 0.02, cacheMissInput: 1, output: 2 },
+		},
+		priceCategory: 'low',
+	},
 ];

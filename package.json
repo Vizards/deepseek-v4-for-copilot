@@ -139,7 +139,8 @@
           "type": "object",
           "default": {
             "deepseek-v4-flash": "deepseek-v4-flash",
-            "deepseek-v4-pro": "deepseek-v4-pro"
+            "deepseek-v4-pro": "deepseek-v4-pro",
+            "deepseek-v4-flash-vision-exp": "deepseek-v4-flash-vision-exp"
           },
           "description": "%deepseek-copilot.config.modelIdOverrides.description%",
           "additionalProperties": false,
@@ -151,6 +152,10 @@
             "deepseek-v4-pro": {
               "type": "string",
               "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description%"
+            },
+            "deepseek-v4-flash-vision-exp": {
+              "type": "string",
+              "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash-vision-exp.description%"
             }
           }
         },

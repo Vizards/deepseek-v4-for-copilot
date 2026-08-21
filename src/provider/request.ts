@@ -71,10 +71,14 @@ export async function prepareChatRequest({
 	const nativeImageInput = modelDef?.capabilities.nativeImageInput === true;
 	const maxTokens = getMaxTokens();
 
+	// Flash/Pro are declared as non-native vision models and therefore resolve
+	// image inputs through the configured/default proxy route (Vision Exp in auto mode).
 	const visionResolution: VisionResolutionResult = nativeImageInput
 		? createNativeVisionResolution(messages)
 		: await resolveImageMessages(messages, token, getVisionDescriber);
+
 	const resolvedMessages = visionResolution.messages;
+	
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
 	if (nativeImageInput) {
 		// For native-image models, count images after conversion so diagnostics reflect

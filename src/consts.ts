@@ -59,6 +59,7 @@ export const MODELS: ModelDefinition[] = [
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
+			nativeImageInput: false,
 			thinking: {
 				supportedEfforts: ['low', 'high', 'max'],
 				defaultEffort: 'high',
@@ -83,6 +84,7 @@ export const MODELS: ModelDefinition[] = [
 		capabilities: {
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
+			nativeImageInput: false,
 			thinking: {
 				supportedEfforts: ['low', 'high', 'max'],
 				defaultEffort: 'high',

@@ -1,10 +1,10 @@
 import vscode from 'vscode';
 import { t } from '../../../../i18n';
-import { logVSCodeVisionModelNotFound, logVSCodeVisionModelSelected } from '../../log';
 import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../../consts';
+import { logVSCodeVisionModelNotFound, logVSCodeVisionModelSelected } from '../../log';
 import type {
-	VisionDescriptionRequest,
 	VisionDescriber,
+	VisionDescriptionRequest,
 	VisionLanguageModelOption,
 } from '../../types';
 import { getVSCodeVisionTargetChatSessionType } from './model';
@@ -167,12 +167,15 @@ export function pickPreferredVSCodeVisionModelKey(
 	options: readonly VisionLanguageModelOption[],
 	configuredKey: string | undefined,
 ): string | undefined {
+	// Always honor explicit user configuration first.
 	if (configuredKey) {
 		const configured = pickConfiguredVSCodeVisionModelEntry(options, configuredKey);
 		if (configured) {
 			return configured.key;
 		}
 	}
+	// In auto mode, require an exact Vision Exp match and do not fall back to
+	// arbitrary options to keep the default path deterministic.
 	const preferred = options.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
 	return preferred?.key;
 }
@@ -186,6 +189,7 @@ function pickPreferredVSCodeVisionModel(
 	models: readonly vscode.LanguageModelChat[],
 	configuredKey: string | undefined,
 ): vscode.LanguageModelChat | undefined {
+	// Explicit configuration wins over automatic default selection.
 	if (configuredKey) {
 		const configured = pickConfiguredVSCodeVisionModelEntry(models, configuredKey);
 		if (configured) {
@@ -193,10 +197,13 @@ function pickPreferredVSCodeVisionModel(
 		}
 	}
 
+	// Auto mode: only use the exact default vision model id.
 	return models.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
 }
 
 function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
+	// Keep a narrow DeepSeek exception: allow Vision Exp as proxy, but continue
+	// excluding DeepSeek Flash/Pro to avoid recursive self-selection.
 	const isDeepSeekVisionExp = model.vendor === 'deepseek' && model.id === DEFAULT_VISION_MODEL_ID;
 	return (
 		(isDeepSeekVisionExp || !EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor)) &&
@@ -228,6 +235,8 @@ function pickConfiguredVSCodeVisionModelEntry<T extends { id: string; vendor: st
 	models: readonly T[],
 	configuredKey: string,
 ): T | undefined {
+	// Keep compatibility with legacy bare-id settings while preferring the
+	// provider-qualified key for unambiguous matching.
 	const legacyId = configuredKey.trim();
 	const parsed = parseVSCodeVisionModelKey(configuredKey);
 	if (!parsed) {

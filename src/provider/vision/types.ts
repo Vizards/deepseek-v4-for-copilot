@@ -47,14 +47,22 @@ export interface VisionDescriber {
 }
 
 export interface VisionResolutionStats {
+	// none: no image input in this request
+	// proxy: image parts are resolved through the vision proxy pipeline
+	// native: image parts are forwarded directly to a native-image model
+	imageHandlingMode: 'none' | 'proxy' | 'native';
 	inputImageParts: number;
 	inputImageMessages: number;
+	// Sum of raw input image bytes from VS Code data parts.
+	inputImageBytes: number;
 	currentImageMessages: number;
 	generatedImageMessages: number;
 	replayedImageMessages: number;
 	omittedImageMessages: number;
 	unavailableImageMessages: number;
 	failedImageMessages: number;
+	// Count of image parts preserved in outbound native-image request payload.
+	forwardedImageParts: number;
 	droppedImageParts: number;
 	markerVisionTextChars: number;
 	invalidMarkerVisionMetadata: number;

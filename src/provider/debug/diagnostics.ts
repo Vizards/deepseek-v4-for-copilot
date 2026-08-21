@@ -290,8 +290,11 @@ export function logToolFlowDiagnostics({
 }
 
 interface VisionMessageStats {
+	imageHandlingMode: 'none' | 'proxy' | 'native';
 	inputImageParts: number;
 	inputImageMessages: number;
+	inputImageBytes: number;
+	forwardedImageParts: number;
 	describedImageMessages: number;
 	failedImageMessages: number;
 	droppedImageParts: number;
@@ -831,8 +834,11 @@ function summarizeVisionResolution(
 	visionProxySource: VisionProxySource | undefined,
 ): VisionMessageStats {
 	const stats: VisionMessageStats = {
+		imageHandlingMode: 'none',
 		inputImageParts: 0,
 		inputImageMessages: 0,
+		inputImageBytes: 0,
+		forwardedImageParts: 0,
 		describedImageMessages: 0,
 		failedImageMessages: 0,
 		droppedImageParts: 0,
@@ -843,6 +849,7 @@ function summarizeVisionResolution(
 
 	for (const [index, message] of inputMessages.entries()) {
 		const imageParts = countImageDataParts(message);
+		stats.inputImageBytes += countImageDataBytes(message);
 		const inputText = getMessageText(message);
 		if (countLiteral(inputText, '[Image Description:') > 0) {
 			stats.historyDescriptionMessages += 1;
@@ -854,6 +861,7 @@ function summarizeVisionResolution(
 
 			const resolvedMessage = resolvedMessages[index];
 			const resolvedImageParts = resolvedMessage ? countImageDataParts(resolvedMessage) : 0;
+			stats.forwardedImageParts += Math.min(imageParts, resolvedImageParts);
 			const resolvedText = resolvedMessage ? getMessageText(resolvedMessage) : '';
 			const newDescriptions = Math.max(
 				0,
@@ -878,11 +886,31 @@ function summarizeVisionResolution(
 		}
 	}
 
+	if (stats.inputImageParts > 0) {
+		// If any image survives in resolved messages we treat this as native forwarding;
+		// otherwise assume proxy replacement consumed all image parts.
+		stats.imageHandlingMode = stats.forwardedImageParts > 0 ? 'native' : 'proxy';
+	}
+	if (visionProxySource) {
+		// Source metadata from the pipeline is authoritative when present.
+		stats.imageHandlingMode = 'proxy';
+	}
+
 	return stats;
 }
 
 function countImageDataParts(message: vscode.LanguageModelChatRequestMessage): number {
 	return message.content.filter((part) => isImageDataPart(part)).length;
+}
+
+function countImageDataBytes(message: vscode.LanguageModelChatRequestMessage): number {
+	let bytes = 0;
+	for (const part of message.content) {
+		if (isImageDataPart(part)) {
+			bytes += part.data.byteLength;
+		}
+	}
+	return bytes;
 }
 
 function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
@@ -914,9 +942,21 @@ function formatVisionTrace(
 	const note =
 		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats);
+	// Prefer precise pipeline counters when available; fall back to reconstructed
+	// message-based stats for older/non-pipeline paths.
+	const mode = pipelineStats?.imageHandlingMode ?? stats.imageHandlingMode;
+	const inputImageParts = pipelineStats?.inputImageParts ?? stats.inputImageParts;
+	const inputImageMessages = pipelineStats?.inputImageMessages ?? stats.inputImageMessages;
+	const inputImageBytes = pipelineStats?.inputImageBytes ?? stats.inputImageBytes;
+	const forwardedImageParts = pipelineStats?.forwardedImageParts ?? stats.forwardedImageParts;
+	const droppedImageParts = pipelineStats?.droppedImageParts ?? stats.droppedImageParts;
 	const parts = [
-		`vision inputImages=${stats.inputImageParts}`,
-		`inputMessages=${stats.inputImageMessages}`,
+		`vision mode=${mode}`,
+		`inputImages=${inputImageParts}`,
+		`forwarded=${forwardedImageParts}`,
+		`dropped=${droppedImageParts}`,
+		`bytes=${inputImageBytes}`,
+		`inputMessages=${inputImageMessages}`,
 	];
 
 	if (pipelineStats && hasVisionPipelineActivity(pipelineStats)) {
@@ -925,7 +965,6 @@ function formatVisionTrace(
 			`generated=${pipelineStats.generatedImageMessages}`,
 			`replayed=${pipelineStats.replayedImageMessages}`,
 			`omitted=${pipelineStats.omittedImageMessages}`,
-			`droppedParts=${pipelineStats.droppedImageParts}`,
 		);
 		appendNumberIfNonZero(parts, 'unavailable', pipelineStats.unavailableImageMessages);
 		appendNumberIfNonZero(parts, 'failed', pipelineStats.failedImageMessages);
@@ -934,7 +973,6 @@ function formatVisionTrace(
 	} else {
 		appendNumberIfNonZero(parts, 'generated', stats.describedImageMessages);
 		appendNumberIfNonZero(parts, 'failed', stats.failedImageMessages);
-		appendNumberIfNonZero(parts, 'droppedParts', stats.droppedImageParts);
 	}
 
 	parts.push(`model=${visionModel}`);
@@ -950,7 +988,10 @@ function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): bool
 		return false;
 	}
 	return (
+		stats.imageHandlingMode !== 'none' ||
 		stats.inputImageParts > 0 ||
+		stats.inputImageBytes > 0 ||
+		stats.forwardedImageParts > 0 ||
 		stats.currentImageMessages > 0 ||
 		stats.generatedImageMessages > 0 ||
 		stats.replayedImageMessages > 0 ||

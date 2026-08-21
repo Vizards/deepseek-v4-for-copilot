@@ -1,5 +1,5 @@
 /** Default model ID used for the vision proxy when auto-detection is enabled. */
-export const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
+export const DEFAULT_VISION_MODEL_ID = 'deepseek-v4-flash-vision-exp';
 
 /**
  * Prompt sent to the vision proxy model when describing image attachments

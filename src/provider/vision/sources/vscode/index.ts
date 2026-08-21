@@ -9,8 +9,13 @@ import type {
 } from '../../types';
 import { getVSCodeVisionTargetChatSessionType } from './model';
 
-const EXCLUDED_VISION_MODEL_IDS = new Set(['copilot-utility', 'copilot-utility-small']);
-const EXCLUDED_VISION_MODEL_VENDORS = new Set(['deepseek', 'claude-code', 'copilotcli']);
+const EXCLUDED_VISION_MODEL_IDS = new Set([
+	'copilot-utility',
+	'copilot-utility-small',
+	'deepseek-v4-flash',
+	'deepseek-v4-pro',
+]);
+const EXCLUDED_VISION_MODEL_VENDORS = new Set(['claude-code', 'copilotcli']);
 const EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES = new Set(['claude-code', 'copilotcli']);
 const VSCODE_VISION_MODEL_KEY_SEPARATOR = '/';
 
@@ -169,10 +174,7 @@ export function pickPreferredVSCodeVisionModelKey(
 		}
 	}
 	const preferred = options.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
-	if (preferred) {
-		return preferred.key;
-	}
-	return options[0]?.key;
+	return preferred?.key;
 }
 
 async function listVSCodeVisionModels(): Promise<vscode.LanguageModelChat[]> {
@@ -191,16 +193,13 @@ function pickPreferredVSCodeVisionModel(
 		}
 	}
 
-	const preferred = models.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
-	if (preferred) {
-		return preferred;
-	}
-	return models[0];
+	return models.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
 }
 
 function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
+	const isDeepSeekVisionExp = model.vendor === 'deepseek' && model.id === DEFAULT_VISION_MODEL_ID;
 	return (
-		!EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor) &&
+		(isDeepSeekVisionExp || !EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor)) &&
 		!EXCLUDED_VISION_MODEL_IDS.has(model.id) &&
 		!EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES.has(
 			getVSCodeVisionTargetChatSessionType(model) ?? '',

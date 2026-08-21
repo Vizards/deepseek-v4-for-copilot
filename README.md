@@ -91,7 +91,6 @@ Install from the registry used by your editor:
 | Model | Thinking Effort | Best For |
 |---|---|---|
 | **DeepSeek V4 Flash** | `none` / `low` / `high` / `max` | Fast everyday coding, quick edits, cheap iteration |
-| **DeepSeek V4 Flash Vision Exp** | `none` / `low` / `high` / `max` | Native image + text mixed input (experimental) |
 | **DeepSeek V4 Pro** | `none` / `low` / `high` / `max` | Complex refactors, agent tasks, deep reasoning |
 
 Both support optional thinking mode, tool calling, and 1M token context.
@@ -102,7 +101,7 @@ Both support optional thinking mode, tool calling, and 1M token context.
 |---|---|---|
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = no limit). Useful for cost control |
-| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro / Flash Vision Exp. Change only for compatible third-party APIs with different model names |
+| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for DeepSeek V4 Flash / Pro. Change only for compatible third-party APIs with different model names |
 | `deepseek-copilot.debugMode` | `minimal` | Diagnostic mode: `minimal` for token usage only, `metadata` for privacy-preserving logs, or `verbose` for full request dumps and pipeline snapshots under extension global storage. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the dump location |
 | `deepseek-copilot.visionModel` | *(auto)* | VS Code vision model used to proxy images. Configure from `DeepSeek: Configure Vision Proxy`; new saves use `vendor/id`, while legacy bare model IDs are still read |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used to describe image attachments |

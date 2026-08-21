@@ -8,9 +8,9 @@ import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
-    dumpDeepSeekRequest,
-    type CacheDiagnosticsRecorder,
-    type CacheDiagnosticsRun,
+	dumpDeepSeekRequest,
+	type CacheDiagnosticsRecorder,
+	type CacheDiagnosticsRun,
 } from './debug';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';

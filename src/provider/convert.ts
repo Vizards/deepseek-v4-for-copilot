@@ -1,6 +1,11 @@
 import vscode from 'vscode';
 import { safeStringify } from '../json';
-import type { DeepSeekContentPart, DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
+import type {
+	DeepSeekContentPart,
+	DeepSeekMessage,
+	DeepSeekTool,
+	DeepSeekToolCall,
+} from '../types';
 import { parseFirstReplayMarker } from './replay';
 
 /**

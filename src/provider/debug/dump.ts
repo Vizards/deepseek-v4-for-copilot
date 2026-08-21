@@ -11,11 +11,11 @@ import type { DeepSeekMessage, DeepSeekRequest } from '../../types';
 import { deepSeekMessageToText } from '../content';
 import { parseReplayMarkerData, REPLAY_MARKER_MIME } from '../replay';
 import {
-    classifyDeepSeekRequest,
-    classifyProviderRequest,
-    formatModelFields,
-    formatRequestLogLine,
-    type RequestKind,
+	classifyDeepSeekRequest,
+	classifyProviderRequest,
+	formatModelFields,
+	formatRequestLogLine,
+	type RequestKind,
 } from '../routing';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';

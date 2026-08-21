@@ -7,10 +7,10 @@ import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } fr
 import { deepSeekContentToText } from '../content';
 import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
 import {
-    classifyDeepSeekRequest,
-    formatModelFields,
-    formatRequestLogLine,
-    type RequestKind,
+	classifyDeepSeekRequest,
+	formatModelFields,
+	formatRequestLogLine,
+	type RequestKind,
 } from '../routing';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';

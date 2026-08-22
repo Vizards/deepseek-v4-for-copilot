@@ -1663,7 +1663,7 @@ function summarizeMessage(
 	return {
 		index,
 		role: message.role,
-		hash: hashString(stableStringify(message)),
+		hash: hashString(stableStringify(toDiagnosticMessageFingerprint(message))),
 		contentHash: hashString(contentText),
 		contentHeadHash: hashString(contentText.slice(0, HASH_WINDOW_CHARS)),
 		contentTailHash: hashString(contentText.slice(-HASH_WINDOW_CHARS)),
@@ -1989,8 +1989,110 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 	};
 }
 
+// Diagnostic summaries must stay readable without materializing raw image payloads.
+// Using sanitized image metadata keeps the trace compact and avoids dominating the
+// cache fingerprint with base64-heavy data URLs.
 function toDiagnosticContentText(content: DeepSeekMessage['content']): string {
-	return deepSeekContentToText(content, { includeImageUrls: true, separator: '\n' });
+	if (typeof content !== 'object' || !Array.isArray(content)) {
+		return deepSeekContentToText(content, { separator: '\n' });
+	}
+
+	const parts: string[] = [];
+	for (const part of content) {
+		if (part.type === 'text') {
+			parts.push(part.text);
+			continue;
+		}
+		if (part.type === 'image_url') {
+			parts.push(formatDiagnosticImageUrlSummary(part.image_url.url));
+		}
+	}
+	return parts.join('\n');
+}
+
+function toDiagnosticMessageFingerprint(message: DeepSeekMessage): unknown {
+	if (typeof message.content !== 'object' || !Array.isArray(message.content)) {
+		return message;
+	}
+
+	return {
+		...message,
+		content: message.content.map((part) => {
+			if (part.type === 'text') {
+				return part;
+			}
+			if (part.type === 'image_url') {
+				const meta = summarizeImageUrlForDiagnostics(part.image_url.url);
+				return {
+					type: 'image_url',
+					image_url: {
+						mimeType: meta.mimeType,
+						byteLength: meta.byteLength,
+						kind: meta.kind,
+					},
+				};
+			}
+			return part;
+		}),
+	};
+}
+
+function formatDiagnosticImageUrlSummary(url: string): string {
+	const summary = summarizeImageUrlForDiagnostics(url);
+	return `[image_url kind=${summary.kind} mime=${summary.mimeType} bytes=${summary.byteLength}]`;
+}
+
+// Replace full data URLs with compact metadata so the cache trace can still express
+// image presence and size without exposing or hashing the raw base64 payload.
+function summarizeImageUrlForDiagnostics(url: string): {
+	kind: 'data-url' | 'remote-url' | 'invalid-data-url';
+	mimeType: string;
+	byteLength: number;
+} {
+	if (!url.startsWith('data:')) {
+		return { kind: 'remote-url', mimeType: 'remote', byteLength: 0 };
+	}
+
+	const commaIndex = url.indexOf(',');
+	if (commaIndex < 0) {
+		return { kind: 'invalid-data-url', mimeType: 'invalid', byteLength: 0 };
+	}
+
+	const header = url.slice(5, commaIndex);
+	const payload = url.slice(commaIndex + 1);
+	const [mimeTypeRaw, ...flags] = header.split(';');
+	const mimeType = mimeTypeRaw || 'text/plain';
+	const isBase64 = flags.some((flag) => flag.toLowerCase() === 'base64');
+	if (isBase64) {
+		return {
+			kind: 'data-url',
+			mimeType,
+			byteLength: estimateBase64DecodedBytes(payload),
+		};
+	}
+
+	try {
+		return {
+			kind: 'data-url',
+			mimeType,
+			byteLength: Buffer.byteLength(decodeURIComponent(payload), 'utf8'),
+		};
+	} catch {
+		return {
+			kind: 'invalid-data-url',
+			mimeType,
+			byteLength: 0,
+		};
+	}
+}
+
+function estimateBase64DecodedBytes(base64Payload: string): number {
+	const normalized = base64Payload.replace(/\s+/g, '');
+	if (!normalized) {
+		return 0;
+	}
+	const padding = normalized.endsWith('==') ? 2 : normalized.endsWith('=') ? 1 : 0;
+	return Math.floor((normalized.length * 3) / 4) - padding;
 }
 
 function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): string {

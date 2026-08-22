@@ -29,6 +29,6 @@
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description": "API model ID for DeepSeek V4 Flash",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-pro.description": "API model ID for DeepSeek V4 Pro",
   "deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash-vision-exp.description": "API model ID for DeepSeek V4 Flash Vision Exp",
-  "deepseek-copilot.config.visionModel.description": "Compatibility setting managed by [Configure Vision Proxy](command:deepseek-copilot.setVisionModel). Stores the selected VS Code vision model as `vendor/id` when that source is active. Legacy bare model IDs are read for compatibility.",
-  "deepseek-copilot.config.visionPrompt.description": "Prompt sent to the vision proxy model when describing image attachments before forwarding them to DeepSeek.\n\n[Configure Vision Proxy](command:deepseek-copilot.setVisionModel)"
+  "deepseek-copilot.config.visionModel.description": "Vision Proxy used by DeepSeek V4 Flash and Pro. When unset, auto mode selects DeepSeek V4 Flash Vision Exp if available. Configure a different VS Code model or API endpoint with [Configure Vision Proxy](command:deepseek-copilot.setVisionModel).",
+  "deepseek-copilot.config.visionPrompt.description": "Prompt used by Flash and Pro's Vision Proxy to describe image attachments. It does not affect native Flash Vision Exp requests.\n\n[Configure Vision Proxy](command:deepseek-copilot.setVisionModel)"
 }

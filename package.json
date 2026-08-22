@@ -127,6 +127,28 @@
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
         },
+        "deepseek-copilot.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%deepseek-copilot.config.completion.enabled.description%"
+        },
+        "deepseek-copilot.completion.modelId": {
+          "type": "string",
+          "default": "deepseek-v4-pro",
+          "description": "%deepseek-copilot.config.completion.modelId.description%"
+        },
+        "deepseek-copilot.completion.maxTokens": {
+          "type": "number",
+          "default": 128,
+          "minimum": 1,
+          "description": "%deepseek-copilot.config.completion.maxTokens.description%"
+        },
+        "deepseek-copilot.completion.debounceDelay": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "%deepseek-copilot.config.completion.debounceDelay.description%"
+        },
         "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",
           "default": false,

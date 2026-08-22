@@ -4,6 +4,7 @@ import { logger } from '../logger';
 import { DeepSeekChatProvider } from '../provider';
 import { registerActionUrls } from './actions';
 import { registerCommands } from './commands';
+import { registerCompletion } from './completion';
 import { initializeDiagnostics } from './diagnostics';
 import { registerProvider } from './provider';
 import { showWelcomeIfNeeded } from './welcome';
@@ -14,6 +15,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	await initializeDiagnostics(context);
 	registerCommands(context);
 	registerActionUrls(context);
+	registerCompletion(context);
 
 	try {
 		const provider = await registerProvider(context);

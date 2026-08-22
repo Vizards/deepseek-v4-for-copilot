@@ -24,8 +24,7 @@ const zh: Translations = {
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
 	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
-	'model.flash-vision-exp.tooltip':
-		'DeepSeek V4 Flash 视觉实验模型，会将用户添加的图片附件直接发送给 DeepSeek 进行原生视觉理解。',
+	'model.flash-vision-exp.tooltip': 'DeepSeek V4 Flash 视觉实验模型，支持原生图片与文本输入。',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
@@ -218,7 +217,7 @@ const en: Translations = {
 	'model.pro.tooltip':
 		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
 	'model.flash-vision-exp.tooltip':
-		'Experimental DeepSeek V4 Flash vision model that sends user image attachments directly to DeepSeek for native image understanding.',
+		'Experimental DeepSeek V4 Flash vision model with native image and text input.',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',

@@ -38,7 +38,7 @@ Flash, Pro, and the experimental Flash Vision Exp appear alongside other models 
 ### Native Vision and Vision Proxy
 Choose the image path that fits the conversation:
 
-- **DeepSeek V4 Flash Vision Exp** sends user image attachments directly to DeepSeek for native image understanding. It is exposed as a separate experimental model and does not silently fall back when the configured API endpoint does not support its model ID.
+- **DeepSeek V4 Flash Vision Exp** handles image attachments as native multimodal input, without Vision Proxy. It is exposed as a separate experimental model and does not silently fall back when the configured API endpoint does not support its model ID.
 - **DeepSeek V4 Flash and Pro** use Vision Proxy: an image-capable model first describes each attachment, then the main DeepSeek model receives the description with the conversation. Auto mode selects Flash Vision Exp when available, while an explicitly configured VS Code model or API endpoint remains supported.
 
 Avoid switching models mid-chat just to inspect an image if DeepSeek prefix-cache reuse matters. Start the conversation with Flash Vision Exp for native vision, or stay on Flash/Pro and let Vision Proxy preserve the main model choice.

@@ -38,7 +38,7 @@ Flash、Pro 和实验性的 Flash Vision Exp 会与其他模型并列出现在 C
 ### 原生视觉与视觉代理
 可以根据对话需要选择不同的图片处理路径：
 
-- **DeepSeek V4 Flash Vision Exp** 会将用户添加的图片附件直接发送给 DeepSeek，进行原生图片理解。它是一个独立暴露的实验模型；如果当前 API 端点不支持其模型 ID，插件不会静默降级。
+- **DeepSeek V4 Flash Vision Exp** 将图片附件作为原生多模态输入处理，不经过视觉代理。它是一个独立暴露的实验模型；如果当前 API 端点不支持其模型 ID，插件不会静默降级。
 - **DeepSeek V4 Flash 和 Pro** 使用视觉代理：先由支持图片输入的模型描述附件，再将描述连同对话内容交给 DeepSeek 主模型。自动模式会在可用时选择 Flash Vision Exp，同时继续支持显式配置其他 VS Code 模型或 API 端点。
 
 如果你在意 DeepSeek 前缀缓存的复用，不建议只为查看一张图片而在对话中途切换模型。需要原生视觉时，可以从对话开始就选择 Flash Vision Exp；希望继续使用 Flash/Pro 时，则让视觉代理处理图片并保留主模型选择。

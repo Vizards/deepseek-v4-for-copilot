@@ -110,6 +110,7 @@ export const MODELS: ModelDefinition[] = [
 			toolCalling: DEEPSEEK_TOOLS_LIMIT,
 			imageInput: true,
 			nativeImageInput: true,
+			visionNative: true,
 			thinking: {
 				supportedEfforts: ['low', 'high', 'max'],
 				defaultEffort: 'high',

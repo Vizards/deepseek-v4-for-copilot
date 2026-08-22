@@ -1,7 +1,7 @@
 {
   "name": "deepseek-v4-for-copilot",
   "displayName": "DeepSeek V4 for Copilot Chat",
-  "description": "Pick DeepSeek V4 Pro & Flash from the Copilot Chat model picker. Vision, thinking mode, agent tools — zero config, BYOK.",
+  "description": "Use DeepSeek V4 Pro, Flash, and Flash Vision Exp in Copilot Chat with native vision, Vision Proxy, reasoning, and agent tools.",
   "icon": "resources/icon.png",
   "version": "0.7.1",
   "publisher": "Vizards",

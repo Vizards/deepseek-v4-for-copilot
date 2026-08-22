@@ -26,6 +26,17 @@ const zh: Translations = {
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
 	'model.flash-vision-exp.tooltip': 'DeepSeek V4 Flash 视觉实验模型，支持原生图片与文本输入。',
 
+	// Balance
+	'balance.noApiKey': 'API Key 未配置，请先运行 "DeepSeek: 设置 API Key"。',
+	'balance.checking': '正在查询 DeepSeek 余额...',
+	'balance.fetchError': '查询 DeepSeek 余额失败：{0}',
+	'balance.unavailable': 'DeepSeek 账号不可用或未返回余额信息。',
+	'balance.result': 'DeepSeek 余额：{0}',
+	'balance.entry': '{0}：{1}（充值 {2}，赠送 {3}）',
+	'balance.statusBar.text': '$(pulse) {0}{1}',
+	'balance.display.enabled': '已启用 DeepSeek 余额显示。',
+	'balance.display.disabled': '已禁用 DeepSeek 余额显示。',
+
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
 	'auth.prompt': '请输入 DeepSeek API Key 或兼容服务令牌。官方 DeepSeek Key 通常以 "sk-" 开头。',
@@ -218,6 +229,17 @@ const en: Translations = {
 		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
 	'model.flash-vision-exp.tooltip':
 		'Experimental DeepSeek V4 Flash vision model with native image and text input.',
+
+	// Balance
+	'balance.noApiKey': 'No API key configured. Run "DeepSeek: Set API Key" first.',
+	'balance.checking': 'Checking DeepSeek balance...',
+	'balance.fetchError': 'Failed to fetch DeepSeek balance: {0}',
+	'balance.unavailable': 'DeepSeek account is unavailable or returned no balance info.',
+	'balance.result': 'DeepSeek Balance: {0}',
+	'balance.entry': '{0}: {1} (paid: {2}, free: {3})',
+	'balance.statusBar.text': '$(pulse) {0}{1}',
+	'balance.display.enabled': 'DeepSeek balance display enabled.',
+	'balance.display.disabled': 'DeepSeek balance display disabled.',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',

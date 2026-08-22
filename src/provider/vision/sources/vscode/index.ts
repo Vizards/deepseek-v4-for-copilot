@@ -1,16 +1,21 @@
 import vscode from 'vscode';
 import { t } from '../../../../i18n';
-import { logVSCodeVisionModelNotFound, logVSCodeVisionModelSelected } from '../../log';
 import { DEFAULT_VISION_MODEL_ID, IMAGE_DESCRIPTION_PROMPT } from '../../consts';
+import { logVSCodeVisionModelNotFound, logVSCodeVisionModelSelected } from '../../log';
 import type {
-	VisionDescriptionRequest,
 	VisionDescriber,
+	VisionDescriptionRequest,
 	VisionLanguageModelOption,
 } from '../../types';
 import { getVSCodeVisionTargetChatSessionType } from './model';
 
-const EXCLUDED_VISION_MODEL_IDS = new Set(['copilot-utility', 'copilot-utility-small']);
-const EXCLUDED_VISION_MODEL_VENDORS = new Set(['deepseek', 'claude-code', 'copilotcli']);
+const EXCLUDED_VISION_MODEL_IDS = new Set([
+	'copilot-utility',
+	'copilot-utility-small',
+	'deepseek-v4-flash',
+	'deepseek-v4-pro',
+]);
+const EXCLUDED_VISION_MODEL_VENDORS = new Set(['claude-code', 'copilotcli']);
 const EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES = new Set(['claude-code', 'copilotcli']);
 const VSCODE_VISION_MODEL_KEY_SEPARATOR = '/';
 
@@ -103,7 +108,14 @@ export class VSCodeLanguageModelVisionDescriber implements VisionDescriber {
 			new vscode.LanguageModelTextPart(request.prompt),
 		] as (vscode.LanguageModelDataPart | vscode.LanguageModelTextPart)[]);
 
-		const response = await this.model.sendRequest([visionMsg], {}, request.token);
+		// Keep the user-facing default reasoning effort for the main chat model, but
+		// disable thinking for the internal Vision Exp proxy pass. This is a serial
+		// preprocessing step, so the extra latency and cost should not be paid unless
+		// the user explicitly asks for it in the primary model configuration.
+		const requestOptions = isDeepSeekVisionExpModel(this.model)
+			? { modelOptions: { reasoningEffort: 'none' as const } }
+			: {};
+		const response = await this.model.sendRequest([visionMsg], requestOptions, request.token);
 		let description = '';
 		for await (const chunk of response.stream) {
 			if (chunk instanceof vscode.LanguageModelTextPart) {
@@ -162,17 +174,23 @@ export function pickPreferredVSCodeVisionModelKey(
 	options: readonly VisionLanguageModelOption[],
 	configuredKey: string | undefined,
 ): string | undefined {
+	// Always honor explicit user configuration first.
 	if (configuredKey) {
 		const configured = pickConfiguredVSCodeVisionModelEntry(options, configuredKey);
 		if (configured) {
 			return configured.key;
 		}
+		// A stale configured value is treated as a hard stop rather than a silent
+		// override. This preserves the existing missing-model notice flow and avoids
+		// quietly replacing the user's current selection with the automatic default.
+		return undefined;
 	}
-	const preferred = options.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
-	if (preferred) {
-		return preferred.key;
-	}
-	return options[0]?.key;
+	// In auto mode, require an exact Vision Exp match and do not fall back to
+	// arbitrary options to keep the default path deterministic.
+	const preferred = options.find(
+		(model) => model.vendor === 'deepseek' && model.id === DEFAULT_VISION_MODEL_ID,
+	);
+	return preferred?.key;
 }
 
 async function listVSCodeVisionModels(): Promise<vscode.LanguageModelChat[]> {
@@ -184,29 +202,44 @@ function pickPreferredVSCodeVisionModel(
 	models: readonly vscode.LanguageModelChat[],
 	configuredKey: string | undefined,
 ): vscode.LanguageModelChat | undefined {
+	// Explicit configuration wins over automatic default selection.
 	if (configuredKey) {
 		const configured = pickConfiguredVSCodeVisionModelEntry(models, configuredKey);
 		if (configured) {
 			return configured;
 		}
+		// A stale explicit setting should not trigger a silent fallback. Keep the
+		// current unavailable / reconfigure flow intact so the user can correct the
+		// model selection explicitly instead of being overridden behind the scenes.
+		return undefined;
 	}
 
-	const preferred = models.find((model) => model.id === DEFAULT_VISION_MODEL_ID);
-	if (preferred) {
-		return preferred;
-	}
-	return models[0];
+	// Auto mode: only use the exact default vision model id.
+	return models.find(
+		(model) => model.vendor === 'deepseek' && model.id === DEFAULT_VISION_MODEL_ID,
+	);
 }
 
 function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
+	// Keep a narrow DeepSeek exception: allow Vision Exp as proxy, but continue
+	// excluding DeepSeek Flash/Pro to avoid recursive self-selection.
+	const isDeepSeekVisionExp = isDeepSeekVisionExpModel(model);
+	const isVendorAllowed =
+		model.vendor === 'deepseek'
+			? isDeepSeekVisionExp
+			: !EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor);
 	return (
-		!EXCLUDED_VISION_MODEL_VENDORS.has(model.vendor) &&
+		isVendorAllowed &&
 		!EXCLUDED_VISION_MODEL_IDS.has(model.id) &&
 		!EXCLUDED_VISION_TARGET_CHAT_SESSION_TYPES.has(
 			getVSCodeVisionTargetChatSessionType(model) ?? '',
 		) &&
 		getSupportsImageToText(model)
 	);
+}
+
+function isDeepSeekVisionExpModel(model: Pick<vscode.LanguageModelChat, 'vendor' | 'id'>): boolean {
+	return model.vendor === 'deepseek' && model.id === DEFAULT_VISION_MODEL_ID;
 }
 
 function getVSCodeVisionModelKey(model: Pick<vscode.LanguageModelChat, 'vendor' | 'id'>): string {
@@ -229,6 +262,8 @@ function pickConfiguredVSCodeVisionModelEntry<T extends { id: string; vendor: st
 	models: readonly T[],
 	configuredKey: string,
 ): T | undefined {
+	// Keep compatibility with legacy bare-id settings while preferring the
+	// provider-qualified key for unambiguous matching.
 	const legacyId = configuredKey.trim();
 	const parsed = parseVSCodeVisionModelKey(configuredKey);
 	if (!parsed) {

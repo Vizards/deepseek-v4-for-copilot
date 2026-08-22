@@ -1,8 +1,8 @@
 import { isOfficialDeepSeekBaseUrl } from '../../endpoint';
 import { t } from '../../i18n';
 import { safeStringify } from '../../json';
+import type { DeepSeekMessage } from '../../types';
 import { API_PROVIDER_HTTP_ERROR_LINKS, MAX_DIAGNOSTIC_FIELD_LENGTH } from '../consts';
-import { getNetworkErrorCauseInfo, getNetworkErrorCode, getNetworkErrorMessage } from './network';
 import type {
 	ApiProviderId,
 	DeepSeekRequestErrorKind,
@@ -12,6 +12,7 @@ import type {
 	HttpErrorLinkStatusKey,
 	RequestErrorContext,
 } from '../types';
+import { getNetworkErrorCauseInfo, getNetworkErrorCode, getNetworkErrorMessage } from './network';
 export type { DeepSeekRequestErrorKind, ErrorActionUrls } from '../types';
 
 const errorActionUrlStore = (() => {
@@ -299,8 +300,37 @@ function getRequestDiagnosticMessage(context: RequestErrorContext): string {
 		request.tool_choice ? `toolChoice=${safeStringify(request.tool_choice)}` : undefined,
 		`toolCount=${request.tools?.length ?? 0}`,
 		`messageCount=${request.messages.length}`,
-		`messageChars=${request.messages.reduce((total, message) => total + message.content.length, 0)}`,
+		`messageChars=${request.messages.reduce((total, message) => total + getContentChars(message.content), 0)}`,
+		`imageParts=${request.messages.reduce((total, message) => total + countImageParts(message.content), 0)}`,
 	);
+}
+
+/**
+ * Measure only the content values sent to the API. Serializing a multimodal
+ * content array would also count JSON keys and punctuation, making this
+ * diagnostic depend on the object representation rather than payload content.
+ * Image URL characters are included because data URLs can dominate request size.
+ */
+function getContentChars(content: DeepSeekMessage['content']): number {
+	if (typeof content === 'string') {
+		return content.length;
+	}
+	return content.reduce(
+		(total, part) => total + (part.type === 'text' ? part.text.length : part.image_url.url.length),
+		0,
+	);
+}
+
+/**
+ * Report image presence separately because messageChars alone cannot distinguish
+ * a large data URL from a long text prompt. Counting parts avoids logging or
+ * decoding image payloads while still making multimodal request failures useful.
+ */
+function countImageParts(content: DeepSeekMessage['content']): number {
+	if (typeof content === 'string') {
+		return 0;
+	}
+	return content.filter((part) => part.type === 'image_url').length;
 }
 
 function joinDiagnosticParts(...parts: (string | undefined)[]): string {

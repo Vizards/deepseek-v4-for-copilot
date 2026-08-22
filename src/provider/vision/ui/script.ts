@@ -241,8 +241,8 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 				}
 				lmModelKey.appendChild(option);
 			}
-			if (!lmModelKey.value && models[0]) {
-				lmModelKey.value = models[0].key;
+			if (!lmModelKey.value && selectedKey) {
+				lmModelKey.value = selectedKey;
 			}
 			updateLanguageModelCost();
 		}

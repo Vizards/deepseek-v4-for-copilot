@@ -1,6 +1,11 @@
 import vscode from 'vscode';
 import { safeStringify } from '../json';
-import type { DeepSeekMessage, DeepSeekTool, DeepSeekToolCall } from '../types';
+import type {
+	DeepSeekContentPart,
+	DeepSeekMessage,
+	DeepSeekTool,
+	DeepSeekToolCall,
+} from '../types';
 import { parseFirstReplayMarker } from './replay';
 
 /**
@@ -10,6 +15,7 @@ import { parseFirstReplayMarker } from './replay';
 export function convertMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	isThinkingModel: boolean,
+	nativeImageInput: boolean,
 ): DeepSeekMessage[] {
 	const result: DeepSeekMessage[] = [];
 
@@ -17,6 +23,7 @@ export function convertMessages(
 		const role = mapRole(message.role);
 
 		let content = '';
+		const nativeVisionContentParts: DeepSeekContentPart[] = [];
 		let thinkingContent = '';
 		const toolCalls: DeepSeekToolCall[] = [];
 		const toolResults: Array<{ callId: string; content: string }> = [];
@@ -24,6 +31,19 @@ export function convertMessages(
 		for (const part of message.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
 				content += part.value;
+				if (nativeImageInput && role === 'user') {
+					nativeVisionContentParts.push({
+						type: 'text',
+						text: part.value,
+					});
+				}
+			} else if (nativeImageInput && role === 'user' && isImageDataPart(part)) {
+				nativeVisionContentParts.push({
+					type: 'image_url',
+					image_url: {
+						url: toImageDataUrl(part),
+					},
+				});
 			} else if (isLanguageModelThinkingPart(part)) {
 				thinkingContent += normalizeThinkingPartText(part.value);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
@@ -68,7 +88,12 @@ export function convertMessages(
 				result.push(msg);
 			}
 		} else {
-			if (content) {
+			if (nativeImageInput && role === 'user' && nativeVisionContentParts.length > 0) {
+				result.push({
+					role: 'user',
+					content: nativeVisionContentParts,
+				});
+			} else if (content) {
 				result.push({
 					role: role as 'user' | 'assistant',
 					content: content,
@@ -87,6 +112,14 @@ export function convertMessages(
 	}
 
 	return result;
+}
+
+function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
+	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
+}
+
+function toImageDataUrl(part: vscode.LanguageModelDataPart): string {
+	return `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`;
 }
 
 function getReasoningContent(
@@ -147,13 +180,31 @@ export function convertTools(
 export function countMessageChars(messages: DeepSeekMessage[]): number {
 	let total = 0;
 	for (const msg of messages) {
-		total += msg.content?.length ?? 0;
+		total += getMessageContentChars(msg.content);
 		total += msg.reasoning_content?.length ?? 0;
 		if (msg.tool_calls) {
 			for (const tc of msg.tool_calls) {
 				total += tc.function?.name?.length ?? 0;
 				total += tc.function?.arguments?.length ?? 0;
 			}
+		}
+	}
+	return total;
+}
+
+function getMessageContentChars(content: DeepSeekMessage['content']): number {
+	if (typeof content === 'string') {
+		return content.length;
+	}
+
+	let total = 0;
+	for (const part of content) {
+		if (part.type === 'text') {
+			total += part.text.length;
+		} else if (part.type === 'image_url') {
+			// Do not count base64 URL chars. Native-image requests are excluded from
+			// adaptive charsPerToken updates, and image cost is handled separately.
+			total += 0;
 		}
 	}
 	return total;

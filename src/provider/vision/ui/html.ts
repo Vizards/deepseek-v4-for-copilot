@@ -110,6 +110,11 @@ export function getVisionProxyPanelHtml(
 }"></textarea>
 						<div class="hint">${escapeHtml(strings.hintExtraBody)}</div>
 					</div>
+					<div class="field">
+						<label for="timeoutMs">${escapeHtml(strings.fieldTimeoutMs)}</label>
+						<input id="timeoutMs" type="number" min="1" placeholder="30000">
+						<div class="hint">${escapeHtml(strings.hintTimeoutMs)}</div>
+					</div>
 				</div>
 			</fieldset>
 			<div class="actions">
@@ -170,8 +175,10 @@ function getVisionProxyPanelStrings() {
 		fieldModelId: t('vision.panel.field.modelId'),
 		fieldCustomHeaders: t('vision.panel.field.customHeaders'),
 		fieldExtraBody: t('vision.panel.field.extraBody'),
+		fieldTimeoutMs: t('vision.panel.field.timeoutMs'),
 		hintCustomHeaders: t('vision.panel.hint.customHeaders'),
 		hintExtraBody: t('vision.panel.hint.extraBody'),
+		hintTimeoutMs: t('vision.panel.hint.timeoutMs'),
 		placeholderOpenAIEndpoint: t('vision.panel.placeholder.openaiEndpoint'),
 		placeholderOpenAIResponsesEndpoint: t('vision.panel.placeholder.openaiResponsesEndpoint'),
 		placeholderAnthropicEndpoint: t('vision.panel.placeholder.anthropicEndpoint'),

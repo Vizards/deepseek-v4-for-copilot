@@ -24,6 +24,7 @@ export interface VisionProxyConfig {
 	apiType: VisionProxyApiType;
 	url: string;
 	modelId: string;
+	timeoutMs?: number;
 	headers?: Record<string, string>;
 	extraBody?: Record<string, unknown>;
 	updatedAt: number;

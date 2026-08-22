@@ -1,4 +1,4 @@
-import { isOfficialDeepSeekBaseUrl } from '../../endpoint';
+import { isNovitaBaseUrl, isOfficialDeepSeekBaseUrl } from '../../endpoint';
 import { t } from '../../i18n';
 import { safeStringify } from '../../json';
 import type { DeepSeekMessage } from '../../types';
@@ -349,7 +349,13 @@ function escapeBoldText(value: string): string {
 }
 
 function identifyApiProvider(baseUrl: string): ApiProviderId | undefined {
-	return isOfficialDeepSeekBaseUrl(baseUrl) ? 'deepseek' : undefined;
+	if (isOfficialDeepSeekBaseUrl(baseUrl)) {
+		return 'deepseek';
+	}
+	if (isNovitaBaseUrl(baseUrl)) {
+		return 'novita';
+	}
+	return undefined;
 }
 
 function getHttpErrorLinkStatusKey(status: number): HttpErrorLinkStatusKey | undefined {

@@ -184,6 +184,7 @@ const zh: Translations = {
 	'error.action.createApiKey': '创建 API Key',
 	'error.action.viewUsage': '用量',
 	'error.action.checkDeepSeekStatus': 'DeepSeek 状态',
+	'error.action.checkNovitaStatus': 'Novita 状态',
 	'error.action.viewDetails': '错误详情',
 	'error.network.dns': '[{0}] DNS 解析失败。请检查网络连接、防火墙或代理设置，以及自定义 baseUrl。',
 	'error.network.unreachable':
@@ -402,6 +403,7 @@ const en: Translations = {
 	'error.action.createApiKey': 'Create API Key',
 	'error.action.viewUsage': 'Usage',
 	'error.action.checkDeepSeekStatus': 'DeepSeek Status',
+	'error.action.checkNovitaStatus': 'Novita Status',
 	'error.action.viewDetails': 'Error Details',
 	'error.network.dns':
 		'[{0}] DNS lookup failed. Check your network connection, firewall, or proxy settings, and your custom baseUrl.',

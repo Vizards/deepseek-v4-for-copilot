@@ -16,17 +16,29 @@ export const API_PROVIDER_HTTP_ERROR_LINKS: Readonly<
 			labelKey: 'error.action.createApiKey',
 			url: EXTERNAL_URLS.deepseek.apiKeys,
 		},
+		novita: {
+			labelKey: 'error.action.createApiKey',
+			url: EXTERNAL_URLS.novita.apiKeys,
+		},
 	},
 	402: {
 		deepseek: {
 			labelKey: 'error.action.viewUsage',
 			url: EXTERNAL_URLS.deepseek.usage,
 		},
+		novita: {
+			labelKey: 'error.action.viewUsage',
+			url: EXTERNAL_URLS.novita.usage,
+		},
 	},
 	'5xx': {
 		deepseek: {
 			labelKey: 'error.action.checkDeepSeekStatus',
 			url: EXTERNAL_URLS.deepseek.status,
+		},
+		novita: {
+			labelKey: 'error.action.checkNovitaStatus',
+			url: EXTERNAL_URLS.novita.status,
 		},
 	},
 };

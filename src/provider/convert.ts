@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import * as crypto from 'crypto';
 import { safeStringify } from '../json';
 import type {
 	DeepSeekContentPart,
@@ -9,6 +10,14 @@ import type {
 import { parseFirstReplayMarker } from './replay';
 
 /**
+ * Options controlling multimodal conversion for the DeepSeek Files API route.
+ */
+export interface ConvertMessageOptions {
+	/** Keyed by the sha256 content hash of an image; value is its file_id. */
+	filesApiFileIdByHash?: ReadonlyMap<string, string>;
+}
+
+/**
  * Convert VS Code chat messages to DeepSeek format.
  * Injects marker-replayed reasoning_content for assistant messages.
  */
@@ -16,7 +25,9 @@ export function convertMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	isThinkingModel: boolean,
 	nativeImageInput: boolean,
+	options?: ConvertMessageOptions,
 ): DeepSeekMessage[] {
+	const filesApiFileIdByHash = options?.filesApiFileIdByHash;
 	const result: DeepSeekMessage[] = [];
 
 	for (const message of messages) {
@@ -38,12 +49,20 @@ export function convertMessages(
 					});
 				}
 			} else if (nativeImageInput && role === 'user' && isImageDataPart(part)) {
-				nativeVisionContentParts.push({
-					type: 'image_url',
-					image_url: {
-						url: toImageDataUrl(part),
-					},
-				});
+				const fileId = resolveFileId(part, filesApiFileIdByHash);
+				if (fileId) {
+					nativeVisionContentParts.push({
+						type: 'file',
+						file_id: fileId,
+					});
+				} else {
+					nativeVisionContentParts.push({
+						type: 'image_url',
+						image_url: {
+							url: toImageDataUrl(part),
+						},
+					});
+				}
 			} else if (isLanguageModelThinkingPart(part)) {
 				thinkingContent += normalizeThinkingPartText(part.value);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
@@ -120,6 +139,21 @@ function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
 
 function toImageDataUrl(part: vscode.LanguageModelDataPart): string {
 	return `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`;
+}
+
+/**
+ * Resolve the Files API file_id for an image part by its sha256 content hash,
+ * or return undefined when no Files API mapping exists (falls back to base64).
+ */
+function resolveFileId(
+	part: vscode.LanguageModelDataPart,
+	fileIdByHash: ReadonlyMap<string, string> | undefined,
+): string | undefined {
+	if (!fileIdByHash) {
+		return undefined;
+	}
+	const hash = crypto.createHash('sha256').update(part.data).digest('hex');
+	return fileIdByHash.get(hash);
 }
 
 function getReasoningContent(
@@ -201,9 +235,10 @@ function getMessageContentChars(content: DeepSeekMessage['content']): number {
 	for (const part of content) {
 		if (part.type === 'text') {
 			total += part.text.length;
-		} else if (part.type === 'image_url') {
-			// Do not count base64 URL chars. Native-image requests are excluded from
-			// adaptive charsPerToken updates, and image cost is handled separately.
+		} else if (part.type === 'image_url' || part.type === 'file') {
+			// Do not count base64 URL chars (image_url) or file_id refs (file).
+			// Native-image requests are excluded from adaptive charsPerToken
+			// updates, and image cost is handled separately.
 			total += 0;
 		}
 	}

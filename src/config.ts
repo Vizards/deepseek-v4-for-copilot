@@ -1,5 +1,10 @@
 import vscode from 'vscode';
 import { CONFIG_SECTION } from './consts';
+import {
+	CLOUD_CACHE_SECONDS,
+	MAX_CACHE_SECONDS,
+	MIN_CACHE_SECONDS,
+} from './provider/vision/filesApi';
 
 export type DebugMode = 'minimal' | 'metadata' | 'verbose';
 
@@ -67,6 +72,61 @@ export function getRequestDumpEnabled(): boolean {
 export function getStabilizeToolListEnabled(): boolean {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 	return config.get<boolean>('experimental.stabilizeToolList', false);
+}
+
+/**
+ * Whether the experimental DeepSeek Files API native-vision route is enabled.
+ *
+ * When enabled (and the model supports it and the endpoint is the official
+ * DeepSeek API), images are uploaded via POST /files and referenced by file_id.
+ */
+export function getFilesApiEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('experimental.filesApi', false);
+}
+
+/**
+ * Get the configured cloud cache lifetime (in seconds) for Files API uploads.
+ *
+ * Reads `cacheExpiresDays` from settings:
+ *   - `-1` → permanent (0, no expires_after)
+ *   - `0` → 1 hour (the API's minimum)
+ *   - a plain number `N` → N days
+ *
+ * The result is clamped to the API's valid range [MIN_CACHE_SECONDS, MAX_CACHE_SECONDS].
+ * Returns 0 only when the user explicitly wants permanent files (never expires).
+ */
+export function getCacheExpiresSeconds(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	// 兜底为 7（天），与 package.json 的 schema default 保持一致，
+	// 避免配置读取失败时落入 0 → 1 小时的语义。
+	const days = config.get<number>('cacheExpiresDays', 7);
+	return parseCacheExpiresSeconds(days);
+}
+
+/**
+ * Parse a `cacheExpiresDays` numeric value into seconds. Clamps to the API's
+ * valid range, or returns 0 for permanent.
+ */
+export function parseCacheExpiresSeconds(raw: number | undefined | null): number {
+	if (raw == null) {
+		return CLOUD_CACHE_SECONDS; // 默认 7 天
+	}
+	// 永久：-1 或任意负数
+	if (raw < 0) {
+		return 0;
+	}
+	// 0 → 1 小时（API 允许的最小值）
+	if (raw === 0) {
+		return MIN_CACHE_SECONDS;
+	}
+	// 正数 → 天，并钳制到 API 允许范围
+	return clampToValidCacheRange(raw * 24 * 60 * 60);
+}
+
+/** Clamp a raw duration (seconds) to the API's valid range. */
+function clampToValidCacheRange(seconds: number): number {
+	return Math.min(Math.max(Math.round(seconds), MIN_CACHE_SECONDS), MAX_CACHE_SECONDS);
 }
 
 /**

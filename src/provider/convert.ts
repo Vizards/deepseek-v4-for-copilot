@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'fs';
+import { extname } from 'path';
 import vscode from 'vscode';
 import { safeStringify } from '../json';
 import type {
@@ -7,6 +9,33 @@ import type {
 	DeepSeekToolCall,
 } from '../types';
 import { parseFirstReplayMarker } from './replay';
+
+interface ToolCallMetadata {
+	name: string;
+	input: unknown;
+}
+
+interface ToolResultImage {
+	mimeType: string;
+	data: Uint8Array;
+}
+
+interface CollectedToolResult {
+	callId: string;
+	content: string;
+	images: ToolResultImage[];
+}
+
+const TOOL_RESULT_IMAGE_MESSAGE =
+	'The previous tool result includes the following image(s). Use them as the actual visual content from the tool result.';
+
+const IMAGE_EXTENSION_MIME_TYPES: Readonly<Record<string, string>> = {
+	'.png': 'image/png',
+	'.jpg': 'image/jpeg',
+	'.jpeg': 'image/jpeg',
+	'.gif': 'image/gif',
+	'.webp': 'image/webp',
+};
 
 /**
  * Convert VS Code chat messages to DeepSeek format.
@@ -18,6 +47,7 @@ export function convertMessages(
 	nativeImageInput: boolean,
 ): DeepSeekMessage[] {
 	const result: DeepSeekMessage[] = [];
+	const toolCallMetadataByCallId = new Map<string, ToolCallMetadata>();
 
 	for (const message of messages) {
 		const role = mapRole(message.role);
@@ -26,7 +56,7 @@ export function convertMessages(
 		const nativeVisionContentParts: DeepSeekContentPart[] = [];
 		let thinkingContent = '';
 		const toolCalls: DeepSeekToolCall[] = [];
-		const toolResults: Array<{ callId: string; content: string }> = [];
+		const toolResults: CollectedToolResult[] = [];
 
 		for (const part of message.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
@@ -47,6 +77,10 @@ export function convertMessages(
 			} else if (isLanguageModelThinkingPart(part)) {
 				thinkingContent += normalizeThinkingPartText(part.value);
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
+				toolCallMetadataByCallId.set(part.callId, {
+					name: part.name,
+					input: part.input,
+				});
 				toolCalls.push({
 					id: part.callId,
 					type: 'function',
@@ -56,15 +90,16 @@ export function convertMessages(
 					},
 				});
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
-				let toolContent = '';
-				for (const item of part.content) {
-					if (item instanceof vscode.LanguageModelTextPart) {
-						toolContent += item.value;
-					}
-				}
+				const collected = collectToolResultContent(
+					part,
+					nativeImageInput ? toolCallMetadataByCallId.get(part.callId) : undefined,
+					nativeImageInput,
+				);
 				toolResults.push({
 					callId: part.callId,
-					content: toolContent || safeStringify(part.content),
+					content:
+						collected.text || (collected.images.length === 0 ? safeStringify(part.content) : ''),
+					images: collected.images,
 				});
 			}
 		}
@@ -101,13 +136,20 @@ export function convertMessages(
 			}
 		}
 
-		// Tool result messages follow their associated assistant message
+		// Tool result messages follow their associated assistant message.
 		for (const tr of toolResults) {
 			result.push({
 				role: 'tool',
 				content: tr.content,
 				tool_call_id: tr.callId,
 			});
+		}
+
+		// DeepSeek only accepts images in user messages, so tool-result image
+		// bytes are forwarded as a multimodal user message after the tool result.
+		const toolResultImages = toolResults.flatMap((tr) => tr.images);
+		if (nativeImageInput && toolResultImages.length > 0) {
+			result.push(createToolResultImageMessage(toolResultImages));
 		}
 	}
 
@@ -119,7 +161,128 @@ function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
 }
 
 function toImageDataUrl(part: vscode.LanguageModelDataPart): string {
-	return `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`;
+	return toImageDataUrlFromImage({ mimeType: part.mimeType, data: part.data });
+}
+
+function toImageDataUrlFromImage(image: ToolResultImage): string {
+	return `data:${image.mimeType};base64,${Buffer.from(image.data).toString('base64')}`;
+}
+
+function collectToolResultContent(
+	part: vscode.LanguageModelToolResultPart,
+	toolCallMetadata: ToolCallMetadata | undefined,
+	includeImages: boolean,
+): { text: string; images: ToolResultImage[] } {
+	let text = '';
+	const images: ToolResultImage[] = [];
+
+	for (const item of part.content) {
+		if (item instanceof vscode.LanguageModelTextPart) {
+			text += item.value;
+		} else if (includeImages && isImageDataPart(item)) {
+			images.push({
+				mimeType: item.mimeType,
+				data: item.data,
+			});
+		}
+	}
+
+	if (includeImages && images.length === 0) {
+		const image = readImageFromToolCall(toolCallMetadata);
+		if (image) {
+			images.push(image);
+		}
+	}
+
+	return { text, images };
+}
+
+function createToolResultImageMessage(images: readonly ToolResultImage[]): DeepSeekMessage {
+	return {
+		role: 'user',
+		content: [
+			{
+				type: 'text',
+				text: TOOL_RESULT_IMAGE_MESSAGE,
+			},
+			...images.map((image) => ({
+				type: 'image_url' as const,
+				image_url: {
+					url: toImageDataUrlFromImage(image),
+				},
+			})),
+		],
+	};
+}
+
+function readImageFromToolCall(
+	metadata: ToolCallMetadata | undefined,
+): ToolResultImage | undefined {
+	if (!metadata || !isImageToolCall(metadata)) {
+		return undefined;
+	}
+
+	for (const candidate of getImagePathCandidates(metadata.input)) {
+		try {
+			const filePath = toFsPath(candidate);
+			const mimeType = getImageMimeType(filePath);
+			if (!mimeType || !existsSync(filePath)) {
+				continue;
+			}
+			return {
+				mimeType,
+				data: readFileSync(filePath),
+			};
+		} catch {
+			// Ignore unreadable/non-file candidates and try the next one.
+		}
+	}
+
+	return undefined;
+}
+
+function isImageToolCall(metadata: ToolCallMetadata): boolean {
+	const name = metadata.name.toLowerCase();
+	if (name.includes('image') || name.includes('screenshot')) {
+		return true;
+	}
+
+	if (metadata.input && typeof metadata.input === 'object' && !Array.isArray(metadata.input)) {
+		const input = metadata.input as Record<string, unknown>;
+		return typeof input.imagePath === 'string' || typeof input.image_path === 'string';
+	}
+
+	return false;
+}
+
+function getImagePathCandidates(input: unknown): string[] {
+	if (!input || typeof input !== 'object' || Array.isArray(input)) {
+		return [];
+	}
+
+	const candidates: string[] = [];
+	for (const key of ['filePath', 'file_path', 'path', 'imagePath', 'image_path', 'uri']) {
+		const value = (input as Record<string, unknown>)[key];
+		if (typeof value === 'string' && value.trim().length > 0) {
+			candidates.push(value.trim());
+		}
+	}
+	return candidates;
+}
+
+function toFsPath(candidate: string): string {
+	if (/^file:/i.test(candidate)) {
+		try {
+			return vscode.Uri.parse(candidate).fsPath;
+		} catch {
+			return candidate;
+		}
+	}
+	return candidate;
+}
+
+function getImageMimeType(filePath: string): string | undefined {
+	return IMAGE_EXTENSION_MIME_TYPES[extname(filePath).toLowerCase()];
 }
 
 function getReasoningContent(

@@ -67,7 +67,9 @@ export async function uploadBytes(
 ): Promise<DeepSeekFile> {
 	const MAX_BYTES = 64 * 1024 * 1024;
 	if (data.byteLength > MAX_BYTES) {
-		throw new Error(`图片大小超过 64 MiB 上限（当前 ${(data.byteLength / 1024 / 1024).toFixed(2)} MiB）。`);
+		throw new Error(
+			`图片大小超过 64 MiB 上限（当前 ${(data.byteLength / 1024 / 1024).toFixed(2)} MiB）。`,
+		);
 	}
 
 	const form = new FormData();
@@ -129,7 +131,11 @@ export async function listCloudFiles(apiKey: string, baseUrl: string): Promise<D
  * @param baseUrl API 基础地址
  * @param fileId 要删除的文件 ID（形如 `file-api-...`）
  */
-export async function deleteCloudFile(apiKey: string, baseUrl: string, fileId: string): Promise<void> {
+export async function deleteCloudFile(
+	apiKey: string,
+	baseUrl: string,
+	fileId: string,
+): Promise<void> {
 	const response = await fetch(`${baseUrl}/files/${encodeURIComponent(fileId)}`, {
 		method: 'DELETE',
 		headers: { Authorization: `Bearer ${apiKey}` },
@@ -246,7 +252,10 @@ async function readCacheEntry(metaPath: vscode.Uri): Promise<LocalCacheEntry | u
 }
 
 async function writeCacheEntry(metaPath: vscode.Uri, entry: LocalCacheEntry): Promise<void> {
-	await vscode.workspace.fs.writeFile(metaPath, Buffer.from(JSON.stringify(entry, null, 2), 'utf8'));
+	await vscode.workspace.fs.writeFile(
+		metaPath,
+		Buffer.from(JSON.stringify(entry, null, 2), 'utf8'),
+	);
 }
 
 /** 记录上一次清理的时间（Unix 秒），避免每次上传都触发目录遍历。 */
@@ -306,7 +315,6 @@ export async function pruneLocalCache(
 		// meta 文件名形如 `<hash>.json`，对应图片文件为 `<hash>.<ext>`。
 		// 图片扩展名未存进 meta，因此通过扫描同目录中同前缀（去掉 .json）的图片文件来定位。
 		const imagePrefix = name.slice(0, -'.json'.length);
-		let imageFound = false;
 		try {
 			await vscode.workspace.fs.delete(metaUri, { recursive: false });
 			for (const [candidate, candidateType] of entries) {
@@ -319,7 +327,6 @@ export async function pruneLocalCache(
 					const imageUri = vscode.Uri.joinPath(cacheDir, candidate);
 					try {
 						await vscode.workspace.fs.delete(imageUri, { recursive: false });
-						imageFound = true;
 					} catch {
 						// 单张图片删除失败时继续尝试删除其他匹配文件。
 					}

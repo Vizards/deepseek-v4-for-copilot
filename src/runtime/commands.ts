@@ -53,9 +53,7 @@ async function clearCloudCacheCommand(context: vscode.ExtensionContext): Promise
 			async () => {
 				const deleted = await clearCloudFiles(apiKey, baseUrl);
 				logger.info(`Cleared ${deleted} cloud cache file(s)`);
-				void vscode.window.showInformationMessage(
-					t('cloudCache.cleared', String(deleted)),
-				);
+				void vscode.window.showInformationMessage(t('cloudCache.cleared', String(deleted)));
 			},
 		);
 	} catch (error) {

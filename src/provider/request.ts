@@ -2,7 +2,13 @@ import vscode from 'vscode';
 import * as crypto from 'crypto';
 import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
-import { getApiModelId, getBaseUrl, getCacheExpiresSeconds, getFilesApiEnabled, getMaxTokens } from '../config';
+import {
+	getApiModelId,
+	getBaseUrl,
+	getCacheExpiresSeconds,
+	getFilesApiEnabled,
+	getMaxTokens,
+} from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
@@ -88,7 +94,10 @@ export async function prepareChatRequest({
 		} catch (error) {
 			// Upload failed — fall back to the base64 native route so the
 			// conversation is not interrupted. Log the reason for diagnosis.
-			console.warn('[deepseek-copilot] Files API upload failed, falling back to base64 native vision', error);
+			console.warn(
+				'[deepseek-copilot] Files API upload failed, falling back to base64 native vision',
+				error,
+			);
 			filesApiFileIdByHash = undefined;
 			effectiveFilesApi = false;
 		}
@@ -286,39 +295,39 @@ function countNativeForwardedImageParts(messages: readonly DeepSeekMessage[]): n
  * same image only uploads once per request.
  */
 async function uploadNativeImages(
-        globalStorageUri: vscode.Uri,
-        apiKey: string,
-        baseUrl: string,
-        messages: readonly vscode.LanguageModelChatRequestMessage[],
+	globalStorageUri: vscode.Uri,
+	apiKey: string,
+	baseUrl: string,
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
 ): Promise<Map<string, string>> {
-        const fileIdByHash = new Map<string, string>();
+	const fileIdByHash = new Map<string, string>();
 
-        for (const message of messages) {
-                for (const part of message.content) {
-                        if (isImageDataPart(part)) {
-                                const hash = hashBytes(part.data);
-                                if (!fileIdByHash.has(hash)) {
-                                        const fileId = await ensureFileId(
-                                                globalStorageUri,
-                                                apiKey,
-                                                baseUrl,
-                                                part.data,
-                                                part.mimeType,
-                                                getCacheExpiresSeconds(),
-                                        );
-                                        fileIdByHash.set(hash, fileId);
-                                }
-                        }
-                }
-        }
+	for (const message of messages) {
+		for (const part of message.content) {
+			if (isImageDataPart(part)) {
+				const hash = hashBytes(part.data);
+				if (!fileIdByHash.has(hash)) {
+					const fileId = await ensureFileId(
+						globalStorageUri,
+						apiKey,
+						baseUrl,
+						part.data,
+						part.mimeType,
+						getCacheExpiresSeconds(),
+					);
+					fileIdByHash.set(hash, fileId);
+				}
+			}
+		}
+	}
 
-        return fileIdByHash;
+	return fileIdByHash;
 }
 
 function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
-        return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
+	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
 }
 
 function hashBytes(data: Uint8Array): string {
-        return crypto.createHash('sha256').update(data).digest('hex');
+	return crypto.createHash('sha256').update(data).digest('hex');
 }

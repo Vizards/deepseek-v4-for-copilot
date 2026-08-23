@@ -37,7 +37,8 @@ const zh: Translations = {
 
 	// Cloud cache (Files API)
 	'cloudCache.noApiKey': '需要先配置 DeepSeek API Key 才能清空云端缓存。',
-	'cloudCache.clearConfirm': '确定要清空 DeepSeek Files API 云端缓存吗？这将永久删除所有已上传的图片文件。',
+	'cloudCache.clearConfirm':
+		'确定要清空 DeepSeek Files API 云端缓存吗？这将永久删除所有已上传的图片文件。',
 	'cloudCache.clearConfirmAction': '清空',
 	'cloudCache.clearing': '正在清空云端缓存...',
 	'cloudCache.cleared': '已清空云端缓存，共删除 {0} 个文件。',

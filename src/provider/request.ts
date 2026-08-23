@@ -89,7 +89,13 @@ export async function prepareChatRequest({
 	let effectiveFilesApi = false;
 	if (filesApiEnabled && filesApiAvailable && nativeImageInput) {
 		try {
-			filesApiFileIdByHash = await uploadNativeImages(globalStorageUri, apiKey, baseUrl, messages);
+			filesApiFileIdByHash = await uploadNativeImages(
+				globalStorageUri,
+				apiKey,
+				baseUrl,
+				messages,
+				token,
+			);
 			effectiveFilesApi = true;
 		} catch (error) {
 			// Upload failed — fall back to the base64 native route so the
@@ -299,6 +305,7 @@ async function uploadNativeImages(
 	apiKey: string,
 	baseUrl: string,
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
+	token?: vscode.CancellationToken,
 ): Promise<Map<string, string>> {
 	const fileIdByHash = new Map<string, string>();
 
@@ -314,6 +321,7 @@ async function uploadNativeImages(
 						part.data,
 						part.mimeType,
 						getCacheExpiresSeconds(),
+						token,
 					);
 					fileIdByHash.set(hash, fileId);
 				}

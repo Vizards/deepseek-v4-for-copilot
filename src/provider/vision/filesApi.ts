@@ -57,6 +57,7 @@ function sha256(data: Uint8Array): string {
  * @param data 图片字节
  * @param filename 文件名
  * @param expiresSeconds 云端过期秒数（0 = 永久）
+ * @param token 可选的取消令牌；请求会响应取消并通过 AbortController 中断
  */
 export async function uploadBytes(
 	apiKey: string,
@@ -64,12 +65,24 @@ export async function uploadBytes(
 	data: Uint8Array,
 	filename: string,
 	expiresSeconds: number,
+	token?: vscode.CancellationToken,
 ): Promise<DeepSeekFile> {
 	const MAX_BYTES = 64 * 1024 * 1024;
 	if (data.byteLength > MAX_BYTES) {
 		throw new Error(
 			`图片大小超过 64 MiB 上限（当前 ${(data.byteLength / 1024 / 1024).toFixed(2)} MiB）。`,
 		);
+	}
+
+	// 用可选的取消令牌构建 AbortController，支持用户按 Esc 中断上传。
+	const controller = new AbortController();
+	const onCancel = () => controller.abort();
+	let cancelDisposable: vscode.Disposable | undefined;
+	if (token) {
+		if (token.isCancellationRequested) {
+			throw new Error('Files API upload cancelled');
+		}
+		cancelDisposable = token.onCancellationRequested(onCancel, undefined);
 	}
 
 	const form = new FormData();
@@ -82,18 +95,23 @@ export async function uploadBytes(
 		form.append('expires_after[seconds]', String(safeExpires));
 	}
 
-	const response = await fetch(`${baseUrl}/files`, {
-		method: 'POST',
-		headers: { Authorization: `Bearer ${apiKey}` },
-		body: form,
-	});
+	try {
+		const response = await fetch(`${baseUrl}/files`, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${apiKey}` },
+			body: form,
+			signal: controller.signal,
+		});
 
-	if (!response.ok) {
-		const body = await response.text();
-		throw new Error(`Files API 上传失败（HTTP ${response.status}）：${body}`);
+		if (!response.ok) {
+			const body = await response.text();
+			throw new Error(`Files API 上传失败（HTTP ${response.status}）：${body}`);
+		}
+
+		return (await response.json()) as DeepSeekFile;
+	} finally {
+		cancelDisposable?.dispose();
 	}
-
-	return (await response.json()) as DeepSeekFile;
 }
 
 /** 官方 `GET /files` 的分页响应。 */
@@ -178,6 +196,7 @@ export async function clearCloudFiles(apiKey: string, baseUrl: string): Promise<
  * @param imageData 图片字节
  * @param mimeType 图片 MIME 类型
  * @param expiresSeconds 云端过期秒数（0 = 永久；默认使用 CLOUD_CACHE_SECONDS）
+ * @param token 可选的取消令牌；上传过程会响应取消
  */
 export async function ensureFileId(
 	globalStorageUri: vscode.Uri,
@@ -186,7 +205,12 @@ export async function ensureFileId(
 	imageData: Uint8Array,
 	mimeType: string,
 	expiresSeconds: number = CLOUD_CACHE_SECONDS,
+	token?: vscode.CancellationToken,
 ): Promise<string> {
+	if (token?.isCancellationRequested) {
+		throw new Error('Files API upload cancelled');
+	}
+
 	const contentHash = sha256(imageData);
 	const cacheDir = vscode.Uri.joinPath(globalStorageUri, 'image-cache');
 	await vscode.workspace.fs.createDirectory(cacheDir);
@@ -230,6 +254,7 @@ export async function ensureFileId(
 		imageData,
 		contentHash + extFromMime(mimeType),
 		expiresSeconds,
+		token,
 	);
 
 	const newEntry: LocalCacheEntry = {
@@ -340,4 +365,21 @@ export async function pruneLocalCache(
 
 	lastPruneAt = Math.floor(Date.now() / 1000);
 	return removed;
+}
+
+/**
+ * 清空本地图片缓存目录（递归删除整个 image-cache 并重建）。
+ * 在清空云端缓存后调用，确保本地 meta 不会引用已删除的 file_id。
+ *
+ * @param globalStorageUri 扩展全局存储根
+ */
+export async function clearLocalCache(globalStorageUri: vscode.Uri): Promise<void> {
+	const cacheDir = vscode.Uri.joinPath(globalStorageUri, 'image-cache');
+	try {
+		await vscode.workspace.fs.delete(cacheDir, { recursive: true });
+	} catch {
+		// 目录不存在（尚未上传过图片），无需处理。
+	}
+	await vscode.workspace.fs.createDirectory(cacheDir);
+	lastPruneAt = Math.floor(Date.now() / 1000);
 }

@@ -5,7 +5,7 @@ import { getBaseUrl } from '../config';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import { ensureRequestDumpRoot } from '../provider/debug';
-import { clearCloudFiles } from '../provider/vision/filesApi';
+import { clearCloudFiles, clearLocalCache } from '../provider/vision/filesApi';
 
 export function registerCommands(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
@@ -48,10 +48,13 @@ async function clearCloudCacheCommand(context: vscode.ExtensionContext): Promise
 
 	const baseUrl = getBaseUrl();
 	try {
-		vscode.window.withProgress(
+		await vscode.window.withProgress(
 			{ location: vscode.ProgressLocation.Notification, title: t('cloudCache.clearing') },
 			async () => {
 				const deleted = await clearCloudFiles(apiKey, baseUrl);
+				// 云端已清空，同步清空本地 image-cache，避免本地 meta 仍指向已删除的
+				// file_id，导致后续聊天复用时服务器 400 "file not found"。
+				await clearLocalCache(context.globalStorageUri);
 				logger.info(`Cleared ${deleted} cloud cache file(s)`);
 				void vscode.window.showInformationMessage(t('cloudCache.cleared', String(deleted)));
 			},

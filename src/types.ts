@@ -7,9 +7,23 @@
 /** API-level reasoning efforts. Disabling thinking is modeled separately. */
 export type ReasoningEffort = 'low' | 'high' | 'max';
 
+export interface DeepSeekTextContentPart {
+	type: 'text';
+	text: string;
+}
+
+export interface DeepSeekImageUrlContentPart {
+	type: 'image_url';
+	image_url: {
+		url: string;
+	};
+}
+
+export type DeepSeekContentPart = DeepSeekTextContentPart | DeepSeekImageUrlContentPart;
+
 export interface DeepSeekMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool';
-	content: string;
+	content: string | DeepSeekContentPart[];
 	tool_call_id?: string;
 	tool_calls?: DeepSeekToolCall[];
 	reasoning_content?: string;
@@ -130,6 +144,7 @@ export interface ModelDefinition {
 	capabilities: {
 		toolCalling: boolean | number;
 		imageInput: boolean;
+		nativeImageInput?: boolean;
 		thinking: ThinkingCapability | false;
 	};
 	requiresThinkingParam: boolean;

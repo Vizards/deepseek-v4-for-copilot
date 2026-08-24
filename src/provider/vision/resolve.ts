@@ -4,23 +4,23 @@ import { toWellFormedString } from '../../json';
 import { parseFirstReplayMarker } from '../replay';
 import { createVisionProxyFailureNotice, createVisionProxyMissingNotice } from '../tools/notices';
 import {
-	formatVisionProxyErrorCode,
-	getVisionProxyErrorDisplayCode,
-	isVisionProxyError,
-} from './protocols/errors';
-import {
 	IMAGE_DESCRIPTION_PREFIX,
 	IMAGE_DESCRIPTION_SUFFIX,
 	IMAGE_DESCRIPTION_UNAVAILABLE,
 } from './consts';
+import { logVisionProxyDescribeFailed, logVisionProxyUnavailable } from './log';
+import {
+	formatVisionProxyErrorCode,
+	getVisionProxyErrorDisplayCode,
+	isVisionProxyError,
+} from './protocols/errors';
+import { getVisionPrompt } from './sources/vscode';
 import type {
 	VisionDescriber,
 	VisionImagePart,
 	VisionResolutionResult,
 	VisionResolutionStats,
 } from './types';
-import { getVisionPrompt } from './sources/vscode';
-import { logVisionProxyDescribeFailed, logVisionProxyUnavailable } from './log';
 
 interface CurrentVisionResolution {
 	text: string;
@@ -122,14 +122,17 @@ export async function resolveImageMessages(
 
 function createVisionResolutionStats(): VisionResolutionStats {
 	return {
+		imageHandlingMode: 'none',
 		inputImageParts: 0,
 		inputImageMessages: 0,
+		inputImageBytes: 0,
 		currentImageMessages: 0,
 		generatedImageMessages: 0,
 		replayedImageMessages: 0,
 		omittedImageMessages: 0,
 		unavailableImageMessages: 0,
 		failedImageMessages: 0,
+		forwardedImageParts: 0,
 		droppedImageParts: 0,
 		markerVisionTextChars: 0,
 		invalidMarkerVisionMetadata: 0,
@@ -141,12 +144,18 @@ function collectInputImageStats(
 	stats: VisionResolutionStats,
 ): void {
 	for (const message of messages) {
-		const imageParts = getImageParts(message).length;
+		const imageDataParts = getImageParts(message);
+		const imageParts = imageDataParts.length;
 		if (imageParts === 0) {
 			continue;
 		}
+		// Any image observed here means the request entered proxy resolution flow.
+		stats.imageHandlingMode = 'proxy';
 		stats.inputImageMessages += 1;
 		stats.inputImageParts += imageParts;
+		for (const part of imageDataParts) {
+			stats.inputImageBytes += part.data.byteLength;
+		}
 	}
 }
 

@@ -21,6 +21,7 @@ const zh: Translations = {
 	// Model descriptions
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
+	'model.flash-vision-exp.detail': '原生视觉实验模型',
 	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
 	'model.pricing.currentPeak': '高峰时段',
@@ -38,6 +39,7 @@ const zh: Translations = {
 	'model.pricing.duration.hours': '{0} 时',
 	'model.pricing.duration.minute': '{0} 分',
 	'model.pricing.duration.minutes': '{0} 分',
+	'model.flash-vision-exp.tooltip': 'DeepSeek V4 Flash 视觉实验模型，支持原生图片与文本输入。',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': '请先配置 API Key',
@@ -67,7 +69,7 @@ const zh: Translations = {
 	'vision.action.configureProxy': '配置视觉代理',
 	'vision.panel.title': 'DeepSeek 视觉代理',
 	'vision.panel.description':
-		'配置一个支持图片输入的模型，用来先把图片转换成文字描述，再把描述随消息发送给 DeepSeek。图片本身不会发送给 DeepSeek。',
+		'为 Flash 和 Pro 配置一个将图片转换成文字描述的视觉模型。Vision Exp 会直接处理原图。',
 	'vision.panel.source.vscodeLm': 'VS Code 模型',
 	'vision.panel.source.apiEndpoint': 'API 端点',
 	'vision.panel.field.source': '视觉代理来源',
@@ -224,6 +226,7 @@ const en: Translations = {
 	// Model descriptions
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
+	'model.flash-vision-exp.detail': 'Experimental native vision model',
 	'model.flash.tooltip':
 		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
 	'model.pro.tooltip':
@@ -243,6 +246,8 @@ const en: Translations = {
 	'model.pricing.duration.hours': '{0} hours',
 	'model.pricing.duration.minute': '{0} minute',
 	'model.pricing.duration.minutes': '{0} minutes',
+	'model.flash-vision-exp.tooltip':
+		'Experimental DeepSeek V4 Flash vision model with native image and text input.',
 
 	// API Key
 	'auth.apiKeyRequiredDetail': 'Please run DeepSeek: Set API Key to configure.',
@@ -276,7 +281,7 @@ const en: Translations = {
 	'vision.action.configureProxy': 'Configure Vision Proxy',
 	'vision.panel.title': 'DeepSeek Vision Proxy',
 	'vision.panel.description':
-		'Configure a vision-capable model to turn image attachments into text before DeepSeek receives the request. DeepSeek receives the description, not the original images.',
+		'Configure a vision model that turns images into text for Flash and Pro. Vision Exp processes original images directly.',
 	'vision.panel.source.vscodeLm': 'VS Code model',
 	'vision.panel.source.apiEndpoint': 'API endpoint',
 	'vision.panel.field.source': 'Vision proxy source',

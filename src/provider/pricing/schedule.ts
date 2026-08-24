@@ -2,8 +2,9 @@
  * DeepSeek V4 peak/off-peak billing windows.
  *
  * The official pricing page defines peak hours as 01:00-04:00 and
- * 06:00-10:00 UTC. Keep this calculation in UTC so the displayed period
- * does not depend on the user's local timezone or daylight-saving rules.
+ * 06:00-10:00 UTC, Monday through Friday. Keep this calculation in UTC so
+ * the displayed period does not depend on the user's local timezone or
+ * daylight-saving rules.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -21,19 +22,43 @@ export interface PricingPeriodSnapshot {
 export function getPricingPeriod(now = new Date()): PricingPeriodSnapshot {
 	const hour = now.getUTCHours();
 	const period: PricingPeriod =
-		(hour >= 1 && hour < 4) || (hour >= 6 && hour < 10) ? 'peak' : 'offPeak';
-	const utcDayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-	const nowMs = now.getTime();
-
-	const nextTransitionMs =
-		TRANSITION_HOURS_UTC.map((transitionHour) => utcDayStart + transitionHour * HOUR_MS).find(
-			(transitionMs) => transitionMs > nowMs,
-		) ?? utcDayStart + DAY_MS + TRANSITION_HOURS_UTC[0] * HOUR_MS;
+		isWeekdayUtc(now.getUTCDay()) && isPeakHour(hour) ? 'peak' : 'offPeak';
 
 	return {
 		period,
-		nextTransitionAt: new Date(nextTransitionMs),
+		nextTransitionAt: getNextTransitionAt(now),
 	};
+}
+
+function isWeekdayUtc(day: number): boolean {
+	return day >= 1 && day <= 5;
+}
+
+function isPeakHour(hour: number): boolean {
+	return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10);
+}
+
+function getNextTransitionAt(now: Date): Date {
+	const utcDayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+	const nowMs = now.getTime();
+
+	// Scan a full week so Friday after the second peak window and every
+	// weekend correctly resolve to Monday 01:00 UTC.
+	for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+		const dayStartMs = utcDayStart + dayOffset * DAY_MS;
+		if (!isWeekdayUtc(new Date(dayStartMs).getUTCDay())) {
+			continue;
+		}
+
+		const nextTransitionMs = TRANSITION_HOURS_UTC.map(
+			(transitionHour) => dayStartMs + transitionHour * HOUR_MS,
+		).find((transitionMs) => transitionMs > nowMs);
+		if (nextTransitionMs !== undefined) {
+			return new Date(nextTransitionMs);
+		}
+	}
+
+	throw new Error('Unable to find the next DeepSeek pricing transition');
 }
 
 export class PricingRefreshScheduler {

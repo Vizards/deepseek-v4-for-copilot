@@ -1,16 +1,20 @@
 import vscode from 'vscode';
 import { REPLAY_MARKER_MIME } from './replay';
 
-const IMAGE_PART_ESTIMATED_CHARS = 1020;
+const IMAGE_PART_FIXED_TOKENS = 384;
+
+interface PartTokenEstimate {
+	textChars: number;
+	fixedTokens: number;
+}
 
 /**
- * Recursively estimate the character count for a single content part.
- * Returns character count, which the caller divides by charsPerToken to get token estimate.
+ * Recursively estimate text chars and fixed token parts for a single content part.
  */
-function estimatePartChars(part: unknown): number {
+function estimatePartTokens(part: unknown): PartTokenEstimate {
 	// 1. LanguageModelTextPart — the most common case
 	if (part instanceof vscode.LanguageModelTextPart) {
-		return part.value.length;
+		return { textChars: part.value.length, fixedTokens: 0 };
 	}
 
 	// 2. LanguageModelToolCallPart — count callId + name + JSON-serialized input
@@ -22,18 +26,21 @@ function estimatePartChars(part: unknown): number {
 			// If input can't be stringified (e.g. contains circular refs), fall back to a rough estimate
 			chars += 2;
 		}
-		return chars;
+		return { textChars: chars, fixedTokens: 0 };
 	}
 
 	// 3. LanguageModelToolResultPart — recursively count nested content parts
 	if (part instanceof vscode.LanguageModelToolResultPart) {
-		let chars = part.callId.length;
+		let textChars = part.callId.length;
+		let fixedTokens = 0;
 		if (Array.isArray(part.content)) {
 			for (const item of part.content) {
-				chars += estimatePartChars(item);
+				const nested = estimatePartTokens(item);
+				textChars += nested.textChars;
+				fixedTokens += nested.fixedTokens;
 			}
 		}
-		return chars;
+		return { textChars, fixedTokens };
 	}
 
 	// 4. LanguageModelDataPart — use a capped heuristic because our model never
@@ -45,34 +52,35 @@ function estimatePartChars(part: unknown): number {
 			// Marker metadata is not sent as assistant content. Its vision text belongs
 			// logically to a previous user image message, but provideTokenCount only
 			// receives one message at a time and cannot safely bind history here.
-			return 0;
+			return { textChars: 0, fixedTokens: 0 };
 		}
 
-		// Images are resolved by the vision pipeline before reaching DeepSeek.
-		// At token-count time we cannot know whether this image will be generated,
-		// replayed from a later assistant marker, or omitted as a historical miss.
-		// Use a stable fallback estimate instead of raw image bytes.
+		// Keep image estimation conservative and independent from charsPerToken
+		// so native-image requests do not distort adaptive text calibration.
 		if (mime.startsWith('image/')) {
-			return IMAGE_PART_ESTIMATED_CHARS;
+			return { textChars: 0, fixedTokens: IMAGE_PART_FIXED_TOKENS };
 		}
 		// PDFs and other documents: use byteLength as a rough proxy but cap it
 		// to prevent a single large attachment from dominating the budget.
-		return Math.min(part.data?.byteLength ?? 0, 10000);
+		return {
+			textChars: Math.min(part.data?.byteLength ?? 0, 10000),
+			fixedTokens: 0,
+		};
 	}
 
 	// 5. LanguageModelThinkingPart (proposed API) — handle string | string[]
 	if (isLanguageModelThinkingPart(part)) {
 		if (typeof part.value === 'string') {
-			return part.value.length;
+			return { textChars: part.value.length, fixedTokens: 0 };
 		}
 		if (Array.isArray(part.value)) {
-			let chars = 0;
+			let textChars = 0;
 			for (const s of part.value) {
-				chars += s.length;
+				textChars += s.length;
 			}
-			return chars;
+			return { textChars, fixedTokens: 0 };
 		}
-		return 0;
+		return { textChars: 0, fixedTokens: 0 };
 	}
 
 	// 6. LanguageModelPromptTsxPart — stringify the value if present
@@ -84,22 +92,25 @@ function estimatePartChars(part: unknown): number {
 		part.constructor?.name === 'LanguageModelPromptTsxPart'
 	) {
 		try {
-			return JSON.stringify((part as { value: unknown }).value).length;
+			return {
+				textChars: JSON.stringify((part as { value: unknown }).value).length,
+				fixedTokens: 0,
+			};
 		} catch {
-			return 0;
+			return { textChars: 0, fixedTokens: 0 };
 		}
 	}
 
 	// Fallback: try to stringify unknown part types
 	if (part && typeof part === 'object') {
 		try {
-			return JSON.stringify(part).length;
+			return { textChars: JSON.stringify(part).length, fixedTokens: 0 };
 		} catch {
-			return 0;
+			return { textChars: 0, fixedTokens: 0 };
 		}
 	}
 
-	return 0;
+	return { textChars: 0, fixedTokens: 0 };
 }
 
 /**
@@ -125,8 +136,13 @@ export function estimateTokenCount(
 	}
 
 	let totalChars = 0;
+	let fixedTokens = 0;
 	for (const part of text.content) {
-		totalChars += estimatePartChars(part);
+		const estimate = estimatePartTokens(part);
+		totalChars += estimate.textChars;
+		fixedTokens += estimate.fixedTokens;
 	}
-	return Math.max(1, Math.ceil(totalChars / charsPerToken));
+
+	const textTokens = totalChars > 0 ? Math.ceil(totalChars / charsPerToken) : 0;
+	return Math.max(1, textTokens + fixedTokens);
 }

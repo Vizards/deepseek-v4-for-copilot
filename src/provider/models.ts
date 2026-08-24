@@ -22,6 +22,7 @@ import { toModelPricingInfo, type ModelPricingInformation } from './pricing/cost
 export type ThinkingEffort = 'none' | ReasoningEffort;
 
 export type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseOptions & {
+	readonly modelOptions?: Record<string, unknown>;
 	readonly modelConfiguration?: Record<string, unknown>;
 	readonly configuration?: Record<string, unknown>;
 };
@@ -73,8 +74,12 @@ export function getConfiguredThinkingEffort(
 	options: ModelConfigurationOptions,
 	thinkingCapability: ThinkingCapability,
 ): ThinkingEffort {
+	// Prefer request-scoped overrides first so an internal proxy pass can force a
+	// specific effort without mutating the persisted user model configuration.
 	const configuredEffort =
-		options.modelConfiguration?.reasoningEffort ?? options.configuration?.reasoningEffort;
+		options.modelOptions?.reasoningEffort ??
+		options.modelConfiguration?.reasoningEffort ??
+		options.configuration?.reasoningEffort;
 
 	if (configuredEffort === 'none' && thinkingCapability.canDisable) {
 		return 'none';

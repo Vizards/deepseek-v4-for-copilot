@@ -4,18 +4,19 @@ import { getDebugLoggingEnabled } from '../../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { logger } from '../../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../../types';
+import { deepSeekContentToText } from '../content';
+import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
 import {
 	classifyDeepSeekRequest,
 	formatModelFields,
 	formatRequestLogLine,
 	type RequestKind,
 } from '../routing';
-import { REPLAY_MARKER_MIME, parseFirstReplayMarker } from '../replay';
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
 import type { ActivatePreflightInspection } from '../tools/preflight';
+import type { VisionResolutionStats as VisionPipelineStats, VisionProxySource } from '../vision';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../vision/consts';
-import type { VisionProxySource, VisionResolutionStats as VisionPipelineStats } from '../vision';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
@@ -289,8 +290,11 @@ export function logToolFlowDiagnostics({
 }
 
 interface VisionMessageStats {
+	imageHandlingMode: 'none' | 'proxy' | 'native';
 	inputImageParts: number;
 	inputImageMessages: number;
+	inputImageBytes: number;
+	forwardedImageParts: number;
 	describedImageMessages: number;
 	failedImageMessages: number;
 	droppedImageParts: number;
@@ -830,8 +834,11 @@ function summarizeVisionResolution(
 	visionProxySource: VisionProxySource | undefined,
 ): VisionMessageStats {
 	const stats: VisionMessageStats = {
+		imageHandlingMode: 'none',
 		inputImageParts: 0,
 		inputImageMessages: 0,
+		inputImageBytes: 0,
+		forwardedImageParts: 0,
 		describedImageMessages: 0,
 		failedImageMessages: 0,
 		droppedImageParts: 0,
@@ -842,6 +849,7 @@ function summarizeVisionResolution(
 
 	for (const [index, message] of inputMessages.entries()) {
 		const imageParts = countImageDataParts(message);
+		stats.inputImageBytes += countImageDataBytes(message);
 		const inputText = getMessageText(message);
 		if (countLiteral(inputText, '[Image Description:') > 0) {
 			stats.historyDescriptionMessages += 1;
@@ -853,6 +861,7 @@ function summarizeVisionResolution(
 
 			const resolvedMessage = resolvedMessages[index];
 			const resolvedImageParts = resolvedMessage ? countImageDataParts(resolvedMessage) : 0;
+			stats.forwardedImageParts += Math.min(imageParts, resolvedImageParts);
 			const resolvedText = resolvedMessage ? getMessageText(resolvedMessage) : '';
 			const newDescriptions = Math.max(
 				0,
@@ -877,11 +886,31 @@ function summarizeVisionResolution(
 		}
 	}
 
+	if (stats.inputImageParts > 0) {
+		// If any image survives in resolved messages we treat this as native forwarding;
+		// otherwise assume proxy replacement consumed all image parts.
+		stats.imageHandlingMode = stats.forwardedImageParts > 0 ? 'native' : 'proxy';
+	}
+	if (visionProxySource) {
+		// Source metadata from the pipeline is authoritative when present.
+		stats.imageHandlingMode = 'proxy';
+	}
+
 	return stats;
 }
 
 function countImageDataParts(message: vscode.LanguageModelChatRequestMessage): number {
 	return message.content.filter((part) => isImageDataPart(part)).length;
+}
+
+function countImageDataBytes(message: vscode.LanguageModelChatRequestMessage): number {
+	let bytes = 0;
+	for (const part of message.content) {
+		if (isImageDataPart(part)) {
+			bytes += part.data.byteLength;
+		}
+	}
+	return bytes;
 }
 
 function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
@@ -913,9 +942,21 @@ function formatVisionTrace(
 	const note =
 		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats);
+	// Prefer precise pipeline counters when available; fall back to reconstructed
+	// message-based stats for older/non-pipeline paths.
+	const mode = pipelineStats?.imageHandlingMode ?? stats.imageHandlingMode;
+	const inputImageParts = pipelineStats?.inputImageParts ?? stats.inputImageParts;
+	const inputImageMessages = pipelineStats?.inputImageMessages ?? stats.inputImageMessages;
+	const inputImageBytes = pipelineStats?.inputImageBytes ?? stats.inputImageBytes;
+	const forwardedImageParts = pipelineStats?.forwardedImageParts ?? stats.forwardedImageParts;
+	const droppedImageParts = pipelineStats?.droppedImageParts ?? stats.droppedImageParts;
 	const parts = [
-		`vision inputImages=${stats.inputImageParts}`,
-		`inputMessages=${stats.inputImageMessages}`,
+		`vision mode=${mode}`,
+		`inputImages=${inputImageParts}`,
+		`forwarded=${forwardedImageParts}`,
+		`dropped=${droppedImageParts}`,
+		`bytes=${inputImageBytes}`,
+		`inputMessages=${inputImageMessages}`,
 	];
 
 	if (pipelineStats && hasVisionPipelineActivity(pipelineStats)) {
@@ -924,7 +965,6 @@ function formatVisionTrace(
 			`generated=${pipelineStats.generatedImageMessages}`,
 			`replayed=${pipelineStats.replayedImageMessages}`,
 			`omitted=${pipelineStats.omittedImageMessages}`,
-			`droppedParts=${pipelineStats.droppedImageParts}`,
 		);
 		appendNumberIfNonZero(parts, 'unavailable', pipelineStats.unavailableImageMessages);
 		appendNumberIfNonZero(parts, 'failed', pipelineStats.failedImageMessages);
@@ -933,7 +973,6 @@ function formatVisionTrace(
 	} else {
 		appendNumberIfNonZero(parts, 'generated', stats.describedImageMessages);
 		appendNumberIfNonZero(parts, 'failed', stats.failedImageMessages);
-		appendNumberIfNonZero(parts, 'droppedParts', stats.droppedImageParts);
 	}
 
 	parts.push(`model=${visionModel}`);
@@ -949,7 +988,10 @@ function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): bool
 		return false;
 	}
 	return (
+		stats.imageHandlingMode !== 'none' ||
 		stats.inputImageParts > 0 ||
+		stats.inputImageBytes > 0 ||
+		stats.forwardedImageParts > 0 ||
 		stats.currentImageMessages > 0 ||
 		stats.generatedImageMessages > 0 ||
 		stats.replayedImageMessages > 0 ||
@@ -1599,6 +1641,7 @@ function summarizeMessage(
 	index: number,
 	followsToolResult: boolean,
 ): CacheTraceMessageSummary {
+	const contentText = toDiagnosticContentText(message.content);
 	const toolCallArgumentChars =
 		message.tool_calls?.reduce((sum, toolCall) => sum + toolCall.function.arguments.length, 0) ?? 0;
 	const reasoningChars = message.reasoning_content?.length ?? 0;
@@ -1611,21 +1654,21 @@ function summarizeMessage(
 		: ('none' as const);
 	const hasReasoningContent = message.reasoning_content !== undefined;
 	const hasEmptyReasoningContent = hasReasoningContent && reasoningChars === 0;
-	const imageDescriptionCount = countLiteral(message.content, '[Image Description:');
-	const unableImageCount = countLiteral(message.content, IMAGE_DESCRIPTION_UNAVAILABLE);
-	const urlCount = countRegex(message.content, /https?:\/\//g);
-	const codeFenceCount = countLiteral(message.content, '```');
-	const likelyPathCount = countLikelyPaths(message.content);
+	const imageDescriptionCount = countLiteral(contentText, '[Image Description:');
+	const unableImageCount = countLiteral(contentText, IMAGE_DESCRIPTION_UNAVAILABLE);
+	const urlCount = countRegex(contentText, /https?:\/\//g);
+	const codeFenceCount = countLiteral(contentText, '```');
+	const likelyPathCount = countLikelyPaths(contentText);
 
 	return {
 		index,
 		role: message.role,
-		hash: hashString(stableStringify(message)),
-		contentHash: hashString(message.content),
-		contentHeadHash: hashString(message.content.slice(0, HASH_WINDOW_CHARS)),
-		contentTailHash: hashString(message.content.slice(-HASH_WINDOW_CHARS)),
-		contentChars: message.content.length,
-		contentLines: countLines(message.content),
+		hash: hashString(stableStringify(toDiagnosticMessageFingerprint(message))),
+		contentHash: hashString(contentText),
+		contentHeadHash: hashString(contentText.slice(0, HASH_WINDOW_CHARS)),
+		contentTailHash: hashString(contentText.slice(-HASH_WINDOW_CHARS)),
+		contentChars: contentText.length,
+		contentLines: countLines(contentText),
 		imageDescriptionCount,
 		unableImageCount,
 		urlCount,
@@ -1641,7 +1684,7 @@ function summarizeMessage(
 		missingPostToolReasoning: assistantAfterToolResult && !hasReasoningContent,
 		missingPostToolCallReasoning: afterToolResultKind === 'tool-call' && !hasReasoningContent,
 		missingPostToolFinalReasoning: afterToolResultKind === 'final' && !hasReasoningContent,
-		contentSections: index === 0 ? summarizeSystemPromptSections(message.content) : undefined,
+		contentSections: index === 0 ? summarizeSystemPromptSections(contentText) : undefined,
 	};
 }
 
@@ -1807,6 +1850,7 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 	let followsToolResult = false;
 
 	for (const message of messages) {
+		const contentText = toDiagnosticContentText(message.content);
 		if (message.role === 'user') {
 			userMessages += 1;
 		} else if (message.role === 'assistant') {
@@ -1817,33 +1861,33 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 			systemMessages += 1;
 		}
 
-		totalContentChars += message.content.length;
-		if (message.content.length > LARGE_MESSAGE_CHARS) {
+		totalContentChars += contentText.length;
+		if (contentText.length > LARGE_MESSAGE_CHARS) {
 			largeMessages += 1;
 		}
 
-		const imageDescriptions = countLiteral(message.content, '[Image Description:');
+		const imageDescriptions = countLiteral(contentText, '[Image Description:');
 		if (imageDescriptions > 0) {
 			imageDescriptionMessages += 1;
 			imageDescriptionParts += imageDescriptions;
 		}
-		if (message.content.includes(IMAGE_DESCRIPTION_UNAVAILABLE)) {
+		if (contentText.includes(IMAGE_DESCRIPTION_UNAVAILABLE)) {
 			unableImageMessages += 1;
 		}
 
-		const messageUrlCount = countRegex(message.content, /https?:\/\//g);
+		const messageUrlCount = countRegex(contentText, /https?:\/\//g);
 		if (messageUrlCount > 0) {
 			urlMessages += 1;
 			urlCount += messageUrlCount;
 		}
 
-		const messageCodeFenceCount = countLiteral(message.content, '```');
+		const messageCodeFenceCount = countLiteral(contentText, '```');
 		if (messageCodeFenceCount > 0) {
 			codeFenceMessages += 1;
 			codeFenceCount += messageCodeFenceCount;
 		}
 
-		const messageLikelyPathCount = countLikelyPaths(message.content);
+		const messageLikelyPathCount = countLikelyPaths(contentText);
 		if (messageLikelyPathCount > 0) {
 			likelyPathMessages += 1;
 			likelyPathCount += messageLikelyPathCount;
@@ -1943,6 +1987,112 @@ function summarizeStats(messages: DeepSeekMessage[], toolCount: number): CacheTr
 		likelyPathMessages,
 		likelyPathCount,
 	};
+}
+
+// Diagnostic summaries must stay readable without materializing raw image payloads.
+// Using sanitized image metadata keeps the trace compact and avoids dominating the
+// cache fingerprint with base64-heavy data URLs.
+function toDiagnosticContentText(content: DeepSeekMessage['content']): string {
+	if (typeof content !== 'object' || !Array.isArray(content)) {
+		return deepSeekContentToText(content, { separator: '\n' });
+	}
+
+	const parts: string[] = [];
+	for (const part of content) {
+		if (part.type === 'text') {
+			parts.push(part.text);
+			continue;
+		}
+		if (part.type === 'image_url') {
+			parts.push(formatDiagnosticImageUrlSummary(part.image_url.url));
+		}
+	}
+	return parts.join('\n');
+}
+
+function toDiagnosticMessageFingerprint(message: DeepSeekMessage): unknown {
+	if (typeof message.content !== 'object' || !Array.isArray(message.content)) {
+		return message;
+	}
+
+	return {
+		...message,
+		content: message.content.map((part) => {
+			if (part.type === 'text') {
+				return part;
+			}
+			if (part.type === 'image_url') {
+				const meta = summarizeImageUrlForDiagnostics(part.image_url.url);
+				return {
+					type: 'image_url',
+					image_url: {
+						mimeType: meta.mimeType,
+						byteLength: meta.byteLength,
+						kind: meta.kind,
+					},
+				};
+			}
+			return part;
+		}),
+	};
+}
+
+function formatDiagnosticImageUrlSummary(url: string): string {
+	const summary = summarizeImageUrlForDiagnostics(url);
+	return `[image_url kind=${summary.kind} mime=${summary.mimeType} bytes=${summary.byteLength}]`;
+}
+
+// Replace full data URLs with compact metadata so the cache trace can still express
+// image presence and size without exposing or hashing the raw base64 payload.
+function summarizeImageUrlForDiagnostics(url: string): {
+	kind: 'data-url' | 'remote-url' | 'invalid-data-url';
+	mimeType: string;
+	byteLength: number;
+} {
+	if (!url.startsWith('data:')) {
+		return { kind: 'remote-url', mimeType: 'remote', byteLength: 0 };
+	}
+
+	const commaIndex = url.indexOf(',');
+	if (commaIndex < 0) {
+		return { kind: 'invalid-data-url', mimeType: 'invalid', byteLength: 0 };
+	}
+
+	const header = url.slice(5, commaIndex);
+	const payload = url.slice(commaIndex + 1);
+	const [mimeTypeRaw, ...flags] = header.split(';');
+	const mimeType = mimeTypeRaw || 'text/plain';
+	const isBase64 = flags.some((flag) => flag.toLowerCase() === 'base64');
+	if (isBase64) {
+		return {
+			kind: 'data-url',
+			mimeType,
+			byteLength: estimateBase64DecodedBytes(payload),
+		};
+	}
+
+	try {
+		return {
+			kind: 'data-url',
+			mimeType,
+			byteLength: Buffer.byteLength(decodeURIComponent(payload), 'utf8'),
+		};
+	} catch {
+		return {
+			kind: 'invalid-data-url',
+			mimeType,
+			byteLength: 0,
+		};
+	}
+}
+
+function estimateBase64DecodedBytes(base64Payload: string): number {
+	const normalized = base64Payload.replace(/\s+/g, '');
+	if (!normalized) {
+		return 0;
+	}
+	const padding = normalized.endsWith('==') ? 2 : normalized.endsWith('=') ? 1 : 0;
+	return Math.floor((normalized.length * 3) / 4) - padding;
 }
 
 function formatMessageSummary(summary: CacheTraceMessageSummary | undefined): string {

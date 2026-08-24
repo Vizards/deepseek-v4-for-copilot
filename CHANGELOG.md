@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.7.1...v0.8.0) (2026-08-22)
+
+
+### Features
+
+* **vision:** add DeepSeek V4 Flash Vision Exp support ([#243](https://github.com/Vizards/deepseek-v4-for-copilot/issues/243)) ([8deb532](https://github.com/Vizards/deepseek-v4-for-copilot/commit/8deb5321f7ef385789206da33af681a74ea96012)), closes [#242](https://github.com/Vizards/deepseek-v4-for-copilot/issues/242)
+
+
+### Documentation
+
+* explain native vision and vision proxy ([#246](https://github.com/Vizards/deepseek-v4-for-copilot/issues/246)) ([b0d8e5a](https://github.com/Vizards/deepseek-v4-for-copilot/commit/b0d8e5a1969de17e179e3d842aefa7af3e8402b8))
+
 ## [0.7.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.7.0...v0.7.1) (2026-08-13)
 
 

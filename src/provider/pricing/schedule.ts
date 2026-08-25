@@ -2,15 +2,24 @@
  * DeepSeek V4 peak/off-peak billing windows.
  *
  * The official pricing page defines peak hours as 01:00-04:00 and
- * 06:00-10:00 UTC, Monday through Friday. Keep this calculation in UTC so
- * the displayed period does not depend on the user's local timezone or
- * daylight-saving rules.
+ * 06:00-10:00 UTC, Monday through Friday. The page currently expresses both
+ * the hours and weekdays in UTC, so this calculation does not depend on the
+ * user's local timezone or daylight-saving rules.
+ *
+ * These windows also happen to be safe if the weekday rule is interpreted in
+ * Beijing time: the UTC and Beijing calendar dates diverge at 16:00 UTC. If
+ * a future schedule includes 16:00 UTC or later while weekdays remain based
+ * on Beijing time, replace getUTCDay() with an Asia/Shanghai date conversion.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const MIN_TIMER_DELAY_MS = 1000;
-const TRANSITION_HOURS_UTC = [1, 4, 6, 10] as const;
+const PEAK_WINDOWS_UTC = [
+	{ start: 1, end: 4 },
+	{ start: 6, end: 10 },
+] as const;
+const TRANSITION_HOURS_UTC = PEAK_WINDOWS_UTC.flatMap(({ start, end }) => [start, end]);
 
 export type PricingPeriod = 'offPeak' | 'peak';
 
@@ -35,7 +44,7 @@ function isWeekdayUtc(day: number): boolean {
 }
 
 function isPeakHour(hour: number): boolean {
-	return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10);
+	return PEAK_WINDOWS_UTC.some(({ start, end }) => hour >= start && hour < end);
 }
 
 function getNextTransitionAt(now: Date): Date {

@@ -1,3 +1,13 @@
+/**
+ * Upper bound for the vision proxy request timeout in milliseconds.
+ *
+ * Node's `setTimeout()` treats any delay larger than `2_147_483_647` ms as
+ * `1` ms, which would produce an almost immediate timeout. This cap (about
+ * 24.86 days) is far above any realistic vision request, so it only guards
+ * against oversized user input.
+ */
+export const MAX_TIMEOUT_MS = 2_147_483_647;
+
 /** Default model ID used for the vision proxy when auto-detection is enabled. */
 export const DEFAULT_VISION_MODEL_ID = 'oswe-vscode-prime';
 

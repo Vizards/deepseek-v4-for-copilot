@@ -112,7 +112,7 @@ export function getVisionProxyPanelHtml(
 					</div>
 					<div class="field">
 						<label for="timeoutMs">${escapeHtml(strings.fieldTimeoutMs)}</label>
-						<input id="timeoutMs" type="number" min="1" placeholder="30000">
+						<input id="timeoutMs" type="number" min="1" max="2147483647" step="1" placeholder="30000">
 						<div class="hint">${escapeHtml(strings.hintTimeoutMs)}</div>
 					</div>
 				</div>

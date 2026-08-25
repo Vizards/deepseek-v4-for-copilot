@@ -9,6 +9,7 @@ import type {
 	VisionProxyProviderFamily,
 	VisionProxySource,
 } from '../../types';
+import { MAX_TIMEOUT_MS } from '../../consts';
 
 export const VISION_PROXY_CONFIG_KEY = 'deepseek-copilot.visionProxy.config';
 export const VISION_PROXY_SOURCE_KEY = 'deepseek-copilot.visionProxy.source';
@@ -162,7 +163,10 @@ function normalizeExtraBody(value: unknown): Record<string, unknown> | undefined
  * Normalize the user-supplied timeout in milliseconds.
  *
  * Returns `undefined` (→ fall back to {@link DEFAULT_TIMEOUT_MS}) when the
- * value is missing, not a finite number, or ≤ 0.  No upper cap is enforced.
+ * value is missing, not a finite number, or ≤ 0. Values above
+ * {@link MAX_TIMEOUT_MS} are clamped to the cap, and non-integer values are
+ * truncated, because Node's `setTimeout()` treats delays larger than
+ * `2_147_483_647` ms as `1` ms and truncates fractional delays.
  */
 function normalizeTimeoutMs(value: unknown): number | undefined {
 	if (value === undefined || value === null) {
@@ -172,7 +176,7 @@ function normalizeTimeoutMs(value: unknown): number | undefined {
 	if (!Number.isFinite(num) || num <= 0) {
 		return undefined;
 	}
-	return num;
+	return Math.min(Math.trunc(num), MAX_TIMEOUT_MS);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

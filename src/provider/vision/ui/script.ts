@@ -297,7 +297,9 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 
 		// Parse a positive integer from the timeout input field.
 		// Returns undefined for empty, non-finite, or ≤ 0 values so the
-		// backend falls back to the default timeout.
+		// backend falls back to the default timeout. Values above
+		// MAX_TIMEOUT_MS are clamped and fractional values are truncated,
+		// mirroring the backend normalization.
 		function parsePositiveNumber(value) {
 			const text = value.trim();
 			if (!text) {
@@ -307,7 +309,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			if (!Number.isFinite(num) || num <= 0) {
 				return undefined;
 			}
-			return num;
+			return Math.min(Math.trunc(num), 2147483647);
 		}
 
 		function parseOptionalJson(value, label) {

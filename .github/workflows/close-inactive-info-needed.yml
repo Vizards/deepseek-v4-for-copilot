@@ -1,0 +1,41 @@
+name: Close inactive info-needed Issues
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Log eligible Issues without changing them
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: close-inactive-info-needed
+  cancel-in-progress: false
+
+jobs:
+  close-inactive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v11
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          only-issue-labels: info needed
+          stale-issue-label: info needed
+          days-before-issue-stale: -1
+          days-before-issue-close: 14
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          remove-issue-stale-when-updated: true
+          close-issue-reason: completed
+          close-issue-message: >-
+            This issue was automatically closed because the requested
+            information was not provided for 14 days. If you can provide
+            the missing details, please ask us to reopen it.
+          debug-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          operations-per-run: 100

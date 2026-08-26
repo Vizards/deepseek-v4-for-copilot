@@ -1,0 +1,121 @@
+name: Batch reply to Issues
+
+run-name: Batch reply to ${{ inputs.issue_numbers }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_numbers:
+        description: "Issue numbers separated by commas or spaces (for example: 12, #34, 56)"
+        required: true
+        type: string
+      reply_body:
+        description: "Markdown reply; use \\n for line breaks"
+        required: true
+        type: string
+      close_issues:
+        description: Close Issues after replying
+        required: true
+        type: boolean
+        default: false
+      state_reason:
+        description: Close reason (used only when closing)
+        required: true
+        type: choice
+        default: completed
+        options:
+          - completed
+          - not_planned
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: batch-issue-maintenance
+  cancel-in-progress: false
+
+jobs:
+  process-issues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Reply and optionally close
+        uses: actions/github-script@v9
+        env:
+          ISSUE_NUMBERS: ${{ inputs.issue_numbers }}
+          REPLY_BODY: ${{ inputs.reply_body }}
+          CLOSE_ISSUES: ${{ inputs.close_issues }}
+          STATE_REASON: ${{ inputs.state_reason }}
+        with:
+          script: |
+            const rawNumbers = process.env.ISSUE_NUMBERS ?? '';
+            const rawReply = process.env.REPLY_BODY ?? '';
+            const closeIssues = process.env.CLOSE_ISSUES === 'true';
+            const stateReason = process.env.STATE_REASON;
+
+            const tokens = rawNumbers.split(/[\s,]+/).filter(Boolean);
+            const invalidTokens = tokens.filter((token) => !/^#?[1-9]\d*$/.test(token));
+
+            if (invalidTokens.length > 0) {
+              throw new Error(`Invalid Issue number(s): ${invalidTokens.join(', ')}`);
+            }
+
+            const issueNumbers = [
+              ...new Set(tokens.map((token) => Number(token.replace(/^#/, '')))),
+            ];
+
+            if (issueNumbers.length === 0) {
+              throw new Error('Enter at least one Issue number.');
+            }
+
+            if (issueNumbers.length > 100) {
+              throw new Error('Process at most 100 Issues in one run.');
+            }
+
+            const replyBody = rawReply.replace(/\\n/g, '\n').trim();
+            if (!replyBody) {
+              throw new Error('Reply must not be empty.');
+            }
+
+            const targets = [];
+            for (const issueNumber of issueNumbers) {
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+
+              if (issue.pull_request) {
+                throw new Error(`#${issueNumber} is a pull request. No Issues were changed.`);
+              }
+              if (issue.state !== 'open') {
+                throw new Error(`#${issueNumber} is not open. No Issues were changed.`);
+              }
+              targets.push(issue);
+            }
+
+            core.info(
+              `Processing ${targets.length} Issue(s); close after replying: ${closeIssues}`,
+            );
+
+            for (const issue of targets) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: replyBody,
+              });
+
+              if (closeIssues) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: stateReason,
+                });
+              }
+
+              core.notice(`#${issue.number}: ${closeIssues ? 'replied and closed' : 'replied'}`);
+            }

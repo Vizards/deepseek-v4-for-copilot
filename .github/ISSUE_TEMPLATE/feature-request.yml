@@ -1,0 +1,61 @@
+name: Feature Request / 功能建议
+description: Propose a user problem for consideration before implementation
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem before proposing an implementation.<br>请先描述需要解决的问题，再讨论具体实现。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the concrete limitation or task.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the result, not an implementation plan.
+    validations:
+      required: true
+
+  - type: textarea
+    id: beneficiaries
+    attributes:
+      label: Who benefits?
+      description: Identify the affected user group and usage context.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing options
+      description: List current settings or workarounds and what remains unsolved.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: implementation
+    attributes:
+      label: Are you willing to implement it?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing Issues and did not find the same request.
+          required: true
+        - label: I confirmed that there is no open pull request for the same request.
+          required: true

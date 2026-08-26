@@ -24,10 +24,8 @@ Write N/A if there are no related issues.
 
 <!-- State what changed and what intentionally did not change. -->
 
-## Author confirmation
+## Final checks
 
-By submitting this pull request, I confirm that:
-
-- I reviewed and can explain every change.
-- I reviewed any user-facing text changes in both English and Chinese.
-- This pull request contains no API keys, authorization headers, private prompts, private code, or unreviewed sensitive logs.
+- [ ] I reviewed and can explain every change
+- [ ] I reviewed any user-facing text changes in both English and Chinese
+- [ ] This pull request contains no API keys, authorization headers, private prompts, private code, or unreviewed sensitive logs

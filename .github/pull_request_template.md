@@ -24,14 +24,10 @@ Write N/A if there are no related issues.
 
 <!-- State what changed and what intentionally did not change. -->
 
-## User-facing text
+## Author confirmation
 
-<!-- Check one. -->
+By submitting this pull request, I confirm that:
 
-- [ ] No user-facing text changed
-- [ ] User-facing text was updated in both English and Chinese
-
-## Final checks
-
-- [ ] I reviewed and can explain every change
-- [ ] This PR contains no API keys, authorization headers, private prompts, private code, or unreviewed sensitive logs
+- I reviewed and can explain every change.
+- I reviewed any user-facing text changes in both English and Chinese.
+- This pull request contains no API keys, authorization headers, private prompts, private code, or unreviewed sensitive logs.

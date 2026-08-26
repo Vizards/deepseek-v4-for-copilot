@@ -8,10 +8,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Textual pricing metadata for the model picker.
  *
- * Do not populate VS Code's inputCost/outputCost/cacheCost fields here. Those
- * proposed fields are numeric credits, while DeepSeek's prices are currency
- * values and change with the current billing period. infoText is the native
- * model-picker surface for this human-readable, time-dependent notice.
+ * VS Code forwards infoText from extension providers starting in 1.135.
+ * Earlier supported hosts ignore it, intentionally degrading to no detailed
+ * pricing notice while leaving the models usable. Do not restore formatted
+ * currency strings as a compatibility fallback: the credit-based model picker
+ * accepts only numbers in inputCost/outputCost/cacheCost and renders strings as
+ * Unknown.
  */
 export interface ModelPricingInformation {
 	readonly infoText?: Readonly<Record<string, string>>;

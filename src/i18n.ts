@@ -24,6 +24,16 @@ const zh: Translations = {
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
 	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
+	'model.pricing.currentPeak': '高峰时段',
+	'model.pricing.currentOffPeak': '空闲时段',
+	'model.pricing.inputLabel': '输入',
+	'model.pricing.cacheHitInputLabel': '输入 (缓存命中)',
+	'model.pricing.outputLabel': '输出',
+	'model.pricing.unitSuffix': ' / 百万 tokens',
+	'model.pricing.periodStarts': '{1}进入{0}',
+	'model.pricing.transitionTime.today': '{0}',
+	'model.pricing.transitionTime.tomorrow': '明天 {0}',
+	'model.pricing.transitionTime.weekday': '{0} {1}',
 	'model.flash-vision-exp.tooltip': 'DeepSeek V4 Flash 视觉实验模型，支持原生图片与文本输入。',
 
 	// API Key
@@ -216,6 +226,16 @@ const en: Translations = {
 		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
 	'model.pro.tooltip':
 		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
+	'model.pricing.currentPeak': 'Peak',
+	'model.pricing.currentOffPeak': 'Off-peak',
+	'model.pricing.inputLabel': 'Input',
+	'model.pricing.cacheHitInputLabel': 'Cache Input',
+	'model.pricing.outputLabel': 'Output',
+	'model.pricing.unitSuffix': ' per 1M tokens',
+	'model.pricing.periodStarts': '{0} starts {1}',
+	'model.pricing.transitionTime.today': 'at {0}',
+	'model.pricing.transitionTime.tomorrow': 'tomorrow at {0}',
+	'model.pricing.transitionTime.weekday': 'on {0} at {1}',
 	'model.flash-vision-exp.tooltip':
 		'Experimental DeepSeek V4 Flash vision model with native image and text input.',
 

@@ -1,6 +1,9 @@
+import vscode from 'vscode';
 import { t } from '../../i18n';
 import type { ModelDefinition, PriceCategory, PricingCurrency } from '../../types';
 import { getPricingPeriod, type PricingPeriod } from './schedule';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Textual pricing metadata for the model picker.
@@ -50,8 +53,12 @@ function formatPricingNotice(
 	const periodLabel = t(
 		period === 'peak' ? 'model.pricing.currentPeak' : 'model.pricing.currentOffPeak',
 	);
+	const nextPeriod = period === 'peak' ? 'offPeak' : 'peak';
+	const nextPeriodLabel = t(
+		nextPeriod === 'peak' ? 'model.pricing.currentPeak' : 'model.pricing.currentOffPeak',
+	);
 	const unitSuffix = t('model.pricing.unitSuffix');
-	const remaining = formatDuration(nextTransitionAt.getTime() - now.getTime());
+	const transitionTime = formatTransitionTime(now, nextTransitionAt);
 	const priceRows = [
 		{
 			label: t('model.pricing.inputLabel'),
@@ -69,38 +76,38 @@ function formatPricingNotice(
 	const priceLines = priceRows.map(({ label, value }) => `${label}: ${value}`).join('\n');
 	const priceBlock = ['```bash', priceLines, '```'].join('\n');
 
-	return [`**${periodLabel}** · ${t('model.pricing.periodRemaining', remaining)}`, priceBlock].join(
-		'\n',
-	);
+	const transitionNotice = t('model.pricing.periodStarts', nextPeriodLabel, transitionTime);
+	return [`**${periodLabel}** · ${transitionNotice}`, priceBlock].join('\n');
 }
 
 function formatPriceValue(value: number, currency: PricingCurrency): string {
 	return `${currency === 'CNY' ? '¥' : '$'}${value}`;
 }
 
-function formatDuration(milliseconds: number): string {
-	const totalMinutes = Math.max(1, Math.ceil(milliseconds / (60 * 1000)));
-	const hours = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
+function formatTransitionTime(now: Date, nextTransitionAt: Date): string {
+	const locale = getPricingLocale();
+	const time = new Intl.DateTimeFormat(locale, {
+		hour: '2-digit',
+		minute: '2-digit',
+		hourCycle: 'h23',
+	}).format(nextTransitionAt);
+	const dayDifference = getLocalDayNumber(nextTransitionAt) - getLocalDayNumber(now);
 
-	if (hours > 0 && minutes > 0) {
-		return t(
-			hours === 1
-				? minutes === 1
-					? 'model.pricing.duration.hourMinute'
-					: 'model.pricing.duration.hourMinutes'
-				: minutes === 1
-					? 'model.pricing.duration.hoursMinute'
-					: 'model.pricing.duration.hoursMinutes',
-			hours,
-			minutes,
-		);
+	if (dayDifference === 0) {
+		return t('model.pricing.transitionTime.today', time);
 	}
-	if (hours > 0) {
-		return t(hours === 1 ? 'model.pricing.duration.hour' : 'model.pricing.duration.hours', hours);
+	if (dayDifference === 1) {
+		return t('model.pricing.transitionTime.tomorrow', time);
 	}
-	return t(
-		minutes === 1 ? 'model.pricing.duration.minute' : 'model.pricing.duration.minutes',
-		minutes,
-	);
+
+	const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(nextTransitionAt);
+	return t('model.pricing.transitionTime.weekday', weekday, time);
+}
+
+function getLocalDayNumber(date: Date): number {
+	return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
+}
+
+function getPricingLocale(): 'en-US' | 'zh-CN' {
+	return vscode.env.language.toLowerCase() === 'zh-cn' ? 'zh-CN' : 'en-US';
 }

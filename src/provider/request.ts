@@ -1,7 +1,14 @@
 import vscode from 'vscode';
+import * as crypto from 'crypto';
 import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
-import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
+import {
+	getApiModelId,
+	getBaseUrl,
+	getCacheExpiresSeconds,
+	getFilesApiEnabled,
+	getMaxTokens,
+} from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
@@ -12,6 +19,7 @@ import {
 	type CacheDiagnosticsRecorder,
 	type CacheDiagnosticsRun,
 } from './debug';
+import { ensureFileId } from './vision/filesApi';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';
 import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
@@ -71,6 +79,36 @@ export async function prepareChatRequest({
 	const nativeImageInput = modelDef?.capabilities.nativeImageInput === true;
 	const maxTokens = getMaxTokens();
 
+	// Experimental Files API route: enabled only when the user opts in, the model
+	// declares visionNative (Files API capability), and the endpoint is official.
+	const filesApiEnabled = getFilesApiEnabled();
+	const filesApiAvailable =
+		modelDef?.capabilities.visionNative === true && isOfficialDeepSeekBaseUrl(baseUrl);
+
+	let filesApiFileIdByHash: Map<string, string> | undefined;
+	let effectiveFilesApi = false;
+	if (filesApiEnabled && filesApiAvailable && nativeImageInput) {
+		try {
+			filesApiFileIdByHash = await uploadNativeImages(
+				globalStorageUri,
+				apiKey,
+				baseUrl,
+				messages,
+				token,
+			);
+			effectiveFilesApi = true;
+		} catch (error) {
+			// Upload failed — fall back to the base64 native route so the
+			// conversation is not interrupted. Log the reason for diagnosis.
+			console.warn(
+				'[deepseek-copilot] Files API upload failed, falling back to base64 native vision',
+				error,
+			);
+			filesApiFileIdByHash = undefined;
+			effectiveFilesApi = false;
+		}
+	}
+
 	// Flash/Pro are declared as non-native vision models and therefore resolve
 	// image inputs through the configured/default proxy route (Vision Exp in auto mode).
 	const visionResolution: VisionResolutionResult = nativeImageInput
@@ -79,7 +117,9 @@ export async function prepareChatRequest({
 
 	const resolvedMessages = visionResolution.messages;
 
-	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
+	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput, {
+		filesApiFileIdByHash: effectiveFilesApi ? filesApiFileIdByHash : undefined,
+	});
 	if (nativeImageInput) {
 		// For native-image models, count images after conversion so diagnostics reflect
 		// what is actually forwarded in the DeepSeek payload.
@@ -177,7 +217,7 @@ function hasNativeImageParts(messages: DeepSeekMessage[]): boolean {
 			continue;
 		}
 		for (const part of message.content) {
-			if (part.type === 'image_url') {
+			if (part.type === 'image_url' || part.type === 'file') {
 				return true;
 			}
 		}
@@ -239,7 +279,7 @@ function createNativeVisionResolutionStats(): VisionResolutionStats {
 	};
 }
 
-/** Count native image parts that survived conversion into image_url content. */
+/** Count native image parts that survived conversion into image_url/file content. */
 function countNativeForwardedImageParts(messages: readonly DeepSeekMessage[]): number {
 	let total = 0;
 	for (const message of messages) {
@@ -247,10 +287,55 @@ function countNativeForwardedImageParts(messages: readonly DeepSeekMessage[]): n
 			continue;
 		}
 		for (const part of message.content) {
-			if (part.type === 'image_url') {
+			if (part.type === 'image_url' || part.type === 'file') {
 				total += 1;
 			}
 		}
 	}
 	return total;
+}
+/**
+ * Experimental Files API route: scan all image parts in the conversation, upload
+ * each unique image to the DeepSeek Files API, and return a map from the image's
+ * sha256 content hash to the resulting file_id. Deduped by content hash so the
+ * same image only uploads once per request.
+ */
+async function uploadNativeImages(
+	globalStorageUri: vscode.Uri,
+	apiKey: string,
+	baseUrl: string,
+	messages: readonly vscode.LanguageModelChatRequestMessage[],
+	token?: vscode.CancellationToken,
+): Promise<Map<string, string>> {
+	const fileIdByHash = new Map<string, string>();
+
+	for (const message of messages) {
+		for (const part of message.content) {
+			if (isImageDataPart(part)) {
+				const hash = hashBytes(part.data);
+				if (!fileIdByHash.has(hash)) {
+					const fileId = await ensureFileId(
+						globalStorageUri,
+						apiKey,
+						baseUrl,
+						part.data,
+						part.mimeType,
+						getCacheExpiresSeconds(),
+						token,
+					);
+					fileIdByHash.set(hash, fileId);
+				}
+			}
+		}
+	}
+
+	return fileIdByHash;
+}
+
+function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
+	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
+}
+
+function hashBytes(data: Uint8Array): string {
+	return crypto.createHash('sha256').update(data).digest('hex');
 }

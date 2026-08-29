@@ -1,8 +1,11 @@
 import vscode from 'vscode';
+import { AuthManager } from '../auth';
 import { EXTERNAL_URLS } from '../consts';
+import { getBaseUrl } from '../config';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import { ensureRequestDumpRoot } from '../provider/debug';
+import { clearCloudFiles, clearLocalCache } from '../provider/vision/filesApi';
 
 export function registerCommands(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
@@ -16,7 +19,50 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('deepseek-copilot.openSettings', () =>
 			vscode.commands.executeCommand('workbench.action.openSettings', 'deepseek-copilot'),
 		),
+		vscode.commands.registerCommand('deepseek-copilot.clearCloudCache', () =>
+			clearCloudCacheCommand(context),
+		),
 	);
+}
+
+/**
+ * 清空 DeepSeek Files API 云端缓存（永久删除所有已上传文件）。
+ * 破坏性操作，先弹确认框，再执行。
+ */
+async function clearCloudCacheCommand(context: vscode.ExtensionContext): Promise<void> {
+	const authManager = new AuthManager(context);
+	const apiKey = await authManager.getApiKey();
+	if (!apiKey) {
+		void vscode.window.showWarningMessage(t('cloudCache.noApiKey'));
+		return;
+	}
+
+	const choice = await vscode.window.showWarningMessage(
+		t('cloudCache.clearConfirm'),
+		{ modal: true },
+		t('cloudCache.clearConfirmAction'),
+	);
+	if (choice !== t('cloudCache.clearConfirmAction')) {
+		return;
+	}
+
+	const baseUrl = getBaseUrl();
+	try {
+		await vscode.window.withProgress(
+			{ location: vscode.ProgressLocation.Notification, title: t('cloudCache.clearing') },
+			async () => {
+				const deleted = await clearCloudFiles(apiKey, baseUrl);
+				// 云端已清空，同步清空本地 image-cache，避免本地 meta 仍指向已删除的
+				// file_id，导致后续聊天复用时服务器 400 "file not found"。
+				await clearLocalCache(context.globalStorageUri);
+				logger.info(`Cleared ${deleted} cloud cache file(s)`);
+				void vscode.window.showInformationMessage(t('cloudCache.cleared', String(deleted)));
+			},
+		);
+	} catch (error) {
+		logger.warn('Failed to clear cloud cache', error);
+		void vscode.window.showErrorMessage(t('cloudCache.clearFailed'));
+	}
 }
 
 async function openRequestDumpsFolder(context: vscode.ExtensionContext): Promise<void> {

@@ -315,10 +315,17 @@ function getContentChars(content: DeepSeekMessage['content']): number {
 	if (typeof content === 'string') {
 		return content.length;
 	}
-	return content.reduce(
-		(total, part) => total + (part.type === 'text' ? part.text.length : part.image_url.url.length),
-		0,
-	);
+	return content.reduce((total, part) => {
+		if (part.type === 'text') {
+			return total + part.text.length;
+		}
+		if (part.type === 'image_url') {
+			// data URLs can dominate request size, so count them.
+			return total + part.image_url.url.length;
+		}
+		// file (Files API) refs are short; treat as negligible.
+		return total;
+	}, 0);
 }
 
 /**
@@ -330,7 +337,7 @@ function countImageParts(content: DeepSeekMessage['content']): number {
 	if (typeof content === 'string') {
 		return 0;
 	}
-	return content.filter((part) => part.type === 'image_url').length;
+	return content.filter((part) => part.type === 'image_url' || part.type === 'file').length;
 }
 
 function joinDiagnosticParts(...parts: (string | undefined)[]): string {

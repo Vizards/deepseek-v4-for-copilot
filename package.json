@@ -75,6 +75,10 @@
       {
         "command": "deepseek-copilot.openRequestDumpsFolder",
         "title": "%deepseek-copilot.command.openRequestDumpsFolder%"
+      },
+      {
+        "command": "deepseek-copilot.clearCloudCache",
+        "title": "%deepseek-copilot.command.clearCloudCache%"
       }
     ],
     "walkthroughs": [
@@ -131,6 +135,25 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "%deepseek-copilot.config.experimental.stabilizeToolList.description%",
+          "tags": [
+            "experimental"
+          ]
+        },
+        "deepseek-copilot.experimental.filesApi": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%deepseek-copilot.config.experimental.filesApi.description%",
+          "tags": [
+            "experimental"
+          ]
+        },
+        "deepseek-copilot.cacheExpiresDays": {
+          "type": "number",
+          "default": 7,
+          "minimum": -1,
+          "maximum": 30,
+          "description": "%deepseek-copilot.config.cacheExpiresDays.description%",
+          "markdownDescription": "%deepseek-copilot.config.cacheExpiresDays.markdownDescription%",
           "tags": [
             "experimental"
           ]

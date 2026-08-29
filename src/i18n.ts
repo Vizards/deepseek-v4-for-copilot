@@ -45,6 +45,15 @@ const zh: Translations = {
 	'auth.removed': 'API Key 已移除。',
 	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DeepSeek: 设置 API Key"。',
 
+	// Cloud cache (Files API)
+	'cloudCache.noApiKey': '需要先配置 DeepSeek API Key 才能清空云端缓存。',
+	'cloudCache.clearConfirm':
+		'确定要清空 DeepSeek Files API 云端缓存吗？这将永久删除所有已上传的图片文件。',
+	'cloudCache.clearConfirmAction': '清空',
+	'cloudCache.clearing': '正在清空云端缓存...',
+	'cloudCache.cleared': '已清空云端缓存，共删除 {0} 个文件。',
+	'cloudCache.clearFailed': '清空云端缓存失败，请查看日志。',
+
 	// Thinking Effort — short labels for model picker dropdown
 	'status.thinking': '思考模式',
 	'thinking.none': '停用',
@@ -251,6 +260,15 @@ const en: Translations = {
 	'auth.removed': 'DeepSeek API key removed.',
 	'auth.notConfigured':
 		'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
+
+	// Cloud cache (Files API)
+	'cloudCache.noApiKey': 'A DeepSeek API key is required to clear the cloud cache.',
+	'cloudCache.clearConfirm':
+		'Clear the DeepSeek Files API cloud cache? This permanently deletes all uploaded image files.',
+	'cloudCache.clearConfirmAction': 'Clear',
+	'cloudCache.clearing': 'Clearing cloud cache...',
+	'cloudCache.cleared': 'Cloud cache cleared. Deleted {0} file(s).',
+	'cloudCache.clearFailed': 'Failed to clear cloud cache. Check the logs.',
 
 	// Thinking Effort
 	'status.thinking': 'Thinking Effort',

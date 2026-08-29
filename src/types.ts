@@ -19,7 +19,19 @@ export interface DeepSeekImageUrlContentPart {
 	};
 }
 
-export type DeepSeekContentPart = DeepSeekTextContentPart | DeepSeekImageUrlContentPart;
+/**
+ * File block used by the DeepSeek Files API native-vision path.
+ * Images are uploaded first via POST /files, then referenced by file_id.
+ */
+export interface DeepSeekFileContentPart {
+	type: 'file';
+	file_id: string;
+}
+
+export type DeepSeekContentPart =
+	| DeepSeekTextContentPart
+	| DeepSeekImageUrlContentPart
+	| DeepSeekFileContentPart;
 
 export interface DeepSeekMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool';
@@ -145,6 +157,12 @@ export interface ModelDefinition {
 		toolCalling: boolean | number;
 		imageInput: boolean;
 		nativeImageInput?: boolean;
+		/**
+		 * True when the model natively accepts images via the DeepSeek Files API
+		 * (file_id blocks uploaded through POST /files). Used by the experimental
+		 * Files API route, distinct from `nativeImageInput` (base64 data URL).
+		 */
+		visionNative?: boolean;
 		thinking: ThinkingCapability | false;
 	};
 	requiresThinkingParam: boolean;

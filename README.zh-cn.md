@@ -21,14 +21,14 @@
   <img src="resources/screenshots/01-picker.png" alt="DeepSeek V4 Flash、Flash Vision Exp 和 Pro 出现在 Copilot Chat 模型选择器中，并展示思考深度菜单" width="800">
 </p>
 
-喜欢 DeepSeek 的性价比，但不想放弃 GitHub Copilot 的 Agent 模式、工具调用和成熟的交互体验？本扩展将 **DeepSeek V4 Flash、Pro 和 Flash Vision Exp** 直接接入 Copilot Chat 模型选择器，支持**原生视觉或视觉代理**、**思考模式**，并使用你自己的 API Key。
+喜欢 DeepSeek 的性价比，但不想放弃 GitHub Copilot 的 Agent 模式、工具调用和成熟的交互体验？本扩展将 **DeepSeek V4 Flash、Pro 和 Flash Vision Exp** 直接接入 Copilot Chat 模型选择器，支持 **原生视觉或视觉代理**、**思考模式**，并使用你自己的 API Key。
 
 ## 为什么选这个扩展？
 
 - **不是替换 Copilot，而是增强它。** 没有新的侧边栏，没有新的聊天界面需要学习。只是在你已经在用的模型选择器中多了一个选项。
 - **Agent 模式、工具调用、Instructions、MCP、Skills——全部正常运作。** Copilot 的完整能力栈，现在跑在 DeepSeek 上。
 - **两种图片处理方式。** Flash Vision Exp 会原生接收图片附件；Flash 和 Pro 则保留原有文本上下文，由可配置的视觉代理将图片转换为文字描述。
-- **需自行提供 API Key，直接向 DeepSeek 付费。** 你的 API Key，你的账单，你的速率限制。密钥存储在操作系统密钥链中，不会以明文形式写入磁盘。
+- **需自行提供 API Key，直接向 DeepSeek 付费。** 你的 API Key，你的账单，你的速率限制。密钥存储在系统密钥链中，不会以明文形式写入磁盘。
 
 ## 功能特性
 
@@ -71,7 +71,7 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 ### 前置条件
 
-- VS Code 1.116 及以上版本。本扩展依赖非公开的 Copilot Chat API，较新的 VS Code 版本可能存在兼容性问题——如遇到请[提交 Issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues)。
+- VS Code 1.116 及以上版本。本扩展依赖非公开的 Copilot Chat API，在较新的 VS Code 版本上可能存在兼容性问题——如果遇到问题，请[提交 Issue](https://github.com/Vizards/deepseek-v4-for-copilot/issues)。
 - GitHub Copilot 订阅（Free / Pro / Enterprise——免费版即可使用）
 - DeepSeek API Key，从 [platform.deepseek.com](https://platform.deepseek.com) 获取；使用自定义 `deepseek-copilot.baseUrl` 时也可使用兼容的 provider token
 
@@ -84,10 +84,10 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 ### 使用步骤
 
-1. 通过命令面板（`Cmd+Shift+P`）运行 **DeepSeek: 设置 API Key**
+1. 通过命令面板（`Cmd/Ctrl + Shift + P`）运行 **DeepSeek: 设置 API Key**
 2. 粘贴你的 Key 或兼容的 provider token（官方 DeepSeek Key 通常以 `sk-` 开头）
 3. 打开 Copilot Chat，点击模型选择器，选择 **DeepSeek V4 Flash**、**DeepSeek V4 Pro** 或 **DeepSeek V4 Flash Vision Exp**
-4. 搞定——开始聊天
+4. 搞定！现在开始聊天吧。
 
 ## 模型
 

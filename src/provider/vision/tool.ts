@@ -88,8 +88,11 @@ async function resolveToolResultPart(
 	const imagePartCount = normalized.parts.filter((item) => item.type === 'image').length;
 	const replayEntry = replayIndex
 		.get(normalized.callId)
-		?.find(([markerIndex]) => markerIndex > messageIndex)?.[1];
-	if (replayEntry && (imagePartCount === 0 || imagePartCount === replayEntry.imageParts)) {
+		?.find(
+			([markerIndex, entry]) =>
+				markerIndex > messageIndex && (imagePartCount === 0 || imagePartCount === entry.imageParts),
+		)?.[1];
+	if (replayEntry) {
 		stats.replayedImageMessages += 1;
 		stats.tool.droppedImageParts += imagePartCount;
 		return new vscode.LanguageModelToolResultPart(normalized.callId, [

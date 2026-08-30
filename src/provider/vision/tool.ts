@@ -3,6 +3,7 @@ import { normalizeToolResult } from './normalize';
 import { parseFirstReplayMarker } from '../replay';
 import type { ToolVisionReplayEntry } from '../replay/types';
 import type { VisionDescriptionSession } from './description';
+import type { VisionResolutionStats } from './types';
 
 type ChatMessageContentPart = vscode.LanguageModelChatRequestMessage['content'][number];
 type ToolVisionReplayIndex = Map<string, [number, ToolVisionReplayEntry][]>;
@@ -11,6 +12,7 @@ type ToolVisionReplayIndex = Map<string, [number, ToolVisionReplayEntry][]>;
 export async function resolveToolResultImages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
 	session: VisionDescriptionSession,
+	stats: VisionResolutionStats,
 ) {
 	const replayIndex: ToolVisionReplayIndex = new Map();
 	for (const [messageIndex, message] of messages.entries()) {
@@ -46,6 +48,7 @@ export async function resolveToolResultImages(
 				messageIndex,
 				replayIndex,
 				session,
+				stats,
 				replayEntries,
 			);
 			content.push(resolvedPart);
@@ -78,6 +81,7 @@ async function resolveToolResultPart(
 	messageIndex: number,
 	replayIndex: ToolVisionReplayIndex,
 	session: VisionDescriptionSession,
+	stats: VisionResolutionStats,
 	replayEntries: ToolVisionReplayEntry[],
 ) {
 	const normalized = normalizeToolResult(part);
@@ -86,6 +90,8 @@ async function resolveToolResultPart(
 		.get(normalized.callId)
 		?.find(([markerIndex]) => markerIndex > messageIndex)?.[1];
 	if (replayEntry && (imagePartCount === 0 || imagePartCount === replayEntry.imageParts)) {
+		stats.replayedImageMessages += 1;
+		stats.tool.droppedImageParts += imagePartCount;
 		return new vscode.LanguageModelToolResultPart(normalized.callId, [
 			new vscode.LanguageModelTextPart(replayEntry.resolvedContent),
 		]);

@@ -82,7 +82,7 @@ export async function resolveImageMessages(
 		stats.input.droppedImageParts += imageParts.length;
 		result.push(createResolvedMessage(message, nonImageParts));
 	}
-	const toolResolution = await resolveToolResultImages(result, session);
+	const toolResolution = await resolveToolResultImages(result, session, stats);
 	const toolVision = toolResolution.replayEntries;
 	const sessionMetadata = session.getMetadata();
 

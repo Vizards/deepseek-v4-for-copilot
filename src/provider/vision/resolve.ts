@@ -1,59 +1,40 @@
 import vscode from 'vscode';
-import { t } from '../../i18n';
 import { toWellFormedString } from '../../json';
 import { parseFirstReplayMarker } from '../replay';
-import { createVisionProxyFailureNotice, createVisionProxyMissingNotice } from '../tools/notices';
-import {
-	IMAGE_DESCRIPTION_PREFIX,
-	IMAGE_DESCRIPTION_SUFFIX,
-	IMAGE_DESCRIPTION_UNAVAILABLE,
-} from './consts';
-import { logVisionProxyDescribeFailed, logVisionProxyUnavailable } from './log';
-import {
-	formatVisionProxyErrorCode,
-	getVisionProxyErrorDisplayCode,
-	isVisionProxyError,
-} from './protocols/errors';
-import { getVisionPrompt } from './sources/vscode';
+import { createVisionDescriptionSession } from './description';
+import { isImageDataPart, type VisionInputSummary } from './normalize';
+import { resolveToolResultImages } from './resolve-tool';
 import type {
 	VisionDescriber,
 	VisionImagePart,
 	VisionResolutionResult,
 	VisionResolutionStats,
 } from './types';
-
-interface CurrentVisionResolution {
-	text: string;
-	failureNotice?: string;
-}
-
 /**
  * Resolve image parts without treating image bytes as persistent identity.
  * Historical images replay marker-carried text; only the current tail user
- * image message is sent to the vision proxy.
+ * image message and actual tool-result image data parts are sent to the proxy.
  */
 export async function resolveImageMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
+	summary: VisionInputSummary,
+	stats: VisionResolutionStats,
 	token: vscode.CancellationToken,
 	getDescriber: () => Promise<VisionDescriber | undefined>,
 ): Promise<VisionResolutionResult> {
-	const stats = createVisionResolutionStats();
-	collectInputImageStats(messages, stats);
-	if (stats.inputImageParts === 0) {
+	if (summary.inputImageParts + summary.toolResultImageParts === 0) {
 		return { messages, stats, replayMarkerMetadata: {} };
 	}
+	const session = createVisionDescriptionSession(stats, token, getDescriber);
 
 	const markerBindings = createVisionMarkerBindings(messages, stats);
 	const currentImageMessageIndex = findCurrentImageMessageIndex(messages);
 	const result: vscode.LanguageModelChatRequestMessage[] = [];
-	let visionDescriber: VisionDescriber | undefined;
-	let visionDescriberRequested = false;
-	let missingVisionProxy = false;
-	let visionFailureNotice: string | undefined;
 	let markerVisionText: string | undefined;
 
 	for (const [messageIndex, message] of messages.entries()) {
-		const imageParts = getImageParts(message);
+		const imageParts =
+			message.role === vscode.LanguageModelChatMessageRole.User ? getImageParts(message) : [];
 		if (imageParts.length === 0) {
 			result.push(message as vscode.LanguageModelChatRequestMessage);
 			continue;
@@ -63,7 +44,7 @@ export async function resolveImageMessages(
 		const replayText = markerBindings.get(messageIndex);
 		if (replayText) {
 			stats.replayedImageMessages += 1;
-			stats.droppedImageParts += imageParts.length;
+			stats.input.droppedImageParts += imageParts.length;
 			result.push(
 				createResolvedMessage(message, [
 					...nonImageParts,
@@ -75,25 +56,12 @@ export async function resolveImageMessages(
 
 		if (messageIndex === currentImageMessageIndex) {
 			stats.currentImageMessages += 1;
-			if (!visionDescriberRequested) {
-				visionDescriberRequested = true;
-				visionDescriber = await getDescriber();
-			}
-			const visionResolution = await resolveCurrentVisionText(
-				imageParts,
+			const visionText = createVisionReplayText(
+				await session.describe(imageParts.map(toVisionImagePart), 'input'),
 				nonImageParts,
-				visionDescriber,
-				stats,
-				token,
 			);
-			const visionText = visionResolution.text;
-			if (!visionDescriber && !token.isCancellationRequested) {
-				missingVisionProxy = true;
-			}
-			visionFailureNotice ??= visionResolution.failureNotice;
 			markerVisionText = visionText;
 			stats.markerVisionTextChars = visionText.length;
-			stats.droppedImageParts += imageParts.length;
 			result.push(
 				createResolvedMessage(message, [
 					...nonImageParts,
@@ -104,59 +72,18 @@ export async function resolveImageMessages(
 		}
 
 		stats.omittedImageMessages += 1;
-		stats.droppedImageParts += imageParts.length;
+		stats.input.droppedImageParts += imageParts.length;
 		result.push(createResolvedMessage(message, nonImageParts));
 	}
+	const resolvedMessages = await resolveToolResultImages(result, session);
+	const sessionMetadata = session.getMetadata();
 
 	return {
-		messages: result,
+		messages: resolvedMessages,
 		stats,
-		replayMarkerMetadata: { visionText: markerVisionText },
-		visionModelId: visionDescriber?.id,
-		visionProxySource: visionDescriber?.source,
-		initialResponseNotice: missingVisionProxy
-			? createVisionProxyMissingNotice()
-			: visionFailureNotice,
+		replayMarkerMetadata: markerVisionText ? { visionText: markerVisionText } : {},
+		...sessionMetadata,
 	};
-}
-
-function createVisionResolutionStats(): VisionResolutionStats {
-	return {
-		imageHandlingMode: 'none',
-		inputImageParts: 0,
-		inputImageMessages: 0,
-		inputImageBytes: 0,
-		currentImageMessages: 0,
-		generatedImageMessages: 0,
-		replayedImageMessages: 0,
-		omittedImageMessages: 0,
-		unavailableImageMessages: 0,
-		failedImageMessages: 0,
-		forwardedImageParts: 0,
-		droppedImageParts: 0,
-		markerVisionTextChars: 0,
-		invalidMarkerVisionMetadata: 0,
-	};
-}
-
-function collectInputImageStats(
-	messages: readonly vscode.LanguageModelChatRequestMessage[],
-	stats: VisionResolutionStats,
-): void {
-	for (const message of messages) {
-		const imageDataParts = getImageParts(message);
-		const imageParts = imageDataParts.length;
-		if (imageParts === 0) {
-			continue;
-		}
-		// Any image observed here means the request entered proxy resolution flow.
-		stats.imageHandlingMode = 'proxy';
-		stats.inputImageMessages += 1;
-		stats.inputImageParts += imageParts;
-		for (const part of imageDataParts) {
-			stats.inputImageBytes += part.data.byteLength;
-		}
-	}
 }
 
 function createVisionMarkerBindings(
@@ -237,77 +164,12 @@ function findCurrentImageMessageIndex(
 	return undefined;
 }
 
-async function resolveCurrentVisionText(
-	imageParts: readonly vscode.LanguageModelDataPart[],
-	nonImageParts: readonly vscode.LanguageModelInputPart[],
-	visionDescriber: VisionDescriber | undefined,
-	stats: VisionResolutionStats,
-	token: vscode.CancellationToken,
-): Promise<CurrentVisionResolution> {
-	if (!visionDescriber || token.isCancellationRequested) {
-		if (!visionDescriber) {
-			logVisionProxyUnavailable();
-		}
-		stats.unavailableImageMessages += 1;
-		return { text: createVisionReplayText(IMAGE_DESCRIPTION_UNAVAILABLE, nonImageParts) };
-	}
-
-	try {
-		const description = await visionDescriber.describe({
-			prompt: getVisionPrompt(),
-			images: imageParts.map(toVisionImagePart),
-			token,
-		});
-		if (description.length === 0) {
-			stats.failedImageMessages += 1;
-			return createFailedVisionResolution(
-				formatVisionProxyErrorCode('empty-response'),
-				t('vision.proxy.error.emptyResponse'),
-				nonImageParts,
-			);
-		}
-
-		stats.generatedImageMessages += 1;
-		return { text: createVisionReplayText(createImageDescriptionText(description), nonImageParts) };
-	} catch (error) {
-		logVisionProxyDescribeFailed(error);
-		stats.failedImageMessages += 1;
-		return createFailedVisionResolution(
-			getVisionProxyErrorDisplayCode(error),
-			formatVisionProxyErrorMessage(error),
-			nonImageParts,
-		);
-	}
-}
-
-function createFailedVisionResolution(
-	errorCode: string,
-	errorMessage: string,
-	nonImageParts: readonly vscode.LanguageModelInputPart[],
-): CurrentVisionResolution {
-	return {
-		text: createVisionReplayText(IMAGE_DESCRIPTION_UNAVAILABLE, nonImageParts),
-		failureNotice: createVisionProxyFailureNotice(errorCode, errorMessage),
-	};
-}
-
-function formatVisionProxyErrorMessage(error: unknown): string {
-	if (isVisionProxyError(error)) {
-		return error.message;
-	}
-	return t('vision.proxy.error.requestFailed', t('vision.proxy.error.unknown'));
-}
-
 function createVisionReplayText(
 	visionText: string,
 	nonImageParts: readonly vscode.LanguageModelInputPart[],
 ): string {
 	const separatedText = hasNonEmptyTextPart(nonImageParts) ? `\n\n${visionText}` : visionText;
 	return toWellFormedString(separatedText);
-}
-
-function createImageDescriptionText(description: string): string {
-	return IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX;
 }
 
 function createResolvedMessage(
@@ -339,10 +201,6 @@ function hasNonEmptyTextPart(parts: readonly vscode.LanguageModelInputPart[]): b
 	return parts.some(
 		(part) => part instanceof vscode.LanguageModelTextPart && part.value.trim().length > 0,
 	);
-}
-
-function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
-	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
 }
 
 function toVisionImagePart(part: vscode.LanguageModelDataPart): VisionImagePart {

@@ -7,6 +7,11 @@ import type {
 	DeepSeekToolCall,
 } from '../types';
 import { parseFirstReplayMarker } from './replay';
+import {
+	isImageDataPart,
+	normalizeToolResult,
+	type NormalizedToolResult,
+} from './vision/normalize';
 
 /**
  * Convert VS Code chat messages to DeepSeek format.
@@ -26,7 +31,7 @@ export function convertMessages(
 		const nativeVisionContentParts: DeepSeekContentPart[] = [];
 		let thinkingContent = '';
 		const toolCalls: DeepSeekToolCall[] = [];
-		const toolResults: Array<{ callId: string; content: string }> = [];
+		const toolResults: NormalizedToolResult[] = [];
 
 		for (const part of message.content) {
 			if (part instanceof vscode.LanguageModelTextPart) {
@@ -56,16 +61,7 @@ export function convertMessages(
 					},
 				});
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
-				let toolContent = '';
-				for (const item of part.content) {
-					if (item instanceof vscode.LanguageModelTextPart) {
-						toolContent += item.value;
-					}
-				}
-				toolResults.push({
-					callId: part.callId,
-					content: toolContent || safeStringify(part.content),
-				});
+				toolResults.push(normalizeToolResult(part));
 			}
 		}
 
@@ -105,7 +101,7 @@ export function convertMessages(
 		for (const tr of toolResults) {
 			result.push({
 				role: 'tool',
-				content: tr.content,
+				content: convertToolResultContent(tr, nativeImageInput),
 				tool_call_id: tr.callId,
 			});
 		}
@@ -114,12 +110,44 @@ export function convertMessages(
 	return result;
 }
 
-function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
-	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
+function toImageDataUrl(part: { mimeType: string; data: Uint8Array }): string {
+	return `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`;
 }
 
-function toImageDataUrl(part: vscode.LanguageModelDataPart): string {
-	return `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`;
+function convertToolResultContent(
+	toolResult: NormalizedToolResult,
+	nativeImageInput: boolean,
+): DeepSeekMessage['content'] {
+	const hasImages = toolResult.parts.some((part) => part.type === 'image');
+	if (!nativeImageInput || !hasImages) {
+		const text = toolResult.parts
+			.filter((part) => part.type === 'text')
+			.map((part) => part.text)
+			.join('');
+		if (text) {
+			return text;
+		}
+
+		// Do not stringify image bytes into a text-only model request. Preserve the
+		// existing fallback for genuinely non-image tool-result content.
+		const fallbackContent = hasImages
+			? toolResult.parts.filter((part) => part.type === 'other').map((part) => part.value)
+			: toolResult.originalContent;
+		return fallbackContent.length > 0 ? safeStringify(fallbackContent) : '';
+	}
+
+	const content: DeepSeekContentPart[] = [];
+	for (const part of toolResult.parts) {
+		if (part.type === 'text') {
+			content.push({ type: 'text', text: part.text });
+		} else if (part.type === 'image') {
+			content.push({
+				type: 'image_url',
+				image_url: { url: toImageDataUrl(part) },
+			});
+		}
+	}
+	return content;
 }
 
 function getReasoningContent(

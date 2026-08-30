@@ -941,31 +941,50 @@ function formatVisionTrace(
 
 	const note =
 		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
-	const visionModel = formatVisionModel(stats);
+	const visionModel = formatVisionModel(stats, pipelineStats);
 	// Prefer precise pipeline counters when available; fall back to reconstructed
 	// message-based stats for older/non-pipeline paths.
 	const mode = pipelineStats?.imageHandlingMode ?? stats.imageHandlingMode;
-	const inputImageParts = pipelineStats?.inputImageParts ?? stats.inputImageParts;
-	const inputImageMessages = pipelineStats?.inputImageMessages ?? stats.inputImageMessages;
-	const inputImageBytes = pipelineStats?.inputImageBytes ?? stats.inputImageBytes;
-	const forwardedImageParts = pipelineStats?.forwardedImageParts ?? stats.forwardedImageParts;
-	const droppedImageParts = pipelineStats?.droppedImageParts ?? stats.droppedImageParts;
+	const inputImageParts = pipelineStats?.input.imageParts ?? stats.inputImageParts;
+	const inputImageMessages = pipelineStats?.input.imageMessages ?? stats.inputImageMessages;
+	const inputImageBytes = pipelineStats?.input.imageBytes ?? stats.inputImageBytes;
+	const forwardedImageParts = pipelineStats?.input.forwardedImageParts ?? stats.forwardedImageParts;
+	const droppedImageParts = pipelineStats?.input.droppedImageParts ?? stats.droppedImageParts;
+	const toolImageParts = pipelineStats?.tool.imageParts ?? 0;
+	const toolImageBytes = pipelineStats?.tool.imageBytes ?? 0;
+	const toolForwardedImageParts = pipelineStats?.tool.forwardedImageParts ?? 0;
+	const toolDroppedImageParts = pipelineStats?.tool.droppedImageParts ?? 0;
 	const parts = [
 		`vision mode=${mode}`,
+		`images=${inputImageParts + toolImageParts}`,
+		`forwarded=${forwardedImageParts + toolForwardedImageParts}`,
+		`dropped=${droppedImageParts + toolDroppedImageParts}`,
+		`bytes=${inputImageBytes + toolImageBytes}`,
 		`inputImages=${inputImageParts}`,
-		`forwarded=${forwardedImageParts}`,
-		`dropped=${droppedImageParts}`,
-		`bytes=${inputImageBytes}`,
+		`inputForwarded=${forwardedImageParts}`,
+		`inputDropped=${droppedImageParts}`,
+		`inputBytes=${inputImageBytes}`,
 		`inputMessages=${inputImageMessages}`,
 	];
 
 	if (pipelineStats && hasVisionPipelineActivity(pipelineStats)) {
 		parts.push(
+			`toolResultImages=${toolImageParts}`,
+			`toolResults=${pipelineStats.tool.resultsWithImages}`,
+			`toolResultBytes=${toolImageBytes}`,
+			`toolForwarded=${toolForwardedImageParts}`,
+			`toolDropped=${toolDroppedImageParts}`,
 			`current=${pipelineStats.currentImageMessages}`,
 			`generated=${pipelineStats.generatedImageMessages}`,
 			`replayed=${pipelineStats.replayedImageMessages}`,
 			`omitted=${pipelineStats.omittedImageMessages}`,
 		);
+		if (pipelineStats.input.imageMimes.length > 0) {
+			parts.push(`mimes=${formatVisionMimeStats(pipelineStats.input.imageMimes)}`);
+		}
+		if (pipelineStats.tool.imageMimes.length > 0) {
+			parts.push(`toolMimes=${formatVisionMimeStats(pipelineStats.tool.imageMimes)}`);
+		}
 		appendNumberIfNonZero(parts, 'unavailable', pipelineStats.unavailableImageMessages);
 		appendNumberIfNonZero(parts, 'failed', pipelineStats.failedImageMessages);
 		appendNumberIfNonZero(parts, 'markerChars', pipelineStats.markerVisionTextChars);
@@ -983,15 +1002,28 @@ function formatVisionTrace(
 	return parts.join(' ') + note;
 }
 
+function formatVisionMimeStats(stats: VisionPipelineStats['input']['imageMimes']): string {
+	return stats
+		.map(
+			(item) =>
+				`${JSON.stringify(item.mimeType)}:parts=${item.imageParts}:bytes=${item.imageBytes}`,
+		)
+		.join(',');
+}
+
 function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): boolean {
 	if (!stats) {
 		return false;
 	}
 	return (
 		stats.imageHandlingMode !== 'none' ||
-		stats.inputImageParts > 0 ||
-		stats.inputImageBytes > 0 ||
-		stats.forwardedImageParts > 0 ||
+		stats.input.imageParts > 0 ||
+		stats.input.imageBytes > 0 ||
+		stats.input.forwardedImageParts > 0 ||
+		stats.input.droppedImageParts > 0 ||
+		stats.tool.imageParts > 0 ||
+		stats.tool.forwardedImageParts > 0 ||
+		stats.tool.droppedImageParts > 0 ||
 		stats.currentImageMessages > 0 ||
 		stats.generatedImageMessages > 0 ||
 		stats.replayedImageMessages > 0 ||
@@ -1002,11 +1034,17 @@ function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): bool
 	);
 }
 
-function formatVisionModel(stats: VisionMessageStats): string {
+function formatVisionModel(
+	stats: VisionMessageStats,
+	pipelineStats: VisionPipelineStats | undefined,
+): string {
 	if (stats.visionModelId) {
 		return stats.visionModelId;
 	}
-	if (stats.inputImageParts === 0) {
+	const pipelineImageParts = pipelineStats
+		? pipelineStats.input.imageParts + pipelineStats.tool.imageParts
+		: stats.inputImageParts;
+	if (pipelineImageParts === 0) {
 		return 'none';
 	}
 	if (

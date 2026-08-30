@@ -1,5 +1,6 @@
 import type vscode from 'vscode';
 import type { ReplayMarkerMetadata } from '../replay';
+import type { VisionInputMimeStats } from './normalize';
 
 export type VisionProxySource = 'api-endpoint' | 'vscode-lm';
 
@@ -47,24 +48,41 @@ export interface VisionDescriber {
 	describe(request: VisionDescriptionRequest): Promise<string>;
 }
 
+export interface VisionResolutionInputStats {
+	// Actual top-level user image data parts only; nested tool images are excluded.
+	imageParts: number;
+	imageMessages: number;
+	// Sum of raw input image bytes from VS Code data parts.
+	imageBytes: number;
+	imageMimes: VisionInputMimeStats[];
+	// Counts successfully carried through the selected native/proxy route, or unresolved/omitted.
+	forwardedImageParts: number;
+	droppedImageParts: number;
+}
+
+export interface VisionResolutionToolStats {
+	// Actual nested tool-result image data parts only; top-level user images are excluded.
+	imageParts: number;
+	imageBytes: number;
+	imageMimes: VisionInputMimeStats[];
+	resultsWithImages: number;
+	forwardedImageParts: number;
+	droppedImageParts: number;
+}
+
 export interface VisionResolutionStats {
 	// none: no image input in this request
 	// proxy: image parts are resolved through the vision proxy pipeline
 	// native: image parts are forwarded directly to a native-image model
 	imageHandlingMode: 'none' | 'proxy' | 'native';
-	inputImageParts: number;
-	inputImageMessages: number;
-	// Sum of raw input image bytes from VS Code data parts.
-	inputImageBytes: number;
+	input: VisionResolutionInputStats;
+	tool: VisionResolutionToolStats;
 	currentImageMessages: number;
 	generatedImageMessages: number;
 	replayedImageMessages: number;
 	omittedImageMessages: number;
 	unavailableImageMessages: number;
 	failedImageMessages: number;
-	// Count of image parts preserved in outbound native-image request payload.
-	forwardedImageParts: number;
-	droppedImageParts: number;
 	markerVisionTextChars: number;
 	invalidMarkerVisionMetadata: number;
 }

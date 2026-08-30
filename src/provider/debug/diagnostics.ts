@@ -939,8 +939,6 @@ function formatVisionTrace(
 		return undefined;
 	}
 
-	const note =
-		stats.inputImageParts === 0 && stats.historyDescriptionMessages > 0 ? ' note=history-only' : '';
 	const visionModel = formatVisionModel(stats, pipelineStats);
 	// Prefer precise pipeline counters when available; fall back to reconstructed
 	// message-based stats for older/non-pipeline paths.
@@ -954,6 +952,10 @@ function formatVisionTrace(
 	const toolImageBytes = pipelineStats?.tool.imageBytes ?? 0;
 	const toolForwardedImageParts = pipelineStats?.tool.forwardedImageParts ?? 0;
 	const toolDroppedImageParts = pipelineStats?.tool.droppedImageParts ?? 0;
+	const note =
+		inputImageParts + toolImageParts === 0 && stats.historyDescriptionMessages > 0
+			? ' note=history-only'
+			: '';
 	const parts = [
 		`vision mode=${mode}`,
 		`images=${inputImageParts + toolImageParts}`,

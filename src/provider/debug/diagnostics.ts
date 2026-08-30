@@ -1047,11 +1047,16 @@ function formatVisionModel(
 	if (pipelineImageParts === 0) {
 		return 'none';
 	}
-	if (
-		stats.droppedImageParts > 0 &&
-		stats.describedImageMessages === 0 &&
-		stats.failedImageMessages === 0
-	) {
+	const droppedImageParts = pipelineStats
+		? pipelineStats.input.droppedImageParts + pipelineStats.tool.droppedImageParts
+		: stats.droppedImageParts;
+	const generatedImageMessages = pipelineStats
+		? pipelineStats.generatedImageMessages
+		: stats.describedImageMessages;
+	const failedImageMessages = pipelineStats
+		? pipelineStats.failedImageMessages
+		: stats.failedImageMessages;
+	if (droppedImageParts > 0 && generatedImageMessages === 0 && failedImageMessages === 0) {
 		return 'none';
 	}
 	return 'unknown';

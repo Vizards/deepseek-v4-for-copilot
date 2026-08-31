@@ -192,6 +192,23 @@
             "%deepseek-copilot.config.debugMode.verbose.description%"
           ],
           "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
+        },
+        "deepseek-copilot.tariff.transitionAlerts": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a visible warning when a DeepSeek tariff transition is within the configured threshold."
+        },
+        "deepseek-copilot.tariff.transitionAudio": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Play a system beep when a DeepSeek tariff transition warning triggers. Disable this if you do not want audio alerts."
+        },
+        "deepseek-copilot.tariff.transitionWarningMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 60,
+          "markdownDescription": "How many minutes before a tariff transition to raise the warning."
         }
       }
     }

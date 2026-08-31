@@ -1,0 +1,40 @@
+name: Question / 使用咨询
+description: Ask the community about using or understanding the extension
+title: "[Question] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are intended primarily for community discussion and peer support.<br>此分类主要用于社区互助交流。
+
+        If you have confirmed unexpected extension behavior, use the [Bug Report](https://github.com/Vizards/deepseek-v4-for-copilot/issues/new?template=bug-report.yml) form and provide reproducible information.<br>如果确认是扩展异常，请使用 [Bug Report / Bug 报告](https://github.com/Vizards/deepseek-v4-for-copilot/issues/new?template=bug-report.yml) 并提供可复现信息。
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Describe what you are trying to understand or accomplish.
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempts
+    attributes:
+      label: What have you tried?
+      description: Mention relevant documentation, settings, or existing Issues you checked.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context, if relevant
+      description: Add versions, screenshots, or links only when they help explain the question.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched the README and existing Issues before opening this question.
+          required: true

@@ -1,0 +1,70 @@
+name: Bug Report / Bug 反馈
+description: Report a problem with the extension
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing Issues before submitting.<br>提交前请先搜索已有 Issue。请勿公开 API Key、Authorization Header、私有 Prompt、私有代码或未经检查的敏感日志。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the actual and expected behavior. Include the exact error text or a screenshot when available.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Provide the smallest sequence of steps, or explain when the problem occurs if it is not reliably reproducible.
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      placeholder: Exact version shown in Extensions
+    validations:
+      required: true
+
+  - type: textarea
+    id: editor-build
+    attributes:
+      label: Editor build
+      description: >-
+        Run "Help: About" from the Command Palette and paste the Version,
+        Commit, and OS. Name the editor if it is not VS Code Stable.
+      placeholder: "Paste the Help: About output here."
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context, if relevant
+      description: |
+        Add only what helps reproduce the problem, such as the model, Chat mode, official API or custom baseUrl, local or remote environment, recent updates, redacted settings, logs, or screenshots.
+
+        If you manually installed or switched Copilot Chat, include its exact version and installation method.
+
+        To collect diagnostic logs:
+        1. Open Settings and search for "DeepSeek Copilot: Debug Mode".
+        2. Select "Metadata" and reproduce the problem.
+        3. Run "DeepSeek: Show Logs" from the Command Palette.
+
+        Review the logs before attaching them. Do not share Verbose request dumps publicly.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing Issues and did not find the same problem.
+          required: true
+        - label: I confirmed that the public content contains no API keys, authorization headers, private prompts, private code, or unreviewed sensitive dumps.
+          required: true

@@ -21,6 +21,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 		const modelId = document.getElementById('modelId');
 		const headers = document.getElementById('headers');
 		const extraBody = document.getElementById('extraBody');
+		const timeoutMs = document.getElementById('timeoutMs');
 		const status = document.getElementById('status');
 		const testResult = document.getElementById('testResult');
 		const testImage = document.getElementById('testImage');
@@ -46,6 +47,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			modelId.value = config.modelId || '';
 			headers.value = config.headers ? JSON.stringify(config.headers, null, 2) : '';
 			extraBody.value = config.extraBody ? JSON.stringify(config.extraBody, null, 2) : '';
+			timeoutMs.value = config.timeoutMs ? String(config.timeoutMs) : '';
 			apiKey.value = '';
 			apiKey.placeholder = state.hasApiKey ? '••••••••••••' : strings.placeholderEnterApiKey;
 			renderApiKeyHint(state.hasApiKey);
@@ -279,6 +281,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 		function collectConfig() {
 			const parsedHeaders = parseOptionalJson(headers.value, strings.fieldCustomHeaders);
 			const parsedExtraBody = parseOptionalJson(extraBody.value, strings.fieldExtraBody);
+			const timeoutValue = parsePositiveNumber(timeoutMs.value);
 			const endpointConfig = getEndpointTypeConfig(endpointType.value);
 			return {
 				providerFamily: endpointConfig.providerFamily,
@@ -287,8 +290,26 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 				modelId: modelId.value,
 				headers: parsedHeaders,
 				extraBody: parsedExtraBody,
+				timeoutMs: timeoutValue,
 				updatedAt: Date.now(),
 			};
+		}
+
+		// Parse a positive integer from the timeout input field.
+		// Returns undefined for empty, non-finite, or ≤ 0 values so the
+		// backend falls back to the default timeout. Values above
+		// MAX_TIMEOUT_MS are clamped and fractional values are truncated,
+		// mirroring the backend normalization.
+		function parsePositiveNumber(value) {
+			const text = value.trim();
+			if (!text) {
+				return undefined;
+			}
+			const num = Number(text);
+			if (!Number.isFinite(num) || num <= 0) {
+				return undefined;
+			}
+			return Math.min(Math.trunc(num), 2147483647);
 		}
 
 		function parseOptionalJson(value, label) {
@@ -449,7 +470,7 @@ export function getVisionProxyPanelScript(initialState: string, initialStrings: 
 			invalidateTestStatus();
 			updateEndpointTypeFromUrl();
 		});
-		for (const field of [apiKey, modelId, headers, extraBody]) {
+		for (const field of [apiKey, modelId, headers, extraBody, timeoutMs]) {
 			field.addEventListener('input', invalidateTestStatus);
 		}
 		endpointType.addEventListener('change', () => {

@@ -1,12 +1,14 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getStabilizeToolListEnabled } from '../config';
+import { getBaseUrl, getStabilizeToolListEnabled } from '../config';
 import { MODELS } from '../consts';
+import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../endpoint';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import { createCacheDiagnosticsRecorder, dumpProviderInput } from './debug';
 import { toChatInfo } from './models';
 import { BalanceCurrencyResolver } from './pricing/currency';
+import { PricingRefreshScheduler } from './pricing/schedule';
 import { prepareChatRequest } from './request';
 import { classifyProviderRequest } from './routing';
 import { resolveConversationSegment } from './segment';
@@ -33,6 +35,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	/** Vision proxy: internal bridge + VS Code LM fallback. */
 	private readonly vision: ReturnType<typeof createVisionService>;
 	private readonly balanceCurrencyResolver: BalanceCurrencyResolver;
+	private readonly pricingRefreshScheduler: PricingRefreshScheduler;
 
 	/**
 	 * Adaptive chars-per-token ratio, calibrated from actual usage data.
@@ -47,9 +50,13 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		this.balanceCurrencyResolver = new BalanceCurrencyResolver(context, this.authManager, () =>
 			this.onDidChangeLanguageModelChatInformationEmitter.fire(),
 		);
+		this.pricingRefreshScheduler = new PricingRefreshScheduler(() =>
+			this.onDidChangeLanguageModelChatInformationEmitter.fire(),
+		);
 
 		context.subscriptions.push(
 			this.onDidChangeLanguageModelChatInformationEmitter,
+			this.pricingRefreshScheduler,
 			// Settings-based fallback API key + base URL changes.
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (
@@ -133,10 +140,14 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 
 		const hasKey = await this.authManager.hasApiKey();
 		const pricingCurrency = this.balanceCurrencyResolver.getDisplayCurrency();
+		const showPricingNotice = isOfficialDeepSeekBaseUrl(normalizeBaseUrl(getBaseUrl()));
+		const now = new Date();
 		if (hasKey) {
 			this.balanceCurrencyResolver.refreshInBackground();
 		}
-		return MODELS.map((model) => toChatInfo(model, hasKey, pricingCurrency));
+		return MODELS.map((model) =>
+			toChatInfo(model, hasKey, pricingCurrency, now, showPricingNotice),
+		);
 	}
 
 	async provideLanguageModelChatResponse(

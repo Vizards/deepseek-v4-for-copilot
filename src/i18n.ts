@@ -24,6 +24,16 @@ const zh: Translations = {
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
 	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
+	'model.pricing.currentPeak': '高峰时段',
+	'model.pricing.currentOffPeak': '空闲时段',
+	'model.pricing.inputLabel': '输入',
+	'model.pricing.cacheHitInputLabel': '输入 (缓存命中)',
+	'model.pricing.outputLabel': '输出',
+	'model.pricing.unitSuffix': ' / 百万 tokens',
+	'model.pricing.periodStarts': '{1}进入{0}',
+	'model.pricing.transitionTime.today': '{0}',
+	'model.pricing.transitionTime.tomorrow': '明天 {0}',
+	'model.pricing.transitionTime.weekday': '{0} {1}',
 	'model.flash-vision-exp.tooltip': 'DeepSeek V4 Flash 视觉实验模型，支持原生图片与文本输入。',
 
 	// API Key
@@ -65,9 +75,11 @@ const zh: Translations = {
 	'vision.panel.field.modelId': '模型 ID',
 	'vision.panel.field.customHeaders': '自定义 headers JSON',
 	'vision.panel.field.extraBody': '额外请求体 JSON',
+	'vision.panel.field.timeoutMs': '请求超时 (毫秒)',
 	'vision.panel.hint.customHeaders':
 		'Header 会随配置保存。建议尽量把服务商 token 放在 API Key 输入框中。',
 	'vision.panel.hint.extraBody': '会合并进请求体，不能覆盖 model、messages、input 或 stream。',
+	'vision.panel.hint.timeoutMs': '留空使用默认 30 秒。值必须大于 0。',
 	'vision.panel.placeholder.openaiEndpoint': 'https://api.example.com/v1/chat/completions',
 	'vision.panel.placeholder.openaiResponsesEndpoint': 'https://api.example.com/v1/responses',
 	'vision.panel.placeholder.anthropicEndpoint': 'https://api.example.com/v1/messages',
@@ -216,6 +228,16 @@ const en: Translations = {
 		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
 	'model.pro.tooltip':
 		'DeepSeek V4 model for agentic coding, broad world knowledge, and high-end reasoning.',
+	'model.pricing.currentPeak': 'Peak',
+	'model.pricing.currentOffPeak': 'Off-peak',
+	'model.pricing.inputLabel': 'Input',
+	'model.pricing.cacheHitInputLabel': 'Cache Input',
+	'model.pricing.outputLabel': 'Output',
+	'model.pricing.unitSuffix': ' per 1M tokens',
+	'model.pricing.periodStarts': '{0} starts {1}',
+	'model.pricing.transitionTime.today': 'at {0}',
+	'model.pricing.transitionTime.tomorrow': 'tomorrow at {0}',
+	'model.pricing.transitionTime.weekday': 'on {0} at {1}',
 	'model.flash-vision-exp.tooltip':
 		'Experimental DeepSeek V4 Flash vision model with native image and text input.',
 
@@ -262,10 +284,12 @@ const en: Translations = {
 	'vision.panel.field.modelId': 'Model ID',
 	'vision.panel.field.customHeaders': 'Custom headers JSON',
 	'vision.panel.field.extraBody': 'Additional request body JSON',
+	'vision.panel.field.timeoutMs': 'Request timeout (ms)',
 	'vision.panel.hint.customHeaders':
 		'Header values are stored with the profile. Put provider tokens in the API key field when possible.',
 	'vision.panel.hint.extraBody':
 		'Merged into the request body. Cannot override model, messages, input, or stream.',
+	'vision.panel.hint.timeoutMs': 'Leave empty for the default 30 seconds. Must be greater than 0.',
 	'vision.panel.placeholder.openaiEndpoint': 'https://api.example.com/v1/chat/completions',
 	'vision.panel.placeholder.openaiResponsesEndpoint': 'https://api.example.com/v1/responses',
 	'vision.panel.placeholder.anthropicEndpoint': 'https://api.example.com/v1/messages',

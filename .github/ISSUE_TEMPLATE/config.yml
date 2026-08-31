@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contact the Maintainer / 联系维护者
+    url: https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/.github/CONTACT.md
+    about: Maintenance collaboration, sensitive security reports, or matters not suited to public discussion

@@ -1,14 +1,15 @@
 import type vscode from 'vscode';
 import { t } from '../../../../i18n';
+import { VisionProxyError } from '../../protocols/errors';
+import { normalizeCustomHeaders } from '../../protocols/headers';
+import { validateVisionEndpointUrl } from '../../protocols/url';
 import type {
 	VisionProxyApiType,
 	VisionProxyConfig,
 	VisionProxyProviderFamily,
 	VisionProxySource,
 } from '../../types';
-import { VisionProxyError } from '../../protocols/errors';
-import { normalizeCustomHeaders } from '../../protocols/headers';
-import { validateVisionEndpointUrl } from '../../protocols/url';
+import { MAX_TIMEOUT_MS } from '../../consts';
 
 export const VISION_PROXY_CONFIG_KEY = 'deepseek-copilot.visionProxy.config';
 export const VISION_PROXY_SOURCE_KEY = 'deepseek-copilot.visionProxy.source';
@@ -77,12 +78,14 @@ export function normalizeVisionProxyConfig(value: unknown): VisionProxyConfig {
 	const modelId = normalizeRequiredString(value.modelId, t('vision.panel.field.modelId'));
 	const headers = normalizeCustomHeaders(value.headers);
 	const extraBody = normalizeExtraBody(value.extraBody);
+	const timeoutMs = normalizeTimeoutMs(value.timeoutMs);
 
 	return {
 		providerFamily,
 		apiType,
 		url,
 		modelId,
+		timeoutMs,
 		headers,
 		extraBody,
 		updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
@@ -154,6 +157,26 @@ function normalizeExtraBody(value: unknown): Record<string, unknown> | undefined
 	}
 
 	return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/**
+ * Normalize the user-supplied timeout in milliseconds.
+ *
+ * Returns `undefined` (→ fall back to {@link DEFAULT_TIMEOUT_MS}) when the
+ * value is missing, not a finite number, or ≤ 0. Values above
+ * {@link MAX_TIMEOUT_MS} are clamped to the cap, and non-integer values are
+ * truncated, because Node's `setTimeout()` treats delays larger than
+ * `2_147_483_647` ms as `1` ms and truncates fractional delays.
+ */
+function normalizeTimeoutMs(value: unknown): number | undefined {
+	if (value === undefined || value === null) {
+		return undefined;
+	}
+	const num = Number(value);
+	if (!Number.isFinite(num) || num <= 0) {
+		return undefined;
+	}
+	return Math.min(Math.trunc(num), MAX_TIMEOUT_MS);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

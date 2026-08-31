@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.0...v0.8.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* **pricing:** show dynamic rates in model picker info text ([#241](https://github.com/Vizards/deepseek-v4-for-copilot/issues/241)) ([e13414f](https://github.com/Vizards/deepseek-v4-for-copilot/commit/e13414fcf8d3a21400d69951a7acdd4037fd3b81))
+* **vision-proxy:** add configurable request timeout ([#203](https://github.com/Vizards/deepseek-v4-for-copilot/issues/203)) ([0a3184a](https://github.com/Vizards/deepseek-v4-for-copilot/commit/0a3184a63a41858b2fbc2eae9d309dc3a51ddd16))
+
 ## [0.8.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.7.1...v0.8.0) (2026-08-22)
 
 

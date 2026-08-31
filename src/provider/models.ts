@@ -6,12 +6,12 @@ import type {
 	ReasoningEffort,
 	ThinkingCapability,
 } from '../types';
-import { toModelCostInfo, type ModelCostInformation } from './pricing/costs';
+import { toModelPricingInfo, type ModelPricingInformation } from './pricing/costs';
 
 /**
  * NOTE: Non-public API surface.
  *
- * The fields below (`configurationSchema` on chat info, cost metadata,
+ * The fields below (`configurationSchema` on chat info, pricing metadata,
  * `modelConfiguration` on response options, plus `isBYOK` / `isUserSelectable` /
  * `statusIcon`)
  * are not part of the stable `vscode.LanguageModelChat*` typings yet. They are
@@ -30,7 +30,7 @@ export type ModelConfigurationOptions = vscode.ProvideLanguageModelChatResponseO
 type ThinkingEffortConfigurationSchema = ReturnType<typeof buildThinkingEffortSchema>;
 
 export type ModelPickerChatInformation = vscode.LanguageModelChatInformation &
-	ModelCostInformation & {
+	ModelPricingInformation & {
 		readonly isUserSelectable: boolean;
 		readonly isBYOK: true;
 		readonly statusIcon?: vscode.ThemeIcon;
@@ -41,6 +41,8 @@ export function toChatInfo(
 	m: ModelDefinition,
 	hasApiKey: boolean,
 	pricingCurrency?: PricingCurrency,
+	now = new Date(),
+	showPricingNotice = true,
 ): ModelPickerChatInformation {
 	const modelDetail = resolveModelText(m, 'detail') ?? m.detail;
 	const modelTooltip = resolveModelText(m, 'tooltip');
@@ -61,7 +63,7 @@ export function toChatInfo(
 			toolCalling: m.capabilities.toolCalling,
 			imageInput: m.capabilities.imageInput,
 		},
-		...toModelCostInfo(m, pricingCurrency),
+		...toModelPricingInfo(m, pricingCurrency, now, showPricingNotice),
 		...(thinkingCapability
 			? { configurationSchema: buildThinkingEffortSchema(thinkingCapability) }
 			: {}),

@@ -5,7 +5,7 @@ import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
-import type { DeepSeekMessage, DeepSeekRequest } from '../types';
+import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
 	dumpDeepSeekRequest,
@@ -17,8 +17,11 @@ import type { ReplayMarkerMetadata } from './replay';
 import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
-import type { VisionResolutionResult, VisionResolutionStats } from './vision';
-import { resolveImageMessages, type VisionDescriber } from './vision';
+import {
+	finalizeVisionResolutionStats,
+	prepareVisionMessages,
+	type VisionDescriber,
+} from './vision';
 
 export interface PreparedChatRequest {
 	client: DeepSeekClient;
@@ -70,29 +73,25 @@ export async function prepareChatRequest({
 	const isThinkingModel = Boolean(thinkingCapability);
 	const nativeImageInput = modelDef?.capabilities.nativeImageInput === true;
 	const maxTokens = getMaxTokens();
-
-	// Flash/Pro are declared as non-native vision models and therefore resolve
-	// image inputs through the configured/default proxy route (Vision Exp in auto mode).
-	const visionResolution: VisionResolutionResult = nativeImageInput
-		? createNativeVisionResolution(messages)
-		: await resolveImageMessages(messages, token, getVisionDescriber);
+	const visionResolution = await prepareVisionMessages({
+		messages,
+		nativeImageInput,
+		token,
+		getDescriber: getVisionDescriber,
+	});
 
 	const resolvedMessages = visionResolution.messages;
 
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
-	if (nativeImageInput) {
-		// For native-image models, count images after conversion so diagnostics reflect
-		// what is actually forwarded in the DeepSeek payload.
-		visionResolution.stats.forwardedImageParts = countNativeForwardedImageParts(deepseekMessages);
-		visionResolution.stats.droppedImageParts = Math.max(
-			0,
-			visionResolution.stats.inputImageParts - visionResolution.stats.forwardedImageParts,
-		);
-	}
+	finalizeVisionResolutionStats(visionResolution.stats, deepseekMessages);
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
-	const hasNativeImages = hasNativeImageParts(deepseekMessages);
+	const hasNativeImages =
+		visionResolution.stats.imageHandlingMode === 'native' &&
+		visionResolution.stats.input.forwardedImageParts +
+			visionResolution.stats.tool.forwardedImageParts >
+			0;
 	const baseRequest: DeepSeekRequest = {
 		model: getApiModelId(modelInfo.id),
 		messages: deepseekMessages,
@@ -169,88 +168,4 @@ export async function prepareChatRequest({
 		visionMarkerTextChars: visionResolution.stats.markerVisionTextChars || undefined,
 		initialResponseNotice: visionResolution.initialResponseNotice,
 	};
-}
-
-function hasNativeImageParts(messages: DeepSeekMessage[]): boolean {
-	for (const message of messages) {
-		if (typeof message.content === 'string') {
-			continue;
-		}
-		for (const part of message.content) {
-			if (part.type === 'image_url') {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/**
- * Build a lightweight resolution result for native-image models.
- * Native mode does not run proxy description, but still records input image
- * counts/bytes so diagnostics are no longer reported as all-zero.
- */
-function createNativeVisionResolution(
-	messages: readonly vscode.LanguageModelChatRequestMessage[],
-): VisionResolutionResult {
-	const stats = createNativeVisionResolutionStats();
-	for (const message of messages) {
-		let imagePartsInMessage = 0;
-		for (const part of message.content) {
-			if (part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/')) {
-				imagePartsInMessage += 1;
-				stats.inputImageBytes += part.data.byteLength;
-			}
-		}
-		if (imagePartsInMessage > 0) {
-			stats.inputImageMessages += 1;
-			stats.inputImageParts += imagePartsInMessage;
-		}
-	}
-
-	if (stats.inputImageParts > 0) {
-		stats.imageHandlingMode = 'native';
-	}
-
-	return {
-		messages,
-		stats,
-		replayMarkerMetadata: {},
-	};
-}
-
-/** Create a zeroed stats object that matches VisionResolutionStats shape. */
-function createNativeVisionResolutionStats(): VisionResolutionStats {
-	return {
-		imageHandlingMode: 'none',
-		inputImageParts: 0,
-		inputImageMessages: 0,
-		inputImageBytes: 0,
-		currentImageMessages: 0,
-		generatedImageMessages: 0,
-		replayedImageMessages: 0,
-		omittedImageMessages: 0,
-		unavailableImageMessages: 0,
-		failedImageMessages: 0,
-		forwardedImageParts: 0,
-		droppedImageParts: 0,
-		markerVisionTextChars: 0,
-		invalidMarkerVisionMetadata: 0,
-	};
-}
-
-/** Count native image parts that survived conversion into image_url content. */
-function countNativeForwardedImageParts(messages: readonly DeepSeekMessage[]): number {
-	let total = 0;
-	for (const message of messages) {
-		if (typeof message.content === 'string') {
-			continue;
-		}
-		for (const part of message.content) {
-			if (part.type === 'image_url') {
-				total += 1;
-			}
-		}
-	}
-	return total;
 }

@@ -22,7 +22,14 @@ export async function resolveImageMessages(
 	token: vscode.CancellationToken,
 	getDescriber: () => Promise<VisionDescriber | undefined>,
 ): Promise<VisionResolutionResult> {
-	if (summary.inputImageParts + summary.toolResultImageParts === 0) {
+	if (
+		summary.inputImageParts + summary.toolResultImageParts === 0 &&
+		!messages.some(
+			(message) =>
+				message.role === vscode.LanguageModelChatMessageRole.Assistant &&
+				Boolean(parseFirstReplayMarker(message)?.toolVision?.length),
+		)
+	) {
 		return { messages, stats, replayMarkerMetadata: {} };
 	}
 	const session = createVisionDescriptionSession(stats, token, getDescriber);
@@ -75,13 +82,14 @@ export async function resolveImageMessages(
 		stats.input.droppedImageParts += imageParts.length;
 		result.push(createResolvedMessage(message, nonImageParts));
 	}
-	const resolvedMessages = await resolveToolResultImages(result, session);
+	const toolResolution = await resolveToolResultImages(result, session, stats);
+	const toolVision = toolResolution.replayEntries;
 	const sessionMetadata = session.getMetadata();
 
 	return {
-		messages: resolvedMessages,
+		messages: toolResolution.messages,
 		stats,
-		replayMarkerMetadata: markerVisionText ? { visionText: markerVisionText } : {},
+		replayMarkerMetadata: { visionText: markerVisionText, toolVision },
 		...sessionMetadata,
 	};
 }

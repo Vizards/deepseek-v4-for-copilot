@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.1...v0.8.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **provider:** support tool-result images across vision routes ([#260](https://github.com/Vizards/deepseek-v4-for-copilot/issues/260)) ([3384f36](https://github.com/Vizards/deepseek-v4-for-copilot/commit/3384f36525676837399a1ad625399a195d43ea88))
+* **vision:** stabilize proxied tool image descriptions ([#261](https://github.com/Vizards/deepseek-v4-for-copilot/issues/261)) ([dad64fb](https://github.com/Vizards/deepseek-v4-for-copilot/commit/dad64fb65b5e563fd668d300de4447d6e884bd0a))
+
 ## [0.8.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.0...v0.8.1) (2026-08-27)
 
 

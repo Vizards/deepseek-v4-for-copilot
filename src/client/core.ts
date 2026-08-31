@@ -1,7 +1,10 @@
 import type { CancellationToken } from 'vscode';
+import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { safeStringify } from '../json';
 import { logger } from '../logger';
 import type {
+	DeepSeekFimRequest,
+	DeepSeekFimResponse,
 	DeepSeekRequest,
 	DeepSeekStreamChunk,
 	DeepSeekToolCall,
@@ -179,6 +182,60 @@ export class DeepSeekClient {
 			const normalizedError = normalizeRequestError(error, { baseUrl: this.baseUrl, request });
 			logger.error('DeepSeek request failed:', formatRequestError(normalizedError));
 			callbacks.onError(normalizedError);
+		} finally {
+			cancelListener?.dispose();
+		}
+	}
+
+	/**
+	 * Request a FIM (Fill-In-the-Middle) code completion.
+	 * Non-streaming; returns the completed text, or `undefined` when cancelled.
+	 * Throws a normalized DeepSeekRequestError on failure — callers decide how to surface it.
+	 *
+	 * Endpoint: official DeepSeek API exposes FIM under `/beta/completions`;
+	 * third-party OpenAI-compatible providers typically expose it at `/completions`.
+	 */
+	async fimCompletion(
+		request: DeepSeekFimRequest,
+		cancellationToken?: CancellationToken,
+	): Promise<string | undefined> {
+		const controller = new AbortController();
+		const cancelListener = cancellationToken?.onCancellationRequested(() => {
+			controller.abort();
+		});
+		if (cancellationToken?.isCancellationRequested) {
+			controller.abort();
+		}
+
+		const path = isOfficialDeepSeekBaseUrl(this.baseUrl) ? '/beta/completions' : '/completions';
+		// Diagnostic context for the shared error layer — FIM requests have no messages.
+		const errorContext = {
+			baseUrl: this.baseUrl,
+			request: { model: request.model, messages: [], stream: false } as DeepSeekRequest,
+		};
+
+		try {
+			const response = await fetch(`${this.baseUrl}${path}`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${this.apiKey}`,
+				},
+				body: safeStringify(request),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				throw await createHttpError(response, errorContext);
+			}
+
+			const data = (await response.json()) as DeepSeekFimResponse;
+			return data.choices?.[0]?.text;
+		} catch (error) {
+			if (isAbortError(error)) {
+				return undefined;
+			}
+			throw normalizeRequestError(error, errorContext);
 		} finally {
 			cancelListener?.dispose();
 		}

@@ -3,7 +3,7 @@ import { toWellFormedString } from '../../json';
 import { parseFirstReplayMarker } from '../replay';
 import { createVisionDescriptionSession } from './description';
 import { isImageDataPart, type VisionInputSummary } from './normalize';
-import { resolveToolResultImages } from './resolve-tool';
+import { resolveToolResultImages } from './tool';
 import type {
 	VisionDescriber,
 	VisionImagePart,

@@ -120,7 +120,9 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		try {
 			await vscode.lm.selectChatModels({ vendor: 'deepseek' });
 		} catch (error) {
-			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
+			if (!(error instanceof vscode.CancellationError)) {
+				logger.warn('Failed to refresh DeepSeek models during deactivate', error);
+			}
 		}
 	}
 

@@ -64,6 +64,12 @@ export function getRequestDumpEnabled(): boolean {
 	return getDebugMode() === 'verbose';
 }
 
+export function getBalanceRefreshIntervalMs(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const minutes = config.get<number>('balanceRefreshInterval', 10);
+	return Math.max(0, minutes) * 60 * 1000;
+}
+
 export function getStabilizeToolListEnabled(): boolean {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 	return config.get<boolean>('experimental.stabilizeToolList', false);

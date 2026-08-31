@@ -75,6 +75,14 @@
       {
         "command": "deepseek-copilot.openRequestDumpsFolder",
         "title": "%deepseek-copilot.command.openRequestDumpsFolder%"
+      },
+      {
+        "command": "deepseek-copilot.checkBalance",
+        "title": "%deepseek-copilot.command.checkBalance%"
+      },
+      {
+        "command": "deepseek-copilot.toggleBalanceDisplay",
+        "title": "%deepseek-copilot.command.toggleBalanceDisplay%"
       }
     ],
     "walkthroughs": [
@@ -126,6 +134,12 @@
           "default": 0,
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
+        },
+        "deepseek-copilot.balanceRefreshInterval": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "description": "%deepseek-copilot.config.balanceRefreshInterval.description%"
         },
         "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",

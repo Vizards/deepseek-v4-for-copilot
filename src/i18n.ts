@@ -21,17 +21,14 @@ const zh: Translations = {
 	// Model descriptions
 	'model.deepseek-flash.detail': '原生视觉与推理',
 	'model.deepseek-flash.tooltip': 'DeepSeek V4.1 Flash，支持原生图片输入、思考模式和工具调用。',
-	'model.retirement.legacyDetail': '旧入口 · 建议迁移',
-	'model.retirement.pendingDetail': '即将退役 · 建议迁移',
-	'model.retirement.retiredDetail': '已退役 · 兼容入口',
 	'model.retirement.custom':
-		'此插件旧模型入口不再推荐使用。建议在服务商支持时切换到 DeepSeek V4.1 Flash（deepseek-flash）。自定义端点或模型映射的实际模型、路由和计费以服务商为准。已有配置和请求处理保持不变。',
+		'**旧模型入口。**  \n请先确认服务商支持 DeepSeek V4.1 Flash。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
 	'model.retirement.flashRetired':
-		'原模型已退役。DeepSeek 官方 API 暂时保留此名称，请求由 DeepSeek V4.1 Flash 提供服务，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
+		'**已下线。**  \n请求将路由到 DeepSeek V4.1 Flash，以新模型价格计费。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
 	'model.retirement.proPending':
-		'DeepSeek V4 Pro 即将退役，目前仍按 V4 Pro 价格计费。北京时间 2026 年 9 月 14 日 12:00 起，至未来 V4.1 Pro 上线前，官方 API 请求将转向 V4.1 Flash，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
+		'**将于 2026-09-14 12:00（北京时间）下线。**  \n之后路由至 DeepSeek V4.1 Flash 并按其价格计费，直至 V4.1 Pro 上线。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
 	'model.retirement.proRetired':
-		'DeepSeek V4 Pro 已退役。自北京时间 2026 年 9 月 14 日 12:00 起，至未来 V4.1 Pro 上线前，官方 API 请求由 V4.1 Flash 提供服务，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
+		'**已下线。**  \n路由至 DeepSeek V4.1 Flash 并按其价格计费，直至 V4.1 Pro 上线。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
@@ -237,17 +234,14 @@ const en: Translations = {
 	'model.deepseek-flash.detail': 'Native vision and reasoning',
 	'model.deepseek-flash.tooltip':
 		'DeepSeek V4.1 Flash with native image input, thinking mode, and tool calling.',
-	'model.retirement.legacyDetail': 'Legacy entry · migration recommended',
-	'model.retirement.pendingDetail': 'Retiring · migration recommended',
-	'model.retirement.retiredDetail': 'Retired · compatibility entry',
 	'model.retirement.custom':
-		'This legacy model entry is no longer recommended. Switch to DeepSeek V4.1 Flash (deepseek-flash) if your provider supports it. The actual model, routing, and pricing for a custom endpoint or model mapping are determined by your provider. Existing settings and request handling are preserved.',
+		'**Legacy model entry.**  \nCheck that your provider supports DeepSeek V4.1 Flash.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
 	'model.retirement.flashRetired':
-		'The original model has been retired. The official DeepSeek API temporarily accepts this name and serves requests with DeepSeek V4.1 Flash at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
+		'**Retired.**  \nRequests are served by DeepSeek V4.1 Flash and billed at the V4.1 Flash price.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
 	'model.retirement.proPending':
-		'DeepSeek V4 Pro is retiring and is currently billed at V4 Pro rates. From September 14, 2026 at 12:00 Beijing time (UTC+8), until V4.1 Pro is released, official API requests will be routed to V4.1 Flash and billed at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
+		'**Retires Sep 14, 2026 at 12:00 UTC+8.**  \nThen requests are routed to DeepSeek V4.1 Flash and billed at its prices until V4.1 Pro is released.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
 	'model.retirement.proRetired':
-		'DeepSeek V4 Pro has been retired. Since September 14, 2026 at 12:00 Beijing time (UTC+8), until V4.1 Pro is released, official API requests are served by V4.1 Flash at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
+		'**Retired.**  \nRequests are routed to DeepSeek V4.1 Flash and billed at its prices until V4.1 Pro is released.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
 	'model.flash-vision-exp.detail': 'Experimental native vision model',

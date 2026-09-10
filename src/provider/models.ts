@@ -47,8 +47,8 @@ export function toChatInfo(
 	usesOfficialModel = true,
 ): ModelPickerChatInformation {
 	const retirement = getModelRetirementNotice(m.id, usesOfficialModel, now);
-	const modelDetail = retirement?.detail ?? resolveModelText(m, 'detail') ?? m.detail;
-	const modelTooltip = retirement?.message ?? resolveModelText(m, 'tooltip');
+	const modelDetail = resolveModelText(m, 'detail') ?? m.detail;
+	const modelTooltip = resolveModelText(m, 'tooltip');
 	const thinkingCapability = m.capabilities.thinking;
 	return {
 		id: m.id,

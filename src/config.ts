@@ -12,6 +12,11 @@ export function getBaseUrl(): string {
 	return config.get<string>('baseUrl') || 'https://api.deepseek.com';
 }
 
+export function getRequestHeaders(): Record<string, string> {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<Record<string, string>>('requestHeaders', {});
+}
+
 /**
  * Resolve the API model ID to send to the endpoint.
  *

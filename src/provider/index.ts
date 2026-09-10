@@ -24,6 +24,7 @@ import { createVisionService } from './vision';
 export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly authManager: AuthManager;
 	private readonly globalStorageUri: vscode.Uri;
+	private readonly storageUri: vscode.Uri | undefined;
 	private readonly onDidChangeLanguageModelChatInformationEmitter = new vscode.EventEmitter<void>();
 	private isActive = true;
 
@@ -46,6 +47,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
 		this.globalStorageUri = context.globalStorageUri;
+		this.storageUri = context.storageUri;
 		this.vision = createVisionService(context);
 		this.balanceCurrencyResolver = new BalanceCurrencyResolver(context, this.authManager, () =>
 			this.onDidChangeLanguageModelChatInformationEmitter.fire(),
@@ -186,6 +188,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		const prepared = await prepareChatRequest({
 			authManager: this.authManager,
 			globalStorageUri: this.globalStorageUri,
+			storageUri: this.storageUri,
 			modelInfo,
 			segment,
 			messages: toolFlow.messages,

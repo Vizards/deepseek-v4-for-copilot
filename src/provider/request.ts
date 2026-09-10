@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
 import { DeepSeekClient } from '../client';
-import { getApiModelId, getBaseUrl, getMaxTokens } from '../config';
+import { getApiModelId, getBaseUrl, getMaxTokens, getRequestHeaders } from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import { t } from '../i18n';
@@ -12,6 +12,7 @@ import {
 	type CacheDiagnosticsRecorder,
 	type CacheDiagnosticsRun,
 } from './debug';
+import { resolveRequestHeaders } from './headers';
 import { getConfiguredThinkingEffort, type ModelConfigurationOptions } from './models';
 import type { ReplayMarkerMetadata } from './replay';
 import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
@@ -41,6 +42,7 @@ export interface PreparedChatRequest {
 export interface PrepareChatRequestOptions {
 	authManager: AuthManager;
 	globalStorageUri: vscode.Uri;
+	storageUri?: vscode.Uri;
 	modelInfo: vscode.LanguageModelChatInformation;
 	segment: ConversationSegment;
 	messages: readonly vscode.LanguageModelChatRequestMessage[];
@@ -53,6 +55,7 @@ export interface PrepareChatRequestOptions {
 export async function prepareChatRequest({
 	authManager,
 	globalStorageUri,
+	storageUri,
 	modelInfo,
 	segment,
 	messages,
@@ -67,7 +70,8 @@ export async function prepareChatRequest({
 	}
 
 	const baseUrl = getBaseUrl();
-	const client = new DeepSeekClient(baseUrl, apiKey);
+	const requestHeaders = resolveRequestHeaders(getRequestHeaders(), options, storageUri);
+	const client = new DeepSeekClient(baseUrl, apiKey, requestHeaders);
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const thinkingCapability = modelDef?.capabilities.thinking;
 	const isThinkingModel = Boolean(thinkingCapability);

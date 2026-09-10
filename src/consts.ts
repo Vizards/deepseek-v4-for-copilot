@@ -53,7 +53,7 @@ export const MODELS: ModelDefinition[] = [
 		name: 'DeepSeek V4.1 Flash',
 		family: 'deepseek',
 		version: 'v4.1',
-		detail: 'Native vision and reasoning',
+		detail: 'Vision and thinking mode',
 		maxInputTokens: 655360,
 		maxOutputTokens: 393216,
 		capabilities: {

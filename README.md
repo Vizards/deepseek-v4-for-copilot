@@ -33,22 +33,22 @@ Love DeepSeek's price-performance but don't want to give up GitHub Copilot's age
 ## Features
 
 ### DeepSeek models in the model picker
-V4.1 Flash, V4 Flash, Pro, and Flash Vision Exp support long context, tool calling, and configurable thinking effort.
+The picker includes V4.1 Flash and three legacy V4 entries, with long context, tool calling, and configurable thinking effort.
 
 ### Native Vision and Vision Proxy
 Choose the image path that fits the conversation:
 
 - **DeepSeek V4.1 Flash and Flash Vision Exp** handle image attachments natively, without Vision Proxy.
-- **DeepSeek V4 Flash and Pro** use Vision Proxy: an image-capable model first describes each attachment, then the main DeepSeek model receives the description with the conversation. Auto mode selects Flash Vision Exp when available, while an explicitly configured VS Code model or API endpoint remains supported.
+- The **DeepSeek V4 Flash and Pro** entries use Vision Proxy: an image-capable model first describes each attachment, then the main DeepSeek model receives the description with the conversation. Auto mode selects Flash Vision Exp when available, while an explicitly configured VS Code model or API endpoint remains supported.
 
-Avoid switching models mid-chat just to inspect an image if DeepSeek prefix-cache reuse matters. Start the conversation with V4.1 Flash for native vision, or stay on V4 Flash/Pro and let Vision Proxy preserve the main model choice.
+[Context caching](https://api-docs.deepseek.com/guides/kv_cache/) requires a full match with a cached prefix. Choose V4.1 Flash for new conversations and plan when to migrate existing ones.
 
 <p align="center">
   <img src="resources/screenshots/03-vision.png" alt="Dropping an image into Copilot Chat and DeepSeek responding to it via the vision proxy" width="800">
 </p>
 
-### Thinking Mode with Reasoning Effort Control
-Full support for DeepSeek's `reasoning_content`. All four entries offer `none` (off), `low` (light reasoning), `high` (balanced, default), and `max` (deep reasoning for hard agent tasks), matching the effort levels implemented by the official API.
+### Thinking Mode and Effort Control
+Supports DeepSeek's thinking mode and `reasoning_content`. `none` disables thinking mode; `low`, `high` (default), and `max` set the thinking effort.
 
 ### Inherits Every Copilot Capability
 Because this plugs into Copilot's native provider API, you get the full stack for free:
@@ -91,14 +91,14 @@ Install from the registry used by your editor:
 
 ## Models
 
-| Model | Image Handling | Thinking Effort | Status |
+| Model Entry | Image Handling | Thinking Effort | Official API Status |
 |---|---|---|---|
 | **DeepSeek V4.1 Flash** | Native image input | `none` / `low` / `high` / `max` | Recommended for new conversations |
-| **DeepSeek V4 Flash** | Vision Proxy | `none` / `low` / `high` / `max` | Original model retired; compatibility entry |
+| **DeepSeek V4 Flash** | Vision Proxy | `none` / `low` / `high` / `max` | Model retired; legacy name still accepted |
 | **DeepSeek V4 Pro** | Vision Proxy | `none` / `low` / `high` / `max` | Retires on September 14, 2026 at 12:00 Beijing time |
-| **DeepSeek V4 Flash Vision Exp** | Native image input | `none` / `low` / `high` / `max` | Original model retired; compatibility entry |
+| **DeepSeek V4 Flash Vision Exp** | Native image input | `none` / `low` / `high` / `max` | Model retired; legacy name still accepted |
 
-All four entries support thinking mode, tool calling, and 1M token context. Legacy entries remain selectable; see their model picker notices or the [official announcement](https://api-docs.deepseek.com/news/news260910/) for retirement and routing details.
+All four entries support thinking mode, tool calling, and 1M token context. See the official [Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing/) documentation for retirement, routing, and billing details.
 
 ## Settings
 

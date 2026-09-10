@@ -33,22 +33,22 @@
 ## 功能特性
 
 ### DeepSeek 模型出现在模型选择器中
-V4.1 Flash、V4 Flash、Pro 和 Flash Vision Exp 均支持长上下文、工具调用和可配置的思考深度。
+选择器包含 V4.1 Flash 和三个旧 V4 入口，支持长上下文、工具调用和可配置的思考强度。
 
 ### 原生视觉与视觉代理
 可以根据对话需要选择不同的图片处理路径：
 
 - **DeepSeek V4.1 Flash 和 Flash Vision Exp** 直接处理图片附件，不经过视觉代理。
-- **DeepSeek V4 Flash 和 Pro** 使用视觉代理：先由支持图片输入的模型描述附件，再将描述连同对话内容交给 DeepSeek 主模型。自动模式会在可用时选择 Flash Vision Exp，同时继续支持显式配置其他 VS Code 模型或 API 端点。
+- **DeepSeek V4 Flash 和 Pro** 入口使用视觉代理：先由支持图片输入的模型描述附件，再将描述连同对话内容交给 DeepSeek 主模型。自动模式会在可用时选择 Flash Vision Exp，同时继续支持显式配置其他 VS Code 模型或 API 端点。
 
-如果你在意 DeepSeek 前缀缓存的复用，不建议只为查看一张图片而在对话中途切换模型。需要原生视觉时，可以从对话开始就选择 V4.1 Flash；希望继续使用 V4 Flash/Pro 时，则让视觉代理处理图片并保留主模型选择。
+[上下文缓存](https://api-docs.deepseek.com/zh-cn/guides/kv_cache/)命中需要完整匹配已有的缓存前缀。新对话推荐选择 V4.1 Flash，旧对话可按进度安排迁移。
 
 <p align="center">
   <img src="resources/screenshots/03-vision.png" alt="将图片拖入 Copilot Chat，DeepSeek 通过视觉代理响应" width="800">
 </p>
 
-### 思考模式与推理深度控制
-完整支持 DeepSeek 的 `reasoning_content`。四个入口均可选择 `停用`、`轻量`、`标准`（均衡，默认）或 `深度`（适用于复杂 Agent 任务），与官方 API 已实现的推理档位保持一致。
+### 思考模式与思考强度控制
+支持 DeepSeek 的思考模式和 `reasoning_content`。`停用`关闭思考模式；开启后可选择`轻量`（`low`）、`标准`（`high`，默认）或`深度`（`max`）。
 
 ### 继承全部 Copilot 能力
 由于本扩展接入的是 Copilot 的原生 provider API，你免费获得完整能力栈：
@@ -91,14 +91,14 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 ## 模型
 
-| 模型 | 图片处理 | 思考深度 | 状态 |
+| 模型入口 | 图片处理 | 思考强度 | 官方 API 状态 |
 |---|---|---|---|
 | **DeepSeek V4.1 Flash** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 新对话推荐使用 |
-| **DeepSeek V4 Flash** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 原模型已退役；兼容入口 |
-| **DeepSeek V4 Pro** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 将于北京时间 2026 年 9 月 14 日 12:00 退役 |
-| **DeepSeek V4 Flash Vision Exp** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 原模型已退役；兼容入口 |
+| **DeepSeek V4 Flash** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 原模型已下线；旧模型名仍可调用 |
+| **DeepSeek V4 Pro** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 将于北京时间 2026 年 9 月 14 日 12:00 下线 |
+| **DeepSeek V4 Flash Vision Exp** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 原模型已下线；旧模型名仍可调用 |
 
-四个入口均支持思考模式、工具调用和 1M Token 上下文。旧入口继续可选，退役与路由信息见模型选择器提示或[官方公告](https://api-docs.deepseek.com/zh-cn/news/news260910/)。
+四个入口均支持思考模式、工具调用和 1M Token 上下文。官方 API 的下线、路由和计费说明见[模型与价格文档](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)。
 
 ## 设置项
 
@@ -113,7 +113,7 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 | `deepseek-copilot.visionPrompt` | *(内置)* | V4 Flash/Pro 的视觉代理用于描述图片附件的提示词，不影响 V4.1 Flash 或 Flash Vision Exp 的原生图片请求 |
 | `deepseek-copilot.experimental.stabilizeToolList` | `false` | 实验性设置。尝试预先激活 VS Code/Copilot 的虚拟工具，让传给 DeepSeek API 的 `tools` 参数在多轮对话中更完整、更稳定。当已启用工具跨轮次变化时，可能提高上下文缓存命中率。代价是 input tokens 可能增加；缓存命中的 input tokens 单价更低，但仍会计入用量。64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；超过 128 个已启用工具时不建议开启 |
 
-思考深度可通过 Copilot Chat 的模型选择器对每个 DeepSeek 模型单独设置。
+思考强度可通过 Copilot Chat 的模型选择器对每个 DeepSeek 模型单独设置。
 
 兼容 API 代理的 `settings.json` 配置示例：
 

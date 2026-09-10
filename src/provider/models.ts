@@ -7,13 +7,14 @@ import type {
 	ThinkingCapability,
 } from '../types';
 import { toModelPricingInfo, type ModelPricingInformation } from './pricing/costs';
+import { getModelRetirementNotice } from './retirement';
 
 /**
  * NOTE: Non-public API surface.
  *
  * The fields below (`configurationSchema` on chat info, pricing metadata,
  * `modelConfiguration` on response options, plus `isBYOK` / `isUserSelectable` /
- * `statusIcon`)
+ * `statusIcon` / `warningText`)
  * are not part of the stable `vscode.LanguageModelChat*` typings yet. They are
  * the same shape currently consumed by GitHub Copilot Chat to render model picker
  * metadata and per-model configuration controls.
@@ -34,6 +35,7 @@ export type ModelPickerChatInformation = vscode.LanguageModelChatInformation &
 		readonly isUserSelectable: boolean;
 		readonly isBYOK: true;
 		readonly statusIcon?: vscode.ThemeIcon;
+		readonly warningText?: Readonly<Record<string, string>>;
 		readonly configurationSchema?: ThinkingEffortConfigurationSchema;
 	};
 
@@ -42,10 +44,11 @@ export function toChatInfo(
 	hasApiKey: boolean,
 	pricingCurrency?: PricingCurrency,
 	now = new Date(),
-	showPricingNotice = true,
+	usesOfficialModel = true,
 ): ModelPickerChatInformation {
-	const modelDetail = resolveModelText(m, 'detail') ?? m.detail;
-	const modelTooltip = resolveModelText(m, 'tooltip');
+	const retirement = getModelRetirementNotice(m.id, usesOfficialModel, now);
+	const modelDetail = retirement?.detail ?? resolveModelText(m, 'detail') ?? m.detail;
+	const modelTooltip = retirement?.message ?? resolveModelText(m, 'tooltip');
 	const thinkingCapability = m.capabilities.thinking;
 	return {
 		id: m.id,
@@ -54,7 +57,8 @@ export function toChatInfo(
 		version: m.version,
 		detail: hasApiKey ? modelDetail : t('auth.apiKeyRequiredDetail'),
 		tooltip: hasApiKey ? modelTooltip : t('auth.apiKeyRequiredDetail'),
-		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
+		statusIcon: !hasApiKey || retirement ? new vscode.ThemeIcon('warning') : undefined,
+		...(retirement ? { warningText: { [retirement.code]: retirement.message } } : {}),
 		maxInputTokens: m.maxInputTokens,
 		maxOutputTokens: m.maxOutputTokens,
 		isBYOK: true,
@@ -63,7 +67,12 @@ export function toChatInfo(
 			toolCalling: m.capabilities.toolCalling,
 			imageInput: m.capabilities.imageInput,
 		},
-		...toModelPricingInfo(m, pricingCurrency, now, showPricingNotice),
+		...toModelPricingInfo(
+			m,
+			pricingCurrency,
+			now,
+			usesOfficialModel && (retirement?.showPricing ?? true),
+		),
 		...(thinkingCapability
 			? { configurationSchema: buildThinkingEffortSchema(thinkingCapability) }
 			: {}),

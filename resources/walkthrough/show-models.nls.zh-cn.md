@@ -1,3 +1,3 @@
-扩展激活后，DeepSeek 模型应立即出现在 Copilot 模型选择器中。如果尚未配置 API Key，模型会显示警告图标，直到你运行 `DeepSeek: 设置 API Key` 为止。
+扩展激活后，DeepSeek 模型就会出现在 Copilot 模型选择器中。新对话推荐选择 **DeepSeek V4.1 Flash**。如果没有立即看到，可以向下滚动模型列表，或打开语言模型管理器。
 
-如果没有立即看到，可能只是模型列表较长。在选取器中向下滚动，查找 DeepSeek V4 Flash、Pro 和 Flash Vision Exp。
+尚未配置 API Key 时，模型会显示警告图标，并提示运行 DeepSeek: 设置 API Key。三个旧 V4 入口继续可选，配置 Key 后仍会保留退役警告。悬停可查看迁移与官方路由说明；Pro 在预定退役时间前仍显示价格。

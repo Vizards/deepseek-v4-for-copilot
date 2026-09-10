@@ -19,6 +19,19 @@ type Translations = Record<string, string>;
 
 const zh: Translations = {
 	// Model descriptions
+	'model.deepseek-flash.detail': '原生视觉与推理',
+	'model.deepseek-flash.tooltip': 'DeepSeek V4.1 Flash，支持原生图片输入、思考模式和工具调用。',
+	'model.retirement.legacyDetail': '旧入口 · 建议迁移',
+	'model.retirement.pendingDetail': '即将退役 · 建议迁移',
+	'model.retirement.retiredDetail': '已退役 · 兼容入口',
+	'model.retirement.custom':
+		'此插件旧模型入口不再推荐使用。建议在服务商支持时切换到 DeepSeek V4.1 Flash（deepseek-flash）。自定义端点或模型映射的实际模型、路由和计费以服务商为准。已有配置和请求处理保持不变。',
+	'model.retirement.flashRetired':
+		'原模型已退役。DeepSeek 官方 API 暂时保留此名称，请求由 DeepSeek V4.1 Flash 提供服务，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
+	'model.retirement.proPending':
+		'DeepSeek V4 Pro 即将退役，目前仍按 V4 Pro 价格计费。北京时间 2026 年 9 月 14 日 12:00 起，至未来 V4.1 Pro 上线前，官方 API 请求将转向 V4.1 Flash，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
+	'model.retirement.proRetired':
+		'DeepSeek V4 Pro 已退役。自北京时间 2026 年 9 月 14 日 12:00 起，至未来 V4.1 Pro 上线前，官方 API 请求由 V4.1 Flash 提供服务，并按 Flash 价格计费。建议切换到 DeepSeek V4.1 Flash（deepseek-flash）。',
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
@@ -64,7 +77,7 @@ const zh: Translations = {
 	'vision.action.configureProxy': '配置视觉代理',
 	'vision.panel.title': 'DeepSeek 视觉代理',
 	'vision.panel.description':
-		'为 Flash 和 Pro 配置一个将图片转换成文字描述的视觉模型。Vision Exp 会直接处理原图。',
+		'为旧 V4 Flash 和 Pro 入口配置一个将图片转换成文字描述的视觉模型。V4.1 Flash 和 Vision Exp 会直接处理原图。',
 	'vision.panel.source.vscodeLm': 'VS Code 模型',
 	'vision.panel.source.apiEndpoint': 'API 端点',
 	'vision.panel.field.source': '视觉代理来源',
@@ -221,6 +234,20 @@ const zh: Translations = {
 
 const en: Translations = {
 	// Model descriptions
+	'model.deepseek-flash.detail': 'Native vision and reasoning',
+	'model.deepseek-flash.tooltip':
+		'DeepSeek V4.1 Flash with native image input, thinking mode, and tool calling.',
+	'model.retirement.legacyDetail': 'Legacy entry · migration recommended',
+	'model.retirement.pendingDetail': 'Retiring · migration recommended',
+	'model.retirement.retiredDetail': 'Retired · compatibility entry',
+	'model.retirement.custom':
+		'This legacy model entry is no longer recommended. Switch to DeepSeek V4.1 Flash (deepseek-flash) if your provider supports it. The actual model, routing, and pricing for a custom endpoint or model mapping are determined by your provider. Existing settings and request handling are preserved.',
+	'model.retirement.flashRetired':
+		'The original model has been retired. The official DeepSeek API temporarily accepts this name and serves requests with DeepSeek V4.1 Flash at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
+	'model.retirement.proPending':
+		'DeepSeek V4 Pro is retiring and is currently billed at V4 Pro rates. From September 14, 2026 at 12:00 Beijing time (UTC+8), until V4.1 Pro is released, official API requests will be routed to V4.1 Flash and billed at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
+	'model.retirement.proRetired':
+		'DeepSeek V4 Pro has been retired. Since September 14, 2026 at 12:00 Beijing time (UTC+8), until V4.1 Pro is released, official API requests are served by V4.1 Flash at Flash rates. Switch to DeepSeek V4.1 Flash (deepseek-flash).',
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
 	'model.flash-vision-exp.detail': 'Experimental native vision model',
@@ -273,7 +300,7 @@ const en: Translations = {
 	'vision.action.configureProxy': 'Configure Vision Proxy',
 	'vision.panel.title': 'DeepSeek Vision Proxy',
 	'vision.panel.description':
-		'Configure a vision model that turns images into text for Flash and Pro. Vision Exp processes original images directly.',
+		'Configure a vision model that turns images into text for legacy V4 Flash and Pro entries. V4.1 Flash and Vision Exp process original images directly.',
 	'vision.panel.source.vscodeLm': 'VS Code model',
 	'vision.panel.source.apiEndpoint': 'API endpoint',
 	'vision.panel.field.source': 'Vision proxy source',

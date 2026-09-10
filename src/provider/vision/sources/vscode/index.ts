@@ -221,8 +221,8 @@ function pickPreferredVSCodeVisionModel(
 }
 
 function isVSCodeVisionModel(model: vscode.LanguageModelChat): boolean {
-	// Keep a narrow DeepSeek exception: allow Vision Exp as proxy, but continue
-	// excluding DeepSeek Flash/Pro to avoid recursive self-selection.
+	// Keep the legacy Vision Exp entry as the only DeepSeek proxy candidate.
+	// Adding V4.1 Flash must not change the existing proxy choices or defaults.
 	const isDeepSeekVisionExp = isDeepSeekVisionExpModel(model);
 	const isVendorAllowed =
 		model.vendor === 'deepseek'

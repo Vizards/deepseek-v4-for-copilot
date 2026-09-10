@@ -1,7 +1,7 @@
 {
   "name": "deepseek-v4-for-copilot",
   "displayName": "DeepSeek V4 for Copilot Chat",
-  "description": "Use DeepSeek V4 Pro, Flash, and Flash Vision Exp in Copilot Chat with native vision, Vision Proxy, reasoning, and agent tools.",
+  "description": "Use DeepSeek V4.1 Flash in Copilot Chat with native vision, reasoning, and agent tools. Keeps legacy V4 entries for migration.",
   "icon": "resources/icon.png",
   "version": "0.8.2",
   "publisher": "Vizards",
@@ -146,6 +146,7 @@
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
+            "deepseek-flash": "deepseek-flash",
             "deepseek-v4-flash": "deepseek-v4-flash",
             "deepseek-v4-pro": "deepseek-v4-pro",
             "deepseek-v4-flash-vision-exp": "deepseek-v4-flash-vision-exp"
@@ -153,6 +154,10 @@
           "description": "%deepseek-copilot.config.modelIdOverrides.description%",
           "additionalProperties": false,
           "properties": {
+            "deepseek-flash": {
+              "type": "string",
+              "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-flash.description%"
+            },
             "deepseek-v4-flash": {
               "type": "string",
               "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description%"

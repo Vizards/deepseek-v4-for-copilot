@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.2...v0.9.0) (2026-09-10)
+
+
+### Features
+
+* **config:** add configurable request headers ([#266](https://github.com/Vizards/deepseek-v4-for-copilot/issues/266)) ([d1a0fc4](https://github.com/Vizards/deepseek-v4-for-copilot/commit/d1a0fc44dc324f70fba2a8daa3705e0332750e3b)), closes [#264](https://github.com/Vizards/deepseek-v4-for-copilot/issues/264)
+* **provider:** add DeepSeek V4.1 Flash and retirement notices ([#267](https://github.com/Vizards/deepseek-v4-for-copilot/issues/267)) ([75c1478](https://github.com/Vizards/deepseek-v4-for-copilot/commit/75c1478339fe2d6685f1aef66c860ca37edf4973))
+
 ## [0.8.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.1...v0.8.2) (2026-08-31)
 
 

@@ -3,7 +3,7 @@
   "displayName": "DeepSeek V4 for Copilot Chat",
   "description": "Use DeepSeek V4.1 Flash in Copilot Chat with native vision, Vision Proxy, reasoning, and agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "Vizards",
   "license": "MIT",
   "repository": {

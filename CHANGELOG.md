@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.0...v0.9.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **provider:** remove model refresh during deactivation ([#271](https://github.com/Vizards/deepseek-v4-for-copilot/issues/271)) ([7126168](https://github.com/Vizards/deepseek-v4-for-copilot/commit/71261682722abecc59f5bc54b11ca79fee63957a))
+* **provider:** remove V4 Pro retirement notices ([#272](https://github.com/Vizards/deepseek-v4-for-copilot/issues/272)) ([3b0fcc5](https://github.com/Vizards/deepseek-v4-for-copilot/commit/3b0fcc5c5d709633e56b4efaeb3c8df9fc4eb3f3))
+
 ## [0.9.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.2...v0.9.0) (2026-09-10)
 
 

@@ -33,7 +33,7 @@ Love DeepSeek's price-performance but don't want to give up GitHub Copilot's age
 ## Features
 
 ### DeepSeek models in the model picker
-The picker includes V4.1 Flash and three legacy V4 entries, with long context, tool calling, and configurable thinking effort.
+The picker includes V4.1 Flash, V4 Pro, and entries for the legacy Flash model names, with long context, tool calling, and configurable thinking effort.
 
 ### Native Vision and Vision Proxy
 Choose the image path that fits the conversation:
@@ -41,7 +41,7 @@ Choose the image path that fits the conversation:
 - **DeepSeek V4.1 Flash and Flash Vision Exp** handle image attachments natively, without Vision Proxy.
 - The **DeepSeek V4 Flash and Pro** entries use Vision Proxy: an image-capable model first describes each attachment, then the main DeepSeek model receives the description with the conversation. Auto mode selects Flash Vision Exp when available, while an explicitly configured VS Code model or API endpoint remains supported.
 
-[Context caching](https://api-docs.deepseek.com/guides/kv_cache/) requires a full match with a cached prefix. Choose V4.1 Flash for new conversations and plan when to migrate existing ones.
+[Context caching](https://api-docs.deepseek.com/guides/kv_cache/) requires a full match with a cached prefix.
 
 <p align="center">
   <img src="resources/screenshots/03-vision.png" alt="Dropping an image into Copilot Chat and DeepSeek responding to it via the vision proxy" width="800">
@@ -86,17 +86,19 @@ Install from the registry used by your editor:
 
 1. Run **DeepSeek: Set API Key** from the Command Palette (`Cmd+Shift+P`)
 2. Paste your key or compatible provider token (official DeepSeek keys usually start with `sk-`)
-3. Open Copilot Chat, click the model picker, and choose **DeepSeek V4.1 Flash**
+3. Open Copilot Chat, click the model picker, and choose **DeepSeek V4.1 Flash** or **DeepSeek V4 Pro**
 4. That's it — chat away
 
 ## Models
 
 | Model Entry | Image Handling | Thinking Effort | Official API Status |
 |---|---|---|---|
-| **DeepSeek V4.1 Flash** | Native image input | `none` / `low` / `high` / `max` | Recommended for new conversations |
+| **DeepSeek V4.1 Flash** | Native image input | `none` / `low` / `high` / `max` | Available via `deepseek-flash` |
+| **DeepSeek V4 Pro** | Vision Proxy | `none` / `low` / `high` / `max` | API services continue; billing method unchanged |
 | **DeepSeek V4 Flash** | Vision Proxy | `none` / `low` / `high` / `max` | Model retired; legacy name still accepted |
-| **DeepSeek V4 Pro** | Vision Proxy | `none` / `low` / `high` / `max` | Retires on September 14, 2026 at 12:00 Beijing time |
 | **DeepSeek V4 Flash Vision Exp** | Native image input | `none` / `low` / `high` / `max` | Model retired; legacy name still accepted |
+
+On the official API, both legacy model names (`deepseek-v4-flash` and `deepseek-v4-flash-vision-exp`) route to DeepSeek-V4.1-Flash and use Flash pricing.
 
 All four entries support thinking mode, tool calling, and 1M token context. See the official [Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing/) documentation for retirement, routing, and billing details.
 
@@ -107,7 +109,7 @@ All four entries support thinking mode, tool calling, and 1M token context. See 
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API endpoint — change for self-hosted / proxied deployments |
 | `deepseek-copilot.requestHeaders` | `{}` | Custom headers for chat completions. [Configuration guide](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/settings/request-headers.en.md) |
 | `deepseek-copilot.maxTokens` | `0` | Max output tokens (`0` = API default). Useful for cost control |
-| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for V4.1 Flash and the three legacy V4 entries. Change only for compatible third-party APIs with different model names |
+| `deepseek-copilot.modelIdOverrides` | prefilled official ID map | API model IDs to send for each DeepSeek model entry. Change only for compatible third-party APIs with different model names |
 | `deepseek-copilot.debugMode` | `minimal` | Diagnostic mode: `minimal` for token usage only, `metadata` for privacy-preserving logs, or `verbose` for full request dumps and pipeline snapshots under extension global storage. Full dumps may include sensitive prompt text, tool schemas, file snippets, and image descriptions. Use `DeepSeek: Open Request Dumps Folder` to open the dump location |
 | `deepseek-copilot.visionModel` | *(auto)* | Vision Proxy used by V4 Flash and Pro. Auto mode selects Flash Vision Exp when available; configure another VS Code model or API endpoint with `DeepSeek: Configure Vision Proxy` |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used by V4 Flash/Pro's Vision Proxy to describe image attachments. It does not affect native V4.1 Flash or Flash Vision Exp requests |

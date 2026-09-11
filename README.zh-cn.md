@@ -33,7 +33,7 @@
 ## 功能特性
 
 ### DeepSeek 模型出现在模型选择器中
-选择器包含 V4.1 Flash 和三个旧 V4 入口，支持长上下文、工具调用和可配置的思考强度。
+选择器包含 V4.1 Flash、V4 Pro，并保留旧 Flash 模型名对应的入口，支持长上下文、工具调用和可配置的思考强度。
 
 ### 原生视觉与视觉代理
 可以根据对话需要选择不同的图片处理路径：
@@ -41,7 +41,7 @@
 - **DeepSeek V4.1 Flash 和 Flash Vision Exp** 直接处理图片附件，不经过视觉代理。
 - **DeepSeek V4 Flash 和 Pro** 入口使用视觉代理：先由支持图片输入的模型描述附件，再将描述连同对话内容交给 DeepSeek 主模型。自动模式会在可用时选择 Flash Vision Exp，同时继续支持显式配置其他 VS Code 模型或 API 端点。
 
-[上下文缓存](https://api-docs.deepseek.com/zh-cn/guides/kv_cache/)命中需要完整匹配已有的缓存前缀。新对话推荐选择 V4.1 Flash，旧对话可按进度安排迁移。
+[上下文缓存](https://api-docs.deepseek.com/zh-cn/guides/kv_cache/)命中需要完整匹配已有的缓存前缀。
 
 <p align="center">
   <img src="resources/screenshots/03-vision.png" alt="将图片拖入 Copilot Chat，DeepSeek 通过视觉代理响应" width="800">
@@ -86,17 +86,19 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 
 1. 通过命令面板（`Cmd+Shift+P`）运行 **DeepSeek: 设置 API Key**
 2. 粘贴你的 Key 或兼容的 provider token（官方 DeepSeek Key 通常以 `sk-` 开头）
-3. 打开 Copilot Chat，点击模型选择器，选择 **DeepSeek V4.1 Flash**
+3. 打开 Copilot Chat，点击模型选择器，选择 **DeepSeek V4.1 Flash** 或 **DeepSeek V4 Pro**
 4. 搞定——开始聊天
 
 ## 模型
 
 | 模型入口 | 图片处理 | 思考强度 | 官方 API 状态 |
 |---|---|---|---|
-| **DeepSeek V4.1 Flash** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 新对话推荐使用 |
+| **DeepSeek V4.1 Flash** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 使用模型名 `deepseek-flash` 调用 |
+| **DeepSeek V4 Pro** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 继续提供 API 调用服务，计费方式保持不变 |
 | **DeepSeek V4 Flash** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 原模型已下线；旧模型名仍可调用 |
-| **DeepSeek V4 Pro** | 视觉代理 | `停用` / `轻量` / `标准` / `深度` | 将于北京时间 2026 年 9 月 14 日 12:00 下线 |
 | **DeepSeek V4 Flash Vision Exp** | 原生图片输入 | `停用` / `轻量` / `标准` / `深度` | 原模型已下线；旧模型名仍可调用 |
+
+在官方 API 中，两个旧模型名（`deepseek-v4-flash` 和 `deepseek-v4-flash-vision-exp`）的请求均由 DeepSeek-V4.1-Flash 提供服务，按 Flash 价格计费。
 
 四个入口均支持思考模式、工具调用和 1M Token 上下文。官方 API 的下线、路由和计费说明见[模型与价格文档](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)。
 
@@ -107,7 +109,7 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 | `deepseek-copilot.baseUrl` | `https://api.deepseek.com` | API 端点——可改为自托管或代理部署地址 |
 | `deepseek-copilot.requestHeaders` | `{}` | 聊天补全请求的自定义请求头。[配置说明](https://github.com/Vizards/deepseek-v4-for-copilot/blob/main/docs/settings/request-headers.zh.md) |
 | `deepseek-copilot.maxTokens` | `0` | 最大输出 Token 数（`0` = API 默认值）。可用于成本控制 |
-| `deepseek-copilot.modelIdOverrides` | 预填官方 ID 映射 | V4.1 Flash 和三个旧 V4 入口对应的 API 模型 ID。仅在使用模型名不同的兼容第三方 API 时修改 |
+| `deepseek-copilot.modelIdOverrides` | 预填官方 ID 映射 | 各 DeepSeek 模型入口对应的 API 模型 ID。仅在使用模型名不同的兼容第三方 API 时修改 |
 | `deepseek-copilot.debugMode` | `minimal` | 诊断模式：`minimal` 仅上报 token 用量，`metadata` 输出隐私安全日志，`verbose` 将完整请求 dump 和 pipeline snapshot 写入扩展 global storage。完整 dump 可能包含敏感提示词文本、工具定义、文件片段和图片描述。使用 `DeepSeek: 打开请求 Dump 目录` 打开 dump 位置 |
 | `deepseek-copilot.visionModel` | *(自动)* | V4 Flash 和 Pro 使用的视觉代理。自动模式会在可用时选择 Flash Vision Exp；也可通过 `DeepSeek: 配置视觉代理` 改用其他 VS Code 模型或 API 端点 |
 | `deepseek-copilot.visionPrompt` | *(内置)* | V4 Flash/Pro 的视觉代理用于描述图片附件的提示词，不影响 V4.1 Flash 或 Flash Vision Exp 的原生图片请求 |

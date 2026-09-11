@@ -223,7 +223,6 @@ const zh: Translations = {
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
-	'extension.deactivateFailed': 'DeepSeek 停用异常',
 	'extension.welcomeFailed': '欢迎引导加载异常',
 	'extension.openRequestDumpsFolderFailed':
 		'打开请求 dump 目录失败，请运行 "DeepSeek: 显示日志" 查看详情。',
@@ -469,7 +468,6 @@ const en: Translations = {
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',
-	'extension.deactivateFailed': 'Failed to prepare DeepSeek provider for deactivate',
 	'extension.welcomeFailed': 'Failed to show DeepSeek welcome prompt',
 	'extension.openRequestDumpsFolderFailed':
 		'Failed to open request dumps folder. Run "DeepSeek: Show Logs" for details.',

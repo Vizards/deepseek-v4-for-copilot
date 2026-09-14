@@ -49,7 +49,21 @@ const zh: Translations = {
 	'auth.emptyValidation': 'API Key 不能为空',
 	'auth.saved': 'API Key 已安全保存。',
 	'auth.removed': 'API Key 已移除。',
-	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DeepSeek: 设置 API Key"。',
+	'auth.clearConfirm': '清除已保存的 API Key？',
+	'auth.clearDetail': '清除后，再次使用时可能需要重新设置 API Key。',
+	'auth.clearAction': '清除 API Key',
+	'auth.notConfigured': '尚未配置 API Key，请先设置 API Key 后重试。',
+
+	// Settings
+	'settings.resetBaseUrl.title': '恢复 DeepSeek Base URL 默认配置',
+	'settings.resetBaseUrl.chooseScope': '选择要重置的范围；仅移除该范围的自定义地址',
+	'settings.resetBaseUrl.user': '用户设置',
+	'settings.resetBaseUrl.workspace': '当前工作区',
+	'settings.resetBaseUrl.current': '当前配置：{0}',
+	'settings.resetBaseUrl.notConfigured': '未自定义，无需重置',
+	'settings.resetBaseUrl.after': '重置后生效地址：{0}',
+	'settings.resetBaseUrl.afterInherited': '重置后继承其余配置，实际生效地址请查看设置',
+	'settings.resetBaseUrl.failed': '重置 Base URL 失败，请运行 "DeepSeek: 显示日志" 查看详情。',
 
 	// Thinking Effort — short labels for model picker dropdown
 	'status.thinking': '思考模式',
@@ -261,8 +275,23 @@ const en: Translations = {
 	'auth.emptyValidation': 'API key cannot be empty',
 	'auth.saved': 'DeepSeek API key saved.',
 	'auth.removed': 'DeepSeek API key removed.',
-	'auth.notConfigured':
-		'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
+	'auth.clearConfirm': 'Clear the saved API Key?',
+	'auth.clearDetail': 'You may need to set an API Key again before using the extension.',
+	'auth.clearAction': 'Clear API Key',
+	'auth.notConfigured': 'DeepSeek API key is not configured. Set an API key and try again.',
+
+	// Settings
+	'settings.resetBaseUrl.title': 'Reset DeepSeek Base URL',
+	'settings.resetBaseUrl.chooseScope': 'Choose a scope; only its custom URL will be removed',
+	'settings.resetBaseUrl.user': 'User Settings',
+	'settings.resetBaseUrl.workspace': 'Current Workspace',
+	'settings.resetBaseUrl.current': 'Configured URL: {0}',
+	'settings.resetBaseUrl.notConfigured': 'Not customized; no reset needed',
+	'settings.resetBaseUrl.after': 'Effective URL after reset: {0}',
+	'settings.resetBaseUrl.afterInherited':
+		'Inherits remaining configuration after reset; check Settings for the effective URL',
+	'settings.resetBaseUrl.failed':
+		'Failed to reset Base URL. Run "DeepSeek: Show Logs" for details.',
 
 	// Thinking Effort
 	'status.thinking': 'Thinking Effort',

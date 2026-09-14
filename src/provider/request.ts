@@ -1,10 +1,9 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { DeepSeekClient } from '../client';
+import { createApiKeyNotConfiguredError, DeepSeekClient } from '../client';
 import { getApiModelId, getBaseUrl, getMaxTokens, getRequestHeaders } from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
-import { t } from '../i18n';
 import type { DeepSeekRequest } from '../types';
 import { convertMessages, countMessageChars } from './convert';
 import {
@@ -66,7 +65,7 @@ export async function prepareChatRequest({
 }: PrepareChatRequestOptions): Promise<PreparedChatRequest> {
 	const apiKey = await authManager.getApiKey();
 	if (!apiKey) {
-		throw new Error(t('auth.notConfigured'));
+		throw createApiKeyNotConfiguredError();
 	}
 
 	const baseUrl = getBaseUrl();

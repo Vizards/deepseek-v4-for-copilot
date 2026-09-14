@@ -158,6 +158,17 @@ export function createUserFacingError(error: Error): Error {
 	return displayError;
 }
 
+export function createApiKeyNotConfiguredError(): Error {
+	return createUserFacingError(
+		new Error(
+			formatMarkdownMessage(
+				t('auth.notConfigured'),
+				getConfigureApiKeyActions(errorActionUrlStore.get()),
+			),
+		),
+	);
+}
+
 function getHttpErrorMessage(status: number, createApiKeyUrl?: string): string {
 	switch (status) {
 		case 400:
@@ -253,8 +264,12 @@ function getUniversalHttpErrorActions(
 	status: number,
 	actionUrls: ErrorActionUrls,
 ): readonly ErrorActionLink[] {
+	return status === 401 ? getConfigureApiKeyActions(actionUrls) : [];
+}
+
+function getConfigureApiKeyActions(actionUrls: ErrorActionUrls): readonly ErrorActionLink[] {
 	const url = actionUrls.configureApiKey;
-	return status === 401 && url ? [{ labelKey: 'error.action.setApiKey', url }] : [];
+	return url ? [{ labelKey: 'error.action.setApiKey', url }] : [];
 }
 
 function getProviderHttpErrorActions(status: number, baseUrl: string): readonly ErrorActionLink[] {

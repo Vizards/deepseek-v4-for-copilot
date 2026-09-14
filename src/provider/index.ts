@@ -90,6 +90,16 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	}
 
 	async clearApiKey(): Promise<void> {
+		const clearAction = t('auth.clearAction');
+		const selected = await vscode.window.showWarningMessage(
+			t('auth.clearConfirm'),
+			{ modal: true, detail: t('auth.clearDetail') },
+			clearAction,
+		);
+		if (selected !== clearAction) {
+			return;
+		}
+
 		await this.authManager.deleteApiKey();
 		this.invalidateCurrencyAndRefreshModels();
 		vscode.window.showInformationMessage(t('auth.removed'));

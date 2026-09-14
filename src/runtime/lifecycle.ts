@@ -13,7 +13,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	registerActionUrls(context);
 
 	try {
-		const provider = await registerProvider(context);
+		const provider = registerProvider(context);
 
 		void showWelcomeIfNeeded(context, provider).catch((error) => {
 			logger.warn(t('extension.welcomeFailed'), error);

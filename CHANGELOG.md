@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.1...v0.9.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* **provider:** avoid Copilot BYOK activation deadlock ([#275](https://github.com/Vizards/deepseek-v4-for-copilot/issues/275)) ([61dd50f](https://github.com/Vizards/deepseek-v4-for-copilot/commit/61dd50ff09f9c82d11800289295e92f0abde86f6)), closes [#274](https://github.com/Vizards/deepseek-v4-for-copilot/issues/274)
+* **settings:** make API key and base URL actions discoverable ([#276](https://github.com/Vizards/deepseek-v4-for-copilot/issues/276)) ([0ccd91e](https://github.com/Vizards/deepseek-v4-for-copilot/commit/0ccd91e85e0754eae5d41350df7e00561d14856d)), closes [#270](https://github.com/Vizards/deepseek-v4-for-copilot/issues/270)
+
 ## [0.9.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.0...v0.9.1) (2026-09-11)
 
 

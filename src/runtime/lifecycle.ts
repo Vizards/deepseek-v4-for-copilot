@@ -3,14 +3,14 @@ import vscode from 'vscode';
 import { t } from '../i18n';
 import { logger } from '../logger';
 import {
-	getDeepSeekTariffState,
-	getDeepSeekTariffStatusText,
-	getNextDeepSeekTariffTransition,
-	refreshDeepSeekTariffWindowsFromPricingPage,
+    getDeepSeekTariffState,
+    getDeepSeekTariffStatusText,
+    getNextDeepSeekTariffTransition,
+    refreshDeepSeekTariffWindowsFromPricingPage,
 } from '../tariff';
 import {
-	isChinesePublicHoliday,
-	refreshChinesePublicHolidaysFromWeb,
+    isChinesePublicHoliday,
+    refreshChinesePublicHolidaysFromWeb,
 } from '../tariff-holidays';
 import { registerActionUrls } from './actions';
 import { registerCommands } from './commands';

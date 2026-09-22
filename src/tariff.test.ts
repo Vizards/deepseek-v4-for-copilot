@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-	getDeepSeekTariffState,
-	getDeepSeekTariffWindowsFromPricingFootnote,
-	getNextDeepSeekTariffTransition,
-	hasDeepSeekTariffScheduleChanged,
+    getDeepSeekTariffState,
+    getDeepSeekTariffWindowsFromPricingFootnote,
+    getNextDeepSeekTariffTransition,
+    hasDeepSeekTariffScheduleChanged,
 } from './tariff';
 
 describe('DeepSeek tariff logic', () => {

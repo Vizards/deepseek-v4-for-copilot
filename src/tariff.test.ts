@@ -47,6 +47,25 @@ describe('DeepSeek tariff logic', () => {
 		]);
 	});
 
+	it('parses the current live pricing page footnote', () => {
+		const windows = getDeepSeekTariffWindowsFromPricingFootnote(
+			'(2) Off-peak rates are half of the peak rates. Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public holidays. All other hours are off-peak, including weekends and Chinese public holidays in full.',
+		);
+		assert.deepEqual(windows, [
+			{ startHourUtc: 1, endHourUtc: 4 },
+			{ startHourUtc: 6, endHourUtc: 10 },
+		]);
+	});
+
+	it('matches the built-in schedule so no false change is reported', () => {
+		assert.equal(
+			hasDeepSeekTariffScheduleChanged(
+				'(2) Off-peak rates are half of the peak rates. Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public holidays. All other hours are off-peak, including weekends and Chinese public holidays in full.',
+			),
+			false,
+		);
+	});
+
 	it('detects when the pricing website schedule changes from the footnote', () => {
 		assert.equal(
 			hasDeepSeekTariffScheduleChanged(

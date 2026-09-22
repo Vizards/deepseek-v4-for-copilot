@@ -12,6 +12,18 @@ export interface DeepSeekTariffTransition {
 	readonly remainingMs: number;
 }
 
+/**
+ * Fallback schedule used until the pricing page has been fetched.
+ *
+ * Pricing page footnote, retrieved 2026-09-21: "Peak hours are 01:00 - 04:00
+ * and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public
+ * holidays. All other hours are off-peak, including weekends and Chinese public
+ * holidays in full."
+ *
+ * The hours and the weekday rule are unchanged, and off-peak is still half of
+ * the peak rate. Chinese public holidays are not tracked here, so a holiday that
+ * falls on a weekday reports as peak even though the page bills it as off-peak.
+ */
 const DEFAULT_PEAK_WINDOWS: readonly DeepSeekTariffWindow[] = [
 	{ startHourUtc: 1, endHourUtc: 4 },
 	{ startHourUtc: 6, endHourUtc: 10 },

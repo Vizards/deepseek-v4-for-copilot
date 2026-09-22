@@ -121,12 +121,6 @@ function getUtcHourFraction(date: Date): number {
 	return date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
 }
 
-function isInPeakWindow(hour: number): boolean {
-	return getDeepSeekTariffWindows().some(
-		(window) => hour >= window.startHourUtc && hour < window.endHourUtc,
-	);
-}
-
 export function getDeepSeekTariffState(date: Date): DeepSeekTariffState {
 	if (isWeekendUtc(date)) {
 		return 'offpeak';
@@ -276,7 +270,7 @@ function extractPricingFootnote(html: string): string | undefined {
 		.replace(/\s+/g, ' ')
 		.trim();
 
-		const markerIndex = plainText.search(/peak\s+hours?\s+are/i);
+	const markerIndex = plainText.search(/peak\s+hours?\s+are/i);
 	if (markerIndex === -1) {
 		return undefined;
 	}

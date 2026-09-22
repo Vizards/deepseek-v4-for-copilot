@@ -2,9 +2,7 @@ import vscode from 'vscode';
 import { logger } from '../logger';
 import { DeepSeekChatProvider } from '../provider';
 
-export async function registerProvider(
-	context: vscode.ExtensionContext,
-): Promise<DeepSeekChatProvider> {
+export function registerProvider(context: vscode.ExtensionContext): DeepSeekChatProvider {
 	const provider = new DeepSeekChatProvider(context);
 
 	context.subscriptions.push(
@@ -16,18 +14,31 @@ export async function registerProvider(
 		vscode.lm.registerLanguageModelChatProvider('deepseek', provider),
 	);
 
-	// Copilot Chat can serve cached model info without configurationSchema.
-	// Activate it first so this refresh reaches a live listener and re-queries the provider.
-	await activateCopilotChat();
+	// Make models discoverable without waiting for Copilot, which may itself be waiting for BYOK.
 	provider.refreshModelPicker();
+	context.subscriptions.push(refreshModelsAfterCopilotActivation(provider));
 
 	return provider;
 }
 
-async function activateCopilotChat(): Promise<void> {
-	try {
-		await vscode.extensions.getExtension('github.copilot-chat')?.activate();
-	} catch (error) {
-		logger.warn('Copilot Chat activation unavailable; model picker refresh may be delayed', error);
-	}
+function refreshModelsAfterCopilotActivation(provider: DeepSeekChatProvider): vscode.Disposable {
+	let disposed = false;
+
+	// Keep the post-activation refresh to replace cached model info missing configurationSchema.
+	Promise.resolve(vscode.extensions.getExtension('github.copilot-chat')?.activate())
+		.then(() => {
+			if (!disposed) {
+				provider.refreshModelPicker();
+			}
+		})
+		.catch((error) => {
+			if (!disposed) {
+				logger.warn('Failed to activate Copilot Chat or refresh model information', error);
+			}
+		});
+
+	// Ignore late activation results after this extension is disposed.
+	return new vscode.Disposable(() => {
+		disposed = true;
+	});
 }

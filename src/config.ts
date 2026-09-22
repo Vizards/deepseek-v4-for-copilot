@@ -12,6 +12,11 @@ export function getBaseUrl(): string {
 	return config.get<string>('baseUrl') || 'https://api.deepseek.com';
 }
 
+export function getRequestHeaders(): Record<string, string> {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<Record<string, string>>('requestHeaders', {});
+}
+
 /**
  * Resolve the API model ID to send to the endpoint.
  *
@@ -28,7 +33,7 @@ export function getApiModelId(vscodeModelId: string): string {
 
 /**
  * Get the configured max output tokens limit.
- * Returns `undefined` when set to 0 (API default — no limit).
+ * Returns `undefined` when set to 0, leaving the output limit to the API default.
  */
 export function getMaxTokens(): number | undefined {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);

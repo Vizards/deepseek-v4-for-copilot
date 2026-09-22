@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getBaseUrl, getStabilizeToolListEnabled } from '../config';
+import { getApiModelId, getBaseUrl, getStabilizeToolListEnabled } from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../endpoint';
 import { t } from '../i18n';
@@ -24,8 +24,8 @@ import { createVisionService } from './vision';
 export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly authManager: AuthManager;
 	private readonly globalStorageUri: vscode.Uri;
+	private readonly storageUri: vscode.Uri | undefined;
 	private readonly onDidChangeLanguageModelChatInformationEmitter = new vscode.EventEmitter<void>();
-	private isActive = true;
 
 	readonly onDidChangeLanguageModelChatInformation =
 		this.onDidChangeLanguageModelChatInformationEmitter.event;
@@ -46,6 +46,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	constructor(context: vscode.ExtensionContext) {
 		this.authManager = new AuthManager(context);
 		this.globalStorageUri = context.globalStorageUri;
+		this.storageUri = context.storageUri;
 		this.vision = createVisionService(context);
 		this.balanceCurrencyResolver = new BalanceCurrencyResolver(context, this.authManager, () =>
 			this.onDidChangeLanguageModelChatInformationEmitter.fire(),
@@ -64,6 +65,8 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 					e.affectsConfiguration('deepseek-copilot.baseUrl')
 				) {
 					this.invalidateCurrencyAndRefreshModels();
+				} else if (e.affectsConfiguration('deepseek-copilot.modelIdOverrides')) {
+					this.refreshModelPicker();
 				}
 			}),
 			// Multi-window: SecretStorage changes don't fire onDidChangeConfiguration.
@@ -87,6 +90,16 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	}
 
 	async clearApiKey(): Promise<void> {
+		const clearAction = t('auth.clearAction');
+		const selected = await vscode.window.showWarningMessage(
+			t('auth.clearConfirm'),
+			{ modal: true, detail: t('auth.clearDetail') },
+			clearAction,
+		);
+		if (selected !== clearAction) {
+			return;
+		}
+
 		await this.authManager.deleteApiKey();
 		this.invalidateCurrencyAndRefreshModels();
 		vscode.window.showInformationMessage(t('auth.removed'));
@@ -108,22 +121,6 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 			.finally(() => this.onDidChangeLanguageModelChatInformationEmitter.fire());
 	}
 
-	async prepareForDeactivate(): Promise<void> {
-		this.isActive = false;
-		this.onDidChangeLanguageModelChatInformationEmitter.fire();
-
-		// Force the host to re-pull `provideLanguageModelChatInformation` synchronously
-		// before the extension unloads. With `isActive = false` we now return [],
-		// which makes Copilot Chat drop DeepSeek models from the picker immediately
-		// instead of leaving stale entries behind after deactivate. The returned
-		// model list itself is unused — we only call this for its side effect.
-		try {
-			await vscode.lm.selectChatModels({ vendor: 'deepseek' });
-		} catch (error) {
-			logger.warn('Failed to refresh DeepSeek models during deactivate', error);
-		}
-	}
-
 	async setVisionModel(): Promise<void> {
 		await this.vision.openConfiguration();
 	}
@@ -134,19 +131,21 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		_options: vscode.PrepareLanguageModelChatModelOptions,
 		_token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
-		if (!this.isActive) {
-			return [];
-		}
-
 		const hasKey = await this.authManager.hasApiKey();
 		const pricingCurrency = this.balanceCurrencyResolver.getDisplayCurrency();
-		const showPricingNotice = isOfficialDeepSeekBaseUrl(normalizeBaseUrl(getBaseUrl()));
+		const isOfficialEndpoint = isOfficialDeepSeekBaseUrl(normalizeBaseUrl(getBaseUrl()));
 		const now = new Date();
 		if (hasKey) {
 			this.balanceCurrencyResolver.refreshInBackground();
 		}
 		return MODELS.map((model) =>
-			toChatInfo(model, hasKey, pricingCurrency, now, showPricingNotice),
+			toChatInfo(
+				model,
+				hasKey,
+				pricingCurrency,
+				now,
+				isOfficialEndpoint && getApiModelId(model.id) === model.id,
+			),
 		);
 	}
 
@@ -186,6 +185,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		const prepared = await prepareChatRequest({
 			authManager: this.authManager,
 			globalStorageUri: this.globalStorageUri,
+			storageUri: this.storageUri,
 			modelInfo,
 			segment,
 			messages: toolFlow.messages,

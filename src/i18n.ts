@@ -19,6 +19,12 @@ type Translations = Record<string, string>;
 
 const zh: Translations = {
 	// Model descriptions
+	'model.deepseek-flash.detail': '图像理解与思考模式',
+	'model.deepseek-flash.tooltip': 'DeepSeek V4.1 Flash，支持图片与文本输入、思考模式和工具调用。',
+	'model.retirement.custom':
+		'**旧模型入口。**  \n请先确认服务商支持 DeepSeek V4.1 Flash。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
+	'model.retirement.flashRetired':
+		'**已下线。**  \n请求由 DeepSeek V4.1 Flash 提供服务，并按 Flash 价格计费。  \n选择“DeepSeek V4.1 Flash”以使用新模型。',
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
@@ -43,7 +49,21 @@ const zh: Translations = {
 	'auth.emptyValidation': 'API Key 不能为空',
 	'auth.saved': 'API Key 已安全保存。',
 	'auth.removed': 'API Key 已移除。',
-	'auth.notConfigured': 'API Key 未配置，请在命令面板运行 "DeepSeek: 设置 API Key"。',
+	'auth.clearConfirm': '清除已保存的 API Key？',
+	'auth.clearDetail': '清除后，再次使用时可能需要重新设置 API Key。',
+	'auth.clearAction': '清除 API Key',
+	'auth.notConfigured': '尚未配置 API Key，请先设置 API Key 后重试。',
+
+	// Settings
+	'settings.resetBaseUrl.title': '恢复 DeepSeek Base URL 默认配置',
+	'settings.resetBaseUrl.chooseScope': '选择要重置的范围；仅移除该范围的自定义地址',
+	'settings.resetBaseUrl.user': '用户设置',
+	'settings.resetBaseUrl.workspace': '当前工作区',
+	'settings.resetBaseUrl.current': '当前配置：{0}',
+	'settings.resetBaseUrl.notConfigured': '未自定义，无需重置',
+	'settings.resetBaseUrl.after': '重置后生效地址：{0}',
+	'settings.resetBaseUrl.afterInherited': '重置后继承其余配置，实际生效地址请查看设置',
+	'settings.resetBaseUrl.failed': '重置 Base URL 失败，请运行 "DeepSeek: 显示日志" 查看详情。',
 
 	// Thinking Effort — short labels for model picker dropdown
 	'status.thinking': '思考模式',
@@ -64,7 +84,7 @@ const zh: Translations = {
 	'vision.action.configureProxy': '配置视觉代理',
 	'vision.panel.title': 'DeepSeek 视觉代理',
 	'vision.panel.description':
-		'为 Flash 和 Pro 配置一个将图片转换成文字描述的视觉模型。Vision Exp 会直接处理原图。',
+		'为 V4 Flash 和 Pro 入口配置一个将图片转换成文字描述的视觉模型。V4.1 Flash 和 Vision Exp 会直接处理原图。',
 	'vision.panel.source.vscodeLm': 'VS Code 模型',
 	'vision.panel.source.apiEndpoint': 'API 端点',
 	'vision.panel.field.source': '视觉代理来源',
@@ -213,7 +233,6 @@ const zh: Translations = {
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek 激活失败，请运行 "DeepSeek: 显示日志" 查看详情。',
-	'extension.deactivateFailed': 'DeepSeek 停用异常',
 	'extension.welcomeFailed': '欢迎引导加载异常',
 	'extension.openRequestDumpsFolderFailed':
 		'打开请求 dump 目录失败，请运行 "DeepSeek: 显示日志" 查看详情。',
@@ -221,6 +240,13 @@ const zh: Translations = {
 
 const en: Translations = {
 	// Model descriptions
+	'model.deepseek-flash.detail': 'Vision and thinking mode',
+	'model.deepseek-flash.tooltip':
+		'DeepSeek V4.1 Flash with image and text input, thinking mode, and tool calling.',
+	'model.retirement.custom':
+		'**Legacy model entry.**  \nCheck that your provider supports DeepSeek V4.1 Flash.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
+	'model.retirement.flashRetired':
+		'**Retired.**  \nRequests are served by DeepSeek V4.1 Flash and billed at the Flash price.  \nSelect “DeepSeek V4.1 Flash” to use the new model.',
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
 	'model.flash-vision-exp.detail': 'Experimental native vision model',
@@ -249,8 +275,23 @@ const en: Translations = {
 	'auth.emptyValidation': 'API key cannot be empty',
 	'auth.saved': 'DeepSeek API key saved.',
 	'auth.removed': 'DeepSeek API key removed.',
-	'auth.notConfigured':
-		'DeepSeek API key not configured. Run "DeepSeek: Set API Key" from the Command Palette.',
+	'auth.clearConfirm': 'Clear the saved API Key?',
+	'auth.clearDetail': 'You may need to set an API Key again before using the extension.',
+	'auth.clearAction': 'Clear API Key',
+	'auth.notConfigured': 'DeepSeek API key is not configured. Set an API key and try again.',
+
+	// Settings
+	'settings.resetBaseUrl.title': 'Reset DeepSeek Base URL',
+	'settings.resetBaseUrl.chooseScope': 'Choose a scope; only its custom URL will be removed',
+	'settings.resetBaseUrl.user': 'User Settings',
+	'settings.resetBaseUrl.workspace': 'Current Workspace',
+	'settings.resetBaseUrl.current': 'Configured URL: {0}',
+	'settings.resetBaseUrl.notConfigured': 'Not customized; no reset needed',
+	'settings.resetBaseUrl.after': 'Effective URL after reset: {0}',
+	'settings.resetBaseUrl.afterInherited':
+		'Inherits remaining configuration after reset; check Settings for the effective URL',
+	'settings.resetBaseUrl.failed':
+		'Failed to reset Base URL. Run "DeepSeek: Show Logs" for details.',
 
 	// Thinking Effort
 	'status.thinking': 'Thinking Effort',
@@ -273,7 +314,7 @@ const en: Translations = {
 	'vision.action.configureProxy': 'Configure Vision Proxy',
 	'vision.panel.title': 'DeepSeek Vision Proxy',
 	'vision.panel.description':
-		'Configure a vision model that turns images into text for Flash and Pro. Vision Exp processes original images directly.',
+		'Configure a vision model that turns images into text for V4 Flash and Pro entries. V4.1 Flash and Vision Exp process original images directly.',
 	'vision.panel.source.vscodeLm': 'VS Code model',
 	'vision.panel.source.apiEndpoint': 'API endpoint',
 	'vision.panel.field.source': 'Vision proxy source',
@@ -448,7 +489,6 @@ const en: Translations = {
 
 	// Extension
 	'extension.activateFailed': 'DeepSeek failed to activate. Run "DeepSeek: Show Logs" for details.',
-	'extension.deactivateFailed': 'Failed to prepare DeepSeek provider for deactivate',
 	'extension.welcomeFailed': 'Failed to show DeepSeek welcome prompt',
 	'extension.openRequestDumpsFolderFailed':
 		'Failed to open request dumps folder. Run "DeepSeek: Show Logs" for details.',

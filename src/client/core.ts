@@ -18,6 +18,7 @@ export class DeepSeekClient {
 	constructor(
 		private readonly baseUrl: string,
 		private readonly apiKey: string,
+		private readonly requestHeaders: Readonly<Record<string, string>> = {},
 	) {}
 
 	/**
@@ -44,12 +45,17 @@ export class DeepSeekClient {
 				stream_options: { include_usage: true },
 			};
 
+			const headers = new Headers({
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${this.apiKey}`,
+			});
+			for (const [name, value] of Object.entries(this.requestHeaders)) {
+				headers.set(name, value);
+			}
+
 			const response = await fetch(`${this.baseUrl}/chat/completions`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${this.apiKey}`,
-				},
+				headers,
 				body: safeStringify(requestBody),
 				signal: controller.signal,
 			});

@@ -1,9 +1,9 @@
 {
   "name": "deepseek-v4-for-copilot",
   "displayName": "DeepSeek V4 for Copilot Chat",
-  "description": "Use DeepSeek V4 Pro, Flash, and Flash Vision Exp in Copilot Chat with native vision, Vision Proxy, reasoning, and agent tools.",
+  "description": "Use DeepSeek V4.1 Flash in Copilot Chat with native vision, Vision Proxy, reasoning, and agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.8.1",
+  "version": "0.9.2",
   "publisher": "Vizards",
   "license": "MIT",
   "repository": {
@@ -59,6 +59,10 @@
       {
         "command": "deepseek-copilot.clearApiKey",
         "title": "%deepseek-copilot.command.clearApiKey%"
+      },
+      {
+        "command": "deepseek-copilot.resetBaseUrl",
+        "title": "%deepseek-copilot.command.resetBaseUrl%"
       },
       {
         "command": "deepseek-copilot.setVisionModel",
@@ -119,13 +123,21 @@
         "deepseek-copilot.baseUrl": {
           "type": "string",
           "default": "https://api.deepseek.com",
-          "description": "%deepseek-copilot.config.baseUrl.description%"
+          "markdownDescription": "%deepseek-copilot.config.baseUrl.description%"
         },
         "deepseek-copilot.maxTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "description": "%deepseek-copilot.config.maxTokens.description%"
+        },
+        "deepseek-copilot.requestHeaders": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "%deepseek-copilot.config.requestHeaders.description%"
         },
         "deepseek-copilot.experimental.stabilizeToolList": {
           "type": "boolean",
@@ -138,6 +150,7 @@
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",
           "default": {
+            "deepseek-flash": "deepseek-flash",
             "deepseek-v4-flash": "deepseek-v4-flash",
             "deepseek-v4-pro": "deepseek-v4-pro",
             "deepseek-v4-flash-vision-exp": "deepseek-v4-flash-vision-exp"
@@ -145,6 +158,10 @@
           "description": "%deepseek-copilot.config.modelIdOverrides.description%",
           "additionalProperties": false,
           "properties": {
+            "deepseek-flash": {
+              "type": "string",
+              "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-flash.description%"
+            },
             "deepseek-v4-flash": {
               "type": "string",
               "description": "%deepseek-copilot.config.modelIdOverrides.deepseek-v4-flash.description%"

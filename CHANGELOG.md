@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.9.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.1...v0.9.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* **provider:** avoid Copilot BYOK activation deadlock ([#275](https://github.com/Vizards/deepseek-v4-for-copilot/issues/275)) ([61dd50f](https://github.com/Vizards/deepseek-v4-for-copilot/commit/61dd50ff09f9c82d11800289295e92f0abde86f6)), closes [#274](https://github.com/Vizards/deepseek-v4-for-copilot/issues/274)
+* **settings:** make API key and base URL actions discoverable ([#276](https://github.com/Vizards/deepseek-v4-for-copilot/issues/276)) ([0ccd91e](https://github.com/Vizards/deepseek-v4-for-copilot/commit/0ccd91e85e0754eae5d41350df7e00561d14856d)), closes [#270](https://github.com/Vizards/deepseek-v4-for-copilot/issues/270)
+
+## [0.9.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.0...v0.9.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **provider:** remove model refresh during deactivation ([#271](https://github.com/Vizards/deepseek-v4-for-copilot/issues/271)) ([7126168](https://github.com/Vizards/deepseek-v4-for-copilot/commit/71261682722abecc59f5bc54b11ca79fee63957a))
+* **provider:** remove V4 Pro retirement notices ([#272](https://github.com/Vizards/deepseek-v4-for-copilot/issues/272)) ([3b0fcc5](https://github.com/Vizards/deepseek-v4-for-copilot/commit/3b0fcc5c5d709633e56b4efaeb3c8df9fc4eb3f3))
+
+## [0.9.0](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.2...v0.9.0) (2026-09-10)
+
+
+### Features
+
+* **config:** add configurable request headers ([#266](https://github.com/Vizards/deepseek-v4-for-copilot/issues/266)) ([d1a0fc4](https://github.com/Vizards/deepseek-v4-for-copilot/commit/d1a0fc44dc324f70fba2a8daa3705e0332750e3b)), closes [#264](https://github.com/Vizards/deepseek-v4-for-copilot/issues/264)
+* **provider:** add DeepSeek V4.1 Flash and retirement notices ([#267](https://github.com/Vizards/deepseek-v4-for-copilot/issues/267)) ([75c1478](https://github.com/Vizards/deepseek-v4-for-copilot/commit/75c1478339fe2d6685f1aef66c860ca37edf4973))
+
+## [0.8.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.1...v0.8.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **provider:** support tool-result images across vision routes ([#260](https://github.com/Vizards/deepseek-v4-for-copilot/issues/260)) ([3384f36](https://github.com/Vizards/deepseek-v4-for-copilot/commit/3384f36525676837399a1ad625399a195d43ea88))
+* **vision:** stabilize proxied tool image descriptions ([#261](https://github.com/Vizards/deepseek-v4-for-copilot/issues/261)) ([dad64fb](https://github.com/Vizards/deepseek-v4-for-copilot/commit/dad64fb65b5e563fd668d300de4447d6e884bd0a))
+
 ## [0.8.1](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.8.0...v0.8.1) (2026-08-27)
 
 

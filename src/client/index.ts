@@ -1,5 +1,6 @@
 export { DeepSeekClient } from './core';
 export {
+	createApiKeyNotConfiguredError,
 	createHttpError,
 	createUserFacingError,
 	DeepSeekRequestError,

@@ -49,6 +49,37 @@ export const WALKTHROUGH_ID = 'Vizards.deepseek-v4-for-copilot#deepseekGettingSt
 /** Available DeepSeek models exposed through the language model provider. */
 export const MODELS: ModelDefinition[] = [
 	{
+		id: 'deepseek-flash',
+		name: 'DeepSeek V4.1 Flash',
+		family: 'deepseek',
+		version: 'v4.1',
+		detail: 'Vision and thinking mode',
+		maxInputTokens: 655360,
+		maxOutputTokens: 393216,
+		capabilities: {
+			toolCalling: DEEPSEEK_TOOLS_LIMIT,
+			imageInput: true,
+			nativeImageInput: true,
+			thinking: {
+				supportedEfforts: ['low', 'high', 'max'],
+				defaultEffort: 'high',
+				canDisable: true,
+			},
+		},
+		requiresThinkingParam: true,
+		pricing: {
+			USD: {
+				offPeak: { cacheHitInput: 0.003, cacheMissInput: 0.15, output: 0.6 },
+				peak: { cacheHitInput: 0.006, cacheMissInput: 0.3, output: 1.2 },
+			},
+			CNY: {
+				offPeak: { cacheHitInput: 0.02, cacheMissInput: 1, output: 4 },
+				peak: { cacheHitInput: 0.04, cacheMissInput: 2, output: 8 },
+			},
+		},
+		priceCategory: 'low',
+	},
+	{
 		id: 'deepseek-v4-flash',
 		name: 'DeepSeek V4 Flash',
 		family: 'deepseek',

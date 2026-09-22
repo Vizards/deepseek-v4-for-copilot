@@ -8,6 +8,10 @@ import {
 	getNextDeepSeekTariffTransition,
 	refreshDeepSeekTariffWindowsFromPricingPage,
 } from '../tariff';
+import {
+	isChinesePublicHoliday,
+	refreshChinesePublicHolidaysFromWeb,
+} from '../tariff-holidays';
 import { registerActionUrls } from './actions';
 import { registerCommands } from './commands';
 import { initializeDiagnostics } from './diagnostics';
@@ -86,7 +90,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			: transitionHappenedNow
 				? new vscode.ThemeColor('statusBarItem.prominentForeground')
 				: undefined;
-		tariffStatusItem.tooltip = `DeepSeek model tariff: ${state === 'peak' ? 'Peak pricing is active (2x)' : 'Off-peak pricing is active (1/2 price)'} for the selected DeepSeek model.`;
+		const offPeakReason =
+			state === 'offpeak' && isChinesePublicHoliday(now) ? ' (Chinese public holiday)' : '';
+		tariffStatusItem.tooltip = `DeepSeek model tariff: ${state === 'peak' ? 'Peak pricing is active (2x)' : 'Off-peak pricing is active (1/2 price)'}${offPeakReason} for the selected DeepSeek model.`;
 		tariffStatusItem.show();
 
 		if (!warningWindowActive && !transitionHappenedNow) {
@@ -160,6 +166,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	refreshTariffSchedule();
 	const tariffRefreshTimer = setInterval(refreshTariffSchedule, 60 * 60 * 1000);
 	context.subscriptions.push({ dispose: () => clearInterval(tariffRefreshTimer) });
+
+	const refreshHolidaySchedule = () =>
+		void refreshChinesePublicHolidaysFromWeb(context.globalState).then((dates) => {
+			logger.info(`Chinese public holiday calendar refreshed, dates=${dates.length}`);
+		});
+	refreshHolidaySchedule();
+	const holidayRefreshTimer = setInterval(refreshHolidaySchedule, 24 * 60 * 60 * 1000);
+	context.subscriptions.push({ dispose: () => clearInterval(holidayRefreshTimer) });
 
 	try {
 		const provider = registerProvider(context);

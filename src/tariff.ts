@@ -1,3 +1,5 @@
+import { isChinesePublicHoliday, type TariffScheduleStorage } from './tariff-holidays';
+
 export type DeepSeekTariffState = 'peak' | 'offpeak';
 
 export interface DeepSeekTariffWindow {
@@ -21,8 +23,8 @@ export interface DeepSeekTariffTransition {
  * holidays in full."
  *
  * The hours and the weekday rule are unchanged, and off-peak is still half of
- * the peak rate. Chinese public holidays are not tracked here, so a holiday that
- * falls on a weekday reports as peak even though the page bills it as off-peak.
+ * the peak rate. Chinese public holidays are off-peak in full, so a holiday that
+ * falls on a weekday reports as off-peak here as well.
  */
 const DEFAULT_PEAK_WINDOWS: readonly DeepSeekTariffWindow[] = [
 	{ startHourUtc: 1, endHourUtc: 4 },
@@ -134,7 +136,7 @@ function getUtcHourFraction(date: Date): number {
 }
 
 export function getDeepSeekTariffState(date: Date): DeepSeekTariffState {
-	if (isWeekendUtc(date)) {
+	if (isWeekendUtc(date) || isChinesePublicHoliday(date)) {
 		return 'offpeak';
 	}
 
@@ -218,10 +220,7 @@ export function getDeepSeekTariffStatusText(now: Date = new Date()): string {
 
 export async function refreshDeepSeekTariffWindowsFromPricingPage(
 	pageUrl: string = 'https://api-docs.deepseek.com/quick_start/pricing',
-	storage?: {
-		get<T>(key: string): T | undefined;
-		update<T>(key: string, value: T): Thenable<void>;
-	},
+	storage?: TariffScheduleStorage,
 ): Promise<readonly DeepSeekTariffWindow[]> {
 	try {
 		const response = await fetch(pageUrl, {
@@ -264,9 +263,7 @@ export async function refreshDeepSeekTariffWindowsFromPricingPage(
 }
 
 export function getDeepSeekTariffScheduleSnapshot(
-	storage?: {
-		get<T>(key: string): T | undefined;
-	},
+	storage?: TariffScheduleStorage,
 ): DeepSeekTariffScheduleSnapshot | undefined {
 	return storage?.get<DeepSeekTariffScheduleSnapshot>(DEEPSEEK_TARIFF_SCHEDULE_KEY);
 }

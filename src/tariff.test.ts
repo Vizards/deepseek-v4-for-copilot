@@ -19,6 +19,26 @@ describe('DeepSeek tariff logic', () => {
 		assert.equal(getDeepSeekTariffState(offPeak), 'offpeak');
 	});
 
+	it('treats Chinese public holidays as off-peak on weekdays', () => {
+		// 2026-09-25 (Friday) and 2026-10-01 (Thursday) are both inside peak windows.
+		assert.equal(getDeepSeekTariffState(new Date('2026-09-25T02:30:00Z')), 'offpeak');
+		assert.equal(getDeepSeekTariffState(new Date('2026-10-01T07:00:00Z')), 'offpeak');
+	});
+
+	it('keeps the weekday schedule unchanged outside holidays', () => {
+		assert.equal(getDeepSeekTariffState(new Date('2026-09-24T02:30:00Z')), 'peak');
+		// 2026-09-20 is a published makeup workday, but it is a Sunday, and the
+		// pricing page keeps weekends off-peak in full.
+		assert.equal(getDeepSeekTariffState(new Date('2026-09-20T02:30:00Z')), 'offpeak');
+	});
+
+	it('skips holiday and weekend days when finding the next transition', () => {
+		const next = getNextDeepSeekTariffTransition(new Date('2026-09-25T03:30:00Z'));
+		assert.ok(next);
+		assert.equal(next.to, 'peak');
+		assert.equal(next.at.toISOString(), '2026-09-28T01:00:00.000Z');
+	});
+
 	it('finds the next transition for a state change', () => {
 		const now = new Date('2026-08-24T03:30:00Z');
 		const next = getNextDeepSeekTariffTransition(now);

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.2...v0.9.3) (2026-09-23)
+
+
+### Bug Fixes
+
+* **provider:** add schemas for parameterless tools ([#282](https://github.com/Vizards/deepseek-v4-for-copilot/issues/282)) ([fb9b048](https://github.com/Vizards/deepseek-v4-for-copilot/commit/fb9b048ae9f56a74d1ddccaff4054cb4bf5f533d)), closes [#280](https://github.com/Vizards/deepseek-v4-for-copilot/issues/280)
+
 ## [0.9.2](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.1...v0.9.2) (2026-09-14)
 
 

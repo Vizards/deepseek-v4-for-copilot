@@ -197,7 +197,11 @@ export function convertTools(
 		function: {
 			name: tool.name,
 			description: tool.description,
-			parameters: tool.inputSchema as Record<string, unknown> | undefined,
+			// Some compatible endpoints require an explicit schema for tools without parameters.
+			parameters: (tool.inputSchema ?? { type: 'object', properties: {} }) as Record<
+				string,
+				unknown
+			>,
 		},
 	}));
 }

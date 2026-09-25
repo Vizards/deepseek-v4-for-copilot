@@ -64,6 +64,52 @@
       "dependsOn": "npm: watch",
       "dependsOrder": "sequence",
       "problemMatcher": []
+    },
+    {
+      "label": "Package & Install Extension (Stable)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/package-extension.sh",
+        "stable",
+        "${workspaceFolder}"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/.vscode/package-extension.ps1",
+          "stable",
+          "${workspaceFolder}"
+        ]
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Package & Install Extension (Insiders)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/package-extension.sh",
+        "insiders",
+        "${workspaceFolder}"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/.vscode/package-extension.ps1",
+          "insiders",
+          "${workspaceFolder}"
+        ]
+      },
+      "problemMatcher": []
     }
   ]
 }

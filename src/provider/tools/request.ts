@@ -7,11 +7,12 @@ import { DEEPSEEK_TOOLS_LIMIT } from './consts';
 export function prepareRequestTools(
 	toolCallingCapability: boolean | number | undefined,
 	options: vscode.ProvideLanguageModelChatResponseOptions,
+	deferTools = false,
 ): DeepSeekTool[] | undefined {
 	const tools = toolCallingCapability ? convertTools(options.tools) : undefined;
 	const toolLimit = getToolCallingLimit(toolCallingCapability);
 	const toolsCount = tools?.length ?? 0;
-	if (toolsCount > toolLimit) {
+	if (toolsCount > toolLimit && !deferTools) {
 		throw new Error(t('request.toolsLimitExceeded', toolLimit, toolsCount));
 	}
 	return tools;

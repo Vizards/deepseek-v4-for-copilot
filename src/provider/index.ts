@@ -1,6 +1,11 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getApiModelId, getBaseUrl, getStabilizeToolListEnabled } from '../config';
+import {
+	getApiModelId,
+	getBaseUrl,
+	getStabilizeToolListEnabled,
+	getToolDiscoveryEnabled,
+} from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../endpoint';
 import { t } from '../i18n';
@@ -172,7 +177,7 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 		});
 
 		const toolFlow = processToolFlow({
-			stabilizeToolList: getStabilizeToolListEnabled(),
+			stabilizeToolList: getStabilizeToolListEnabled() && !getToolDiscoveryEnabled(),
 			messages,
 			tools: options.tools,
 			progress,

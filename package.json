@@ -209,6 +209,24 @@
             "%deepseek-copilot.config.debugMode.verbose.description%"
           ],
           "markdownDescription": "%deepseek-copilot.config.debugMode.description%"
+        },
+        "deepseek-copilot.experimental.toolDiscovery.enabled": {
+          "type": "boolean",
+          "default": false,
+          "tags": [
+            "experimental"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.experimental.toolDiscovery.enabled.description%"
+        },
+        "deepseek-copilot.experimental.toolDiscovery.maxTools": {
+          "type": "integer",
+          "default": 64,
+          "minimum": 8,
+          "maximum": 128,
+          "tags": [
+            "experimental"
+          ],
+          "description": "%deepseek-copilot.config.experimental.toolDiscovery.maxTools.description%"
         }
       }
     }
@@ -222,7 +240,8 @@
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/",
     "package": "vsce package --readme-path dist/README.marketplace.md -o dist/",
-    "login": "vsce login Vizards"
+    "login": "vsce login Vizards",
+    "test:discovery": "node --test tests/tool-discovery.test.cjs tests/tool-discovery-http.test.cjs tests/tool-discovery-provider.test.cjs"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

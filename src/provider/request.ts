@@ -1,7 +1,14 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
 import { createApiKeyNotConfiguredError, DeepSeekClient } from '../client';
-import { getApiModelId, getBaseUrl, getMaxTokens, getRequestHeaders } from '../config';
+import {
+	getApiModelId,
+	getBaseUrl,
+	getMaxTokens,
+	getRequestHeaders,
+	getToolDiscoveryEnabled,
+	getToolDiscoveryMaxTools,
+} from '../config';
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import type { DeepSeekRequest } from '../types';
@@ -17,6 +24,7 @@ import type { ReplayMarkerMetadata } from './replay';
 import { classifyDeepSeekRequest, shouldForceThinkingNone, type RequestKind } from './routing';
 import type { ConversationSegment } from './segment';
 import { collectTrailingToolResultIds, prepareRequestTools } from './tools/request';
+import { ToolCatalog, ToolDiscoveryClient, type CompletionClient } from './tools/discovery';
 import {
 	finalizeVisionResolutionStats,
 	prepareVisionMessages,
@@ -24,7 +32,7 @@ import {
 } from './vision';
 
 export interface PreparedChatRequest {
-	client: DeepSeekClient;
+	client: CompletionClient;
 	request: DeepSeekRequest;
 	isThinkingModel: boolean;
 	totalRequestChars: number;
@@ -70,7 +78,7 @@ export async function prepareChatRequest({
 
 	const baseUrl = getBaseUrl();
 	const requestHeaders = resolveRequestHeaders(getRequestHeaders(), options, storageUri);
-	const client = new DeepSeekClient(baseUrl, apiKey, requestHeaders);
+	let client: CompletionClient = new DeepSeekClient(baseUrl, apiKey, requestHeaders);
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const thinkingCapability = modelDef?.capabilities.thinking;
 	const isThinkingModel = Boolean(thinkingCapability);
@@ -87,7 +95,19 @@ export async function prepareChatRequest({
 
 	const deepseekMessages = convertMessages(resolvedMessages, isThinkingModel, nativeImageInput);
 	finalizeVisionResolutionStats(visionResolution.stats, deepseekMessages);
-	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
+	const discoveryEnabled = getToolDiscoveryEnabled();
+	let tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options, discoveryEnabled);
+	const maxTools = Math.min(
+		getToolDiscoveryMaxTools(),
+		typeof modelDef?.capabilities.toolCalling === 'number'
+			? modelDef.capabilities.toolCalling
+			: 128,
+	);
+	if (discoveryEnabled && tools && tools.length > maxTools) {
+		const catalog = new ToolCatalog(tools, deepseekMessages, maxTools);
+		tools = catalog.wireTools;
+		client = new ToolDiscoveryClient(client, catalog);
+	}
 
 	const totalRequestChars = countMessageChars(deepseekMessages);
 	const hasNativeImages =
@@ -100,7 +120,12 @@ export async function prepareChatRequest({
 		messages: deepseekMessages,
 		stream: true,
 		tools,
-		tool_choice: tools && tools.length > 0 ? ('auto' as const) : undefined,
+		tool_choice:
+			tools && tools.length > 0
+				? discoveryEnabled && options.toolMode === vscode.LanguageModelChatToolMode.Required
+					? 'required'
+					: 'auto'
+				: undefined,
 		max_tokens: maxTokens,
 	};
 	const requestKind = classifyDeepSeekRequest({

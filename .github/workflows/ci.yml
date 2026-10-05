@@ -25,6 +25,8 @@ jobs:
 
       - run: npm run compile
 
+      - run: npm run test:discovery
+
       - run: mkdir -p dist && npm run package
 
       - uses: actions/upload-artifact@v4

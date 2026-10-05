@@ -114,6 +114,8 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 | `deepseek-copilot.visionModel` | *(自动)* | V4 Flash 和 Pro 使用的视觉代理。自动模式会在可用时选择 Flash Vision Exp；也可通过 `DeepSeek: 配置视觉代理` 改用其他 VS Code 模型或 API 端点 |
 | `deepseek-copilot.visionPrompt` | *(内置)* | V4 Flash/Pro 的视觉代理用于描述图片附件的提示词，不影响 V4.1 Flash 或 Flash Vision Exp 的原生图片请求 |
 | `deepseek-copilot.experimental.stabilizeToolList` | `false` | 实验性设置。尝试预先激活 VS Code/Copilot 的虚拟工具，让传给 DeepSeek API 的 `tools` 参数在多轮对话中更完整、更稳定。当已启用工具跨轮次变化时，可能提高上下文缓存命中率。代价是 input tokens 可能增加；缓存命中的 input tokens 单价更低，但仍会计入用量。64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；超过 128 个已启用工具时不建议开启 |
+| `deepseek-copilot.experimental.toolDiscovery.enabled` | `false` | 实验性按需工具发现：工具目录超过请求预算时启用。优先于工具列表稳定化设置，可能增加 API 请求次数和延迟 |
+| `deepseek-copilot.experimental.toolDiscovery.maxTools` | `64` | 每个工具发现请求的函数定义上限，包含搜索函数（8–128）。未选中的工具仍可搜索 |
 
 思考强度可通过 Copilot Chat 的模型选择器对每个 DeepSeek 模型单独设置。
 
@@ -129,6 +131,14 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
   }
 }
 ```
+
+### 实验性工具发现
+
+启用 `deepseek-copilot.experimental.toolDiscovery.enabled` 后，当宿主传入的工具数量超过配置预算时，先向模型提供少量工具和 `deepseek_search_tools`。模型可按名称或描述搜索，也可分页浏览目录。选中的工具会以原始参数定义加入下一次 API 请求；较早的选择可能被移出当前请求，但仍可再次搜索。工具数量未超过预算时，保持正常传递。
+
+目录仅包含宿主传入的工具。实际调用及授权仍由 Copilot 处理，包括宿主的 `activate_*` 调用。此设置不会启动或停止 MCP 服务器。关闭它即可恢复原有行为。
+
+此模式默认关闭，采用词汇匹配搜索，最多允许四轮内部搜索续请求（共五次 API 请求）；每次 API 请求均正常计费。响应会缓冲到该轮结束。搜索历史仅保留在当前提供方调用内部，下一次调用会重新构建目录。现有请求 dump 只记录初始请求；逐轮诊断及多请求的上下文和用量显示仍需进一步验证。
 
 ## 方案对比
 

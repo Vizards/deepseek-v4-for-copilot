@@ -74,6 +74,19 @@ export function getStabilizeToolListEnabled(): boolean {
 	return config.get<boolean>('experimental.stabilizeToolList', false);
 }
 
+export function getToolDiscoveryEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>('experimental.toolDiscovery.enabled', false);
+}
+
+export function getToolDiscoveryMaxTools(): number {
+	const value = vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<number>('experimental.toolDiscovery.maxTools', 64);
+	return Number.isFinite(value) ? Math.max(8, Math.min(128, Math.floor(value))) : 64;
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

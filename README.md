@@ -114,6 +114,8 @@ All four entries support thinking mode, tool calling, and 1M token context. See 
 | `deepseek-copilot.visionModel` | *(auto)* | Vision Proxy used by V4 Flash and Pro. Auto mode selects Flash Vision Exp when available; configure another VS Code model or API endpoint with `DeepSeek: Configure Vision Proxy` |
 | `deepseek-copilot.visionPrompt` | *(built-in)* | Prompt used by V4 Flash/Pro's Vision Proxy to describe image attachments. It does not affect native V4.1 Flash or Flash Vision Exp requests |
 | `deepseek-copilot.experimental.stabilizeToolList` | `false` | Experimental. Tries to pre-activate VS Code/Copilot virtual tools so the DeepSeek API `tools` parameter is more complete and stable across turns. May improve context-cache hit rate when enabled tools change between turns. Can increase input tokens because more function definitions may be included; cache-hit input tokens are cheaper but still count toward usage. Usually leave it off with 64 or fewer enabled tools unless the tool list still changes across turns; do not enable it with more than 128 enabled tools |
+| `deepseek-copilot.experimental.toolDiscovery.enabled` | `false` | Experimental on-demand tool discovery for catalogs larger than the request budget. Overrides tool-list stabilization; may add API calls and latency |
+| `deepseek-copilot.experimental.toolDiscovery.maxTools` | `64` | Maximum schemas per discovery request, including the search function (8–128). Omitted tools remain searchable |
 
 Thinking Effort is configured from Copilot Chat's model picker for each DeepSeek model.
 
@@ -129,6 +131,14 @@ Example `settings.json` override for compatible API proxies:
   }
 }
 ```
+
+### Experimental tool discovery
+
+Enable `deepseek-copilot.experimental.toolDiscovery.enabled` to expose a small initial tool set plus `deepseek_search_tools` when the host supplies more tools than the configured budget. The model can search names/descriptions or browse the catalog with pagination. Selected tools are sent with their original schemas on the next API request; older selections may be evicted and remain searchable. Catalogs within the budget pass through normally.
+
+The catalog contains only host-supplied tools. Copilot continues to execute real calls and manage approvals, including host `activate_*` calls. This setting does not start or stop MCP servers. Disable it to restore the existing behavior.
+
+This opt-in mode uses lexical search and allows at most four internal search continuations (five API requests total); each API request incurs normal usage charges. Responses are buffered until a round finishes. Search history is internal to the current provider call, and the catalog is rebuilt on the next call. Existing request dumps describe the initial request; per-round diagnostics and multi-request context/usage presentation still need further validation.
 
 ## Compared to alternatives
 

@@ -142,7 +142,7 @@ export interface ModelDefinition {
 	maxInputTokens: number;
 	maxOutputTokens: number;
 	capabilities: {
-		toolCalling: boolean | number;
+		toolCalling: boolean;
 		imageInput: boolean;
 		nativeImageInput?: boolean;
 		thinking: ThinkingCapability | false;

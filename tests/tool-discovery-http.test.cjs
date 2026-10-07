@@ -16,7 +16,7 @@ const { DeepSeekClient } = require('../out/client');
 const { ToolCatalog, ToolDiscoveryClient } = require('../out/provider/tools/discovery');
 Module._load = load;
 
-test('real HTTP/SSE transport sends bounded schemas and hides internal discovery from host', async t => {
+for (const mode of ['search', 'direct', 'recover']) test(`real HTTP/SSE transport: ${mode} keeps host calls and bounded schemas`, async t => {
   const received = [], emitted = [];
   const tools = Array.from({ length: 135 }, (_, i) => ({ type: 'function', function: {
     name: `mcp_1c_tool_${i}`, description: `Metadata operation ${i}`,
@@ -27,12 +27,13 @@ test('real HTTP/SSE transport sends bounded schemas and hides internal discovery
     let body = ''; for await (const chunk of req) body += chunk;
     const payload = JSON.parse(body); received.push(payload);
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-    const search = received.length === 1;
-    const name = search ? catalog.searchName : 'mcp_1c_tool_134';
+    const unavailable = mode === 'recover' && received.length === 1;
+    const search = mode !== 'direct' && received.length === (mode === 'recover' ? 2 : 1);
+    const name = unavailable ? 'removed_tool' : search ? catalog.searchName : 'mcp_1c_tool_134';
     const args = search ? '{"query":"mcp_1c_tool_134","limit":1}' : '{"value":"original"}';
     const chunk = delta => 'data: ' + JSON.stringify({ choices: [{ index: 0, delta, finish_reason: null }] }) + '\n\n';
     res.write(chunk({ reasoning_content: search ? 'Find the operation.' : 'Use the selected operation.' }));
-    res.write(chunk({ tool_calls: [{ index: 0, id: search ? 'search-1' : 'real-1', type: 'function',
+    res.write(chunk({ tool_calls: [{ index: 0, id: unavailable ? 'missing-1' : search ? 'search-1' : 'real-1', type: 'function',
       function: { name, arguments: args.slice(0, 10) } }] }));
     res.write(chunk({ tool_calls: [{ index: 0, function: { arguments: args.slice(10) } }] }));
     res.end('data: ' + JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] }) +
@@ -47,12 +48,18 @@ test('real HTTP/SSE transport sends bounded schemas and hides internal discovery
     onToolCall: call => emitted.push(['call', call]), onDone: () => emitted.push(['done']),
     onError: error => { throw error; },
   }, { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) });
-  assert.equal(received.length, 2);
-  assert.deepEqual(received.map(req => req.tools.length), [1, 2]);
+  assert.equal(received.length, mode === 'direct' ? 1 : mode === 'recover' ? 3 : 2);
+  assert.deepEqual(received.map(req => req.tools.length), mode === 'direct' ? [1] : mode === 'recover' ? [1, 1, 2] : [1, 2]);
   assert.ok(received.every(req => req.tools.length <= 64));
-  assert.deepEqual(received[1].tools.find(t => t.function.name === 'mcp_1c_tool_134'), tools[134]);
-  assert.equal(received[1].messages.at(-2).reasoning_content, 'Find the operation.');
-  assert.equal(received[1].messages.at(-1).tool_call_id, 'search-1');
+  if (mode !== 'direct') {
+    assert.deepEqual(received.at(-1).tools.find(t => t.function.name === 'mcp_1c_tool_134'), tools[134]);
+    assert.equal(received.at(-1).messages.at(-2).reasoning_content, 'Find the operation.');
+    assert.equal(received.at(-1).messages.at(-1).tool_call_id, 'search-1');
+  }
+  if (mode === 'recover') {
+    assert.equal(received[1].messages.at(-1).tool_call_id, 'missing-1');
+    assert.match(JSON.parse(received[1].messages.at(-1).content).error, /not available/);
+  }
   assert.deepEqual(emitted.map(item => item[0]), ['thinking', 'call', 'done']);
   assert.equal(emitted[1][1].function.name, 'mcp_1c_tool_134');
   assert.equal(emitted[1][1].function.arguments, '{"value":"original"}');

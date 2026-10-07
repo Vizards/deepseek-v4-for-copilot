@@ -79,6 +79,11 @@ export class ToolCatalog {
 		return [this.searchTool, ...this.selected.map((name) => this.tools.get(name)!)];
 	}
 
+	/** Selection limits schemas sent upstream, not which host-provided tools may be called. */
+	hasHostTool(name: string): boolean {
+		return this.tools.has(name);
+	}
+
 	private get searchTool(): DeepSeekTool {
 		return {
 			type: 'function',
@@ -178,7 +183,6 @@ export class ToolDiscoveryClient implements CompletionClient {
 		for (let round = 0; round <= MAX_SEARCH_ROUNDS; round += 1) {
 			if (token.isCancellationRequested) return;
 			const tools = this.catalog.wireTools;
-			const exposed = new Set(tools.map((tool) => tool.function.name));
 			const calls: DeepSeekToolCall[] = [];
 			const chunks: Array<{ kind: 'content' | 'thinking'; text: string }> = [];
 			let completed = false;
@@ -200,12 +204,10 @@ export class ToolDiscoveryClient implements CompletionClient {
 			);
 			if (token.isCancellationRequested) return;
 			if (!completed) throw new Error('Tool discovery response ended without completion.');
-			if (calls.some((call) => !exposed.has(call.function.name))) {
-				throw new Error('The model requested a tool outside the active tool selection.');
-			}
 			const searches = calls.filter((call) => call.function.name === this.catalog.searchName);
 			const realCalls = calls.filter((call) => call.function.name !== this.catalog.searchName);
-			if (!searches.length || realCalls.length) {
+			const unavailable = realCalls.filter((call) => !this.catalog.hasHostTool(call.function.name));
+			if (!unavailable.length && (!searches.length || realCalls.length)) {
 				if (request.tool_choice === 'required' && !realCalls.length) {
 					throw new Error('A real tool call was required, but the model returned no tool call.');
 				}
@@ -221,7 +223,9 @@ export class ToolDiscoveryClient implements CompletionClient {
 			}
 			if (round === MAX_SEARCH_ROUNDS)
 				throw new Error(
-					'Tool discovery exceeded four search rounds. Narrow the request and retry.',
+					unavailable.length
+						? `Tool discovery could not recover after four continuations; unavailable host tools: ${[...new Set(unavailable.map((call) => call.function.name))].slice(0, 5).join(', ')}.`
+						: 'Tool discovery exceeded four search rounds. Narrow the request and retry.',
 				);
 			messages.push({
 				role: 'assistant',
@@ -233,13 +237,20 @@ export class ToolDiscoveryClient implements CompletionClient {
 					.filter((chunk) => chunk.kind === 'thinking')
 					.map((chunk) => chunk.text)
 					.join(''),
-				tool_calls: searches,
+				tool_calls: calls,
 			});
-			for (const call of searches)
+			for (const call of calls)
 				messages.push({
 					role: 'tool',
 					tool_call_id: call.id,
-					content: this.catalog.search(call.function.arguments),
+					content:
+						call.function.name === this.catalog.searchName
+							? this.catalog.search(call.function.arguments)
+							: JSON.stringify({
+									error: this.catalog.hasHostTool(call.function.name)
+										? 'This tool was not executed because the same response requested an unavailable tool. Reissue this call if still needed.'
+										: `This tool is not available in the current host-provided catalog and was not executed. Choose an available tool or use ${this.catalog.searchName} to find one.`,
+								}),
 				});
 		}
 	}

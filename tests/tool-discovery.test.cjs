@@ -87,13 +87,86 @@ test('mixed discovery and real calls return to host without executing or inventi
   assert.deepEqual(h.output, [['call', call('grep', { value: 'safe' }, 'real')], ['done']]);
 });
 
-test('unselected or invented tool calls fail before emitting any content or calls', async () => {
-  for (const name of ['mcp_1c_tool_100', 'not_authorized']) {
-    const h = harness();
-    h.steps.push((_, cb) => { cb.onContent('not emitted'); cb.onToolCall(call(name)); cb.onDone(); });
-    await assert.rejects(h.run(), /outside the active tool selection/);
+test('a deferred host tool can be called directly from conversation context', async () => {
+  const h = harness();
+  const requested = call('mcp_1c_tool_100', { value: 'preserved' }, 'deferred-1');
+  h.steps.push((req, cb) => {
+    assert.ok(!req.tools.some(t => t.function.name === requested.function.name));
+    cb.onToolCall(requested); cb.onDone();
+  });
+  await h.run();
+  assert.equal(h.requests.length, 1);
+  assert.deepEqual(h.output, [['call', requested], ['done']]);
+});
+
+test('an evicted tool still belongs to the host catalog and reaches normal host approval', async () => {
+  const h = harness(pool(), 8);
+  h.catalog.search('{"query":"mcp_1c_tool_100","limit":1}');
+  h.catalog.search('{"query":"","limit":7}');
+  assert.ok(!h.catalog.wireTools.some(t => t.function.name === 'mcp_1c_tool_100'));
+  h.steps.push((_, cb) => { cb.onToolCall(call('mcp_1c_tool_100')); cb.onDone(); });
+  await h.run();
+  assert.deepEqual(h.output, [['call', call('mcp_1c_tool_100')], ['done']]);
+});
+
+test('a tool absent from the host catalog is not emitted and the model can recover', async () => {
+  const h = harness();
+  h.steps.push((_, cb) => {
+    cb.onContent('unavailable attempt'); cb.onThinking('initial reasoning');
+    cb.onToolCall(call('not_authorized', {}, 'missing-1')); cb.onDone();
+  });
+  h.steps.push((req, cb) => {
+    assert.equal(req.messages.at(-2).reasoning_content, 'initial reasoning');
+    assert.equal(req.messages.at(-1).tool_call_id, 'missing-1');
+    assert.match(JSON.parse(req.messages.at(-1).content).error, /not available.*host/);
+    assert.ok(!req.tools.some(t => t.function.name === 'not_authorized'));
+    cb.onToolCall(call('grep', {value:'retry'}, 'real-1')); cb.onDone();
+  });
+  await h.run();
+  assert.equal(h.requests.length, 2);
+  assert.deepEqual(h.output, [['call', call('grep', {value:'retry'}, 'real-1')], ['done']]);
+  assert.deepEqual(h.request.messages, []);
+});
+
+test('mixed unavailable and host calls are all marked unexecuted before a corrected retry', async () => {
+  const h = harness();
+  h.steps.push((_, cb) => {
+    cb.onToolCall(call('grep', {}, 'valid-1'));
+    cb.onToolCall(call('removed_tool', {}, 'missing-1'));
+    cb.onToolCall(call(h.catalog.searchName, {query:'mcp_1c_tool_100',limit:1}, 'search-1'));
+    cb.onDone();
+  });
+  h.steps.push((req, cb) => {
+    const results = req.messages.slice(-3);
+    assert.deepEqual(results.map(r => r.tool_call_id), ['valid-1','missing-1','search-1']);
+    assert.match(JSON.parse(results[0].content).error, /not executed/);
+    assert.match(JSON.parse(results[1].content).error, /not available/);
+    assert.equal(JSON.parse(results[2].content).tools[0].name, 'mcp_1c_tool_100');
+    assert.ok(req.tools.some(t => t.function.name === 'mcp_1c_tool_100'));
     assert.deepEqual(h.output, []);
-  }
+    cb.onToolCall(call('grep', {}, 'valid-2')); cb.onDone();
+  });
+  await h.run();
+  assert.deepEqual(h.output, [['call', call('grep', {}, 'valid-2')], ['done']]);
+});
+
+test('repeated unavailable tools stop within the existing API request budget', async () => {
+  const h = harness();
+  for (let i = 0; i < 5; i++) h.steps.push((_, cb) => {
+    cb.onToolCall(call('removed_tool', {}, `missing-${i}`)); cb.onDone();
+  });
+  await assert.rejects(h.run(), /unavailable.*removed_tool/);
+  assert.equal(h.requests.length, 5);
+  assert.deepEqual(h.output, []);
+});
+
+test('cancellation after an unavailable call stops without retry or output', async () => {
+  const h = harness(), cancellation = token();
+  h.steps.push((_, cb) => {
+    cb.onToolCall(call('removed_tool')); cancellation.isCancellationRequested = true; cb.onDone();
+  });
+  await h.run(cancellation);
+  assert.equal(h.requests.length, 1); assert.deepEqual(h.output, []);
 });
 
 test('cancellation during internal search stops continuation and emits no tool calls', async () => {

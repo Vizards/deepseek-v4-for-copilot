@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.3...v0.9.4) (2026-10-07)
+
+
+### Bug Fixes
+
+* remove stale 128-tool limit ([#291](https://github.com/Vizards/deepseek-v4-for-copilot/issues/291)) ([6c4fa95](https://github.com/Vizards/deepseek-v4-for-copilot/commit/6c4fa953b43d84267aa99dae80f9f51b6550db72)), closes [#286](https://github.com/Vizards/deepseek-v4-for-copilot/issues/286)
+
 ## [0.9.3](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.2...v0.9.3) (2026-09-23)
 
 

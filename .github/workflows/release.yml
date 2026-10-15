@@ -1,15 +1,40 @@
 name: Release
 
+# Open VSX trusts one workflow filename, so automatic and rescue publishing live here.
+
 on:
   push:
     branches: [main]
 
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Existing release tag to publish, e.g. v0.3.0.'
+        required: true
+        type: string
+      publish_vscode_marketplace:
+        description: Publish this tag to the VS Code Marketplace.
+        required: false
+        type: boolean
+        default: true
+      publish_open_vsx:
+        description: Publish this tag to Open VSX.
+        required: false
+        type: boolean
+        default: true
+      attach_github_release:
+        description: Attach the VSIX to the existing GitHub Release.
+        required: false
+        type: boolean
+        default: true
+
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'push' && github.ref || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,7 +44,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v4.4.1
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -36,12 +61,13 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           ref: ${{ needs.release.outputs.tag_name }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -63,20 +89,24 @@ jobs:
           fi
           echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
 
+      - name: Sign in with Entra workload identity federation
+        if: vars.PUBLISH_VSCODE_MARKETPLACE != 'false'
+        uses: azure/login@v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
       - name: Publish to VS Code Marketplace
         if: vars.PUBLISH_VSCODE_MARKETPLACE != 'false'
-        run: npm exec -- vsce publish --packagePath "${{ steps.vsix.outputs.path }}" --skip-duplicate
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npm exec -- vsce publish --azure-credential --packagePath "${{ steps.vsix.outputs.path }}" --skip-duplicate
 
       - name: Publish to Open VSX
         if: vars.PUBLISH_OPEN_VSX != 'false'
-        run: npm exec -- ovsx publish --skip-duplicate "${{ steps.vsix.outputs.path }}"
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npm exec -- ovsx publish --trusted-publishing --skip-duplicate "${{ steps.vsix.outputs.path }}"
 
       - name: Attach VSIX to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           tag_name: ${{ needs.release.outputs.tag_name }}
           files: ${{ steps.vsix.outputs.path }}
@@ -85,3 +115,82 @@ jobs:
       - name: Show release info
         run: |
           echo "Released ${{ needs.release.outputs.tag_name }}"
+
+  rescue:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: publish-${{ inputs.tag_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          ref: refs/tags/${{ inputs.tag_name }}
+
+      - name: Validate requested tag matches checked out commit
+        shell: bash
+        run: |
+          git fetch --force --tags
+          tag_ref="refs/tags/${{ inputs.tag_name }}"
+          if ! git rev-parse --verify "${tag_ref}" >/dev/null 2>&1; then
+            echo "Tag ${tag_ref} does not exist." >&2
+            exit 1
+          fi
+
+          head_commit="$(git rev-parse HEAD)"
+          tag_commit="$(git rev-list -n 1 "${tag_ref}")"
+
+          if [ "${head_commit}" != "${tag_commit}" ]; then
+            echo "Checked out commit ${head_commit} does not match tag ${tag_ref} (${tag_commit})." >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: rm -rf dist && mkdir -p dist && npm run package
+
+      - name: Locate VSIX
+        id: vsix
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(dist/*.vsix)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one VSIX in dist, found ${#files[@]}" >&2
+            printf '%s\n' "${files[@]}" >&2
+            exit 1
+          fi
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign in with Entra workload identity federation
+        if: inputs.publish_vscode_marketplace == true
+        uses: azure/login@v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Publish to VS Code Marketplace
+        if: inputs.publish_vscode_marketplace == true
+        run: npm exec --yes --package=@vscode/vsce@4.0.0 -- vsce publish --azure-credential --packagePath "${{ steps.vsix.outputs.path }}" --skip-duplicate
+
+      - name: Publish to Open VSX
+        if: inputs.publish_open_vsx == true
+        run: npm exec --yes --package=ovsx@1.2.0 -- ovsx publish --trusted-publishing --skip-duplicate "${{ steps.vsix.outputs.path }}"
+
+      - name: Attach VSIX to GitHub Release
+        if: inputs.attach_github_release == true
+        uses: softprops/action-gh-release@v2.6.2
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          files: ${{ steps.vsix.outputs.path }}
+          fail_on_unmatched_files: true

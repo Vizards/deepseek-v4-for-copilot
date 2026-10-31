@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import vscode from 'vscode';
 import { createUserFacingError } from '../client';
 import { logger } from '../logger';
@@ -17,12 +18,20 @@ import { formatRequestLogLine, type RequestKind } from './routing';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
+	pendingReasoningText: string;
+	reasoningRunId: string | undefined;
 	emittedToolCallIds: string[];
 	initialResponseNoticeReported: boolean;
 	replayMarkerReported: boolean;
 }
 
 const COPILOT_USAGE_DATA_PART_MIME = 'usage';
+
+/**
+ * Buffered reasoning characters before a part is reported. Parts in one run
+ * share an id and merge in the chat model, so this only reduces progress events.
+ */
+const REASONING_FLUSH_CHARS = 256;
 
 export interface StreamChatCompletionOptions {
 	prepared: PreparedChatRequest;
@@ -43,6 +52,8 @@ export function streamChatCompletion({
 }: StreamChatCompletionOptions): Promise<void> {
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
+		pendingReasoningText: '',
+		reasoningRunId: undefined,
 		emittedToolCallIds: [],
 		initialResponseNoticeReported: false,
 		replayMarkerReported: false,
@@ -54,6 +65,8 @@ export function streamChatCompletion({
 			prepared.request,
 			{
 				onContent: (content: string) => {
+					// Close the run before any other part, so the buffered tail keeps its id.
+					endReasoningRun(state, progress);
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
@@ -64,15 +77,18 @@ export function streamChatCompletion({
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
+					endReasoningRun(state, progress);
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					handleToolCall(toolCall, state, progress);
 				},
 
 				onError: (error: Error) => {
+					endReasoningRun(state, progress);
 					throw createUserFacingError(error);
 				},
 
 				onDone: () => {
+					endReasoningRun(state, progress);
 					reportReplayMarkerOnce(prepared, progress, state, 'done');
 					finalizeReplayDiagnostics(
 						prepared.trailingToolResultIds,
@@ -82,6 +98,8 @@ export function streamChatCompletion({
 				},
 
 				onUsage: (usage) => {
+					// Usage is reported last; close the run so its tail is not orphaned after it.
+					endReasoningRun(state, progress);
 					const charsPerToken = prepared.hasNativeImages
 						? getCharsPerToken()
 						: updateCharsPerToken(prepared.totalRequestChars, usage, getCharsPerToken());
@@ -216,11 +234,68 @@ function handleThinking(
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 ): void {
 	state.accumulatedReasoning += text;
+	state.pendingReasoningText += text;
+
+	// Report the first delta of a run at once so reasoning appears immediately.
+	if (
+		state.reasoningRunId === undefined ||
+		state.pendingReasoningText.length >= REASONING_FLUSH_CHARS
+	) {
+		reportReasoningRun(state, progress);
+	}
+}
+
+/**
+ * Report buffered reasoning as one part of the active run.
+ *
+ * The chat model merges consecutive thinking parts only while their ids match,
+ * and it treats an id-less part as anonymous. Without an id, the chat renderer
+ * stamps its own onto the part, which splits one reasoning burst into a part
+ * per delta. Sharing one id across the run keeps the burst whole.
+ */
+function reportReasoningRun(
+	state: ResponseStreamState,
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+): void {
+	const text = state.pendingReasoningText;
+	if (!text) {
+		return;
+	}
+
+	state.pendingReasoningText = '';
+	state.reasoningRunId ??= randomUUID();
 
 	// LanguageModelThinkingPart is a proposed API; the project root augmentation provides types.
 	progress.report(
-		new vscode.LanguageModelThinkingPart(text) as unknown as vscode.LanguageModelResponsePart,
+		new vscode.LanguageModelThinkingPart(
+			text,
+			state.reasoningRunId,
+		) as unknown as vscode.LanguageModelResponsePart,
 	);
+}
+
+/**
+ * End the active reasoning run, reporting anything still buffered.
+ *
+ * Never throws: the close runs ahead of content, tool calls, usage, and the
+ * replay marker, and a failed report must not skip any of them. The id is
+ * cleared even on failure so a later run cannot merge into a dead one.
+ */
+function endReasoningRun(
+	state: ResponseStreamState,
+	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
+): void {
+	try {
+		reportReasoningRun(state, progress);
+	} catch (error) {
+		try {
+			logger.warn('Failed to report buffered reasoning', error);
+		} catch {
+			// The run close must not throw, even when logging is unavailable.
+		}
+	} finally {
+		state.reasoningRunId = undefined;
+	}
 }
 
 function handleToolCall(

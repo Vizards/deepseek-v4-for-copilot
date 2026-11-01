@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import vscode from 'vscode';
 import { createUserFacingError } from '../client';
 import { logger } from '../logger';
@@ -17,6 +18,7 @@ import { formatRequestLogLine, type RequestKind } from './routing';
 
 interface ResponseStreamState {
 	accumulatedReasoning: string;
+	reasoningRunId: string | undefined;
 	emittedToolCallIds: string[];
 	initialResponseNoticeReported: boolean;
 	replayMarkerReported: boolean;
@@ -43,6 +45,7 @@ export function streamChatCompletion({
 }: StreamChatCompletionOptions): Promise<void> {
 	const state: ResponseStreamState = {
 		accumulatedReasoning: '',
+		reasoningRunId: undefined,
 		emittedToolCallIds: [],
 		initialResponseNoticeReported: false,
 		replayMarkerReported: false,
@@ -54,6 +57,7 @@ export function streamChatCompletion({
 			prepared.request,
 			{
 				onContent: (content: string) => {
+					state.reasoningRunId = undefined;
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					progress.report(new vscode.LanguageModelTextPart(content));
 				},
@@ -64,6 +68,7 @@ export function streamChatCompletion({
 				},
 
 				onToolCall: (toolCall: DeepSeekToolCall) => {
+					state.reasoningRunId = undefined;
 					reportInitialResponseNoticeOnce(progress, state, initialResponseNotice);
 					handleToolCall(toolCall, state, progress);
 				},
@@ -82,6 +87,7 @@ export function streamChatCompletion({
 				},
 
 				onUsage: (usage) => {
+					state.reasoningRunId = undefined;
 					const charsPerToken = prepared.hasNativeImages
 						? getCharsPerToken()
 						: updateCharsPerToken(prepared.totalRequestChars, usage, getCharsPerToken());
@@ -216,10 +222,15 @@ function handleThinking(
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 ): void {
 	state.accumulatedReasoning += text;
+	// Consecutive thinking deltas belong to one run, even across render updates.
+	state.reasoningRunId ??= randomUUID();
 
 	// LanguageModelThinkingPart is a proposed API; the project root augmentation provides types.
 	progress.report(
-		new vscode.LanguageModelThinkingPart(text) as unknown as vscode.LanguageModelResponsePart,
+		new vscode.LanguageModelThinkingPart(
+			text,
+			state.reasoningRunId,
+		) as unknown as vscode.LanguageModelResponsePart,
 	);
 }
 

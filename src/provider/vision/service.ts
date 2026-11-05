@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { t } from '../../i18n';
+import { visionDescriptionCache } from './cache';
 import { logInvalidVisionProxyApiEndpointConfig, logVisionApiEndpointSelected } from './log';
 import { VISION_PROXY_API_KEY_SECRET, VisionProxyConfigStore } from './sources/endpoint/config';
 import { createEndpointVisionDescriber } from './sources/endpoint';
@@ -20,6 +21,7 @@ export function createVisionService(context: vscode.ExtensionContext): {
 } {
 	const store = new VisionProxyConfigStore(context);
 	const vscodeLm = createVSCodeLanguageModelVisionDescriberGetter();
+	visionDescriptionCache.configure(context.globalStorageUri);
 
 	const reset = (): void => {
 		vscodeLm.reset();

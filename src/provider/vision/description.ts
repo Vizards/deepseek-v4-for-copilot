@@ -2,6 +2,7 @@ import vscode from 'vscode';
 import { t } from '../../i18n';
 import { toWellFormedString } from '../../json';
 import { createVisionProxyFailureNotice, createVisionProxyMissingNotice } from '../tools/notices';
+import { createVisionDescriptionCacheKey, visionDescriptionCache } from './cache';
 import {
 	IMAGE_DESCRIPTION_PREFIX,
 	IMAGE_DESCRIPTION_SUFFIX,
@@ -65,9 +66,24 @@ export function createVisionDescriptionSession(
 				return IMAGE_DESCRIPTION_UNAVAILABLE;
 			}
 
+			const prompt = getVisionPrompt();
+			const cacheKey = createVisionDescriptionCacheKey({
+				describerId: currentDescriber.id,
+				prompt,
+				images,
+			});
+			// Replay the previous description for this exact image set. Regenerating it
+			// would change the text, and every token after it would miss the cache.
+			const cachedDescription = await visionDescriptionCache.get(cacheKey);
+			if (cachedDescription !== undefined) {
+				stats.cachedImageMessages += 1;
+				recordImageOutcome(stats, owner, images.length, 'forwarded');
+				return wrapDescription(cachedDescription);
+			}
+
 			try {
 				const description = await currentDescriber.describe({
-					prompt: getVisionPrompt(),
+					prompt,
 					images,
 					token,
 				});
@@ -82,10 +98,9 @@ export function createVisionDescriptionSession(
 				}
 
 				stats.generatedImageMessages += 1;
+				visionDescriptionCache.set(cacheKey, description);
 				recordImageOutcome(stats, owner, images.length, 'forwarded');
-				return toWellFormedString(
-					IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX,
-				);
+				return wrapDescription(description);
 			} catch (error) {
 				if (isCancellation(error, token)) {
 					stats.unavailableImageMessages += 1;
@@ -113,6 +128,10 @@ export function createVisionDescriptionSession(
 			};
 		},
 	};
+}
+
+function wrapDescription(description: string): string {
+	return toWellFormedString(IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX);
 }
 
 function recordImageOutcome(

@@ -92,6 +92,34 @@ export function getNativeVisionRouting(): NativeVisionRouting {
 	return value === 'always' || value === 'never' ? value : 'auto';
 }
 
+export const DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS = 336;
+export const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 256;
+
+/**
+ * Lifetime of a cached vision description, in hours. 0 disables the cache.
+ *
+ * Descriptions are generated text, so the cache exists to keep a replayed image
+ * byte-identical across turns (a mutated description invalidates the entire
+ * DeepSeek prompt-cache prefix). Expiry bounds how stale a description may get.
+ */
+export function getVisionDescriptionCacheTtlHours(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<number>(
+		'visionDescriptionCacheTtlHours',
+		DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS,
+	);
+	return Number.isFinite(value) && value >= 0 ? value : DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS;
+}
+
+/**
+ * Whether cached descriptions survive an extension host restart.
+ * Off by default: descriptions contain image content in plain text.
+ */
+export function getVisionDescriptionCachePersist(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('visionDescriptionCachePersist', false);
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

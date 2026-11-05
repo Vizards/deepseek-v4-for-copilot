@@ -79,6 +79,8 @@ export interface VisionResolutionStats {
 	tool: VisionResolutionToolStats;
 	currentImageMessages: number;
 	generatedImageMessages: number;
+	// Descriptions served from the TTL cache instead of a new vision call.
+	cachedImageMessages: number;
 	replayedImageMessages: number;
 	omittedImageMessages: number;
 	unavailableImageMessages: number;

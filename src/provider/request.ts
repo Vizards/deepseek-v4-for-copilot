@@ -5,6 +5,7 @@ import { getApiModelId, getBaseUrl, getMaxTokens, getRequestHeaders } from '../c
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import type { DeepSeekRequest } from '../types';
+import { resolveNativeImageInput } from './capabilities';
 import { convertMessages, countMessageChars } from './convert';
 import {
 	dumpDeepSeekRequest,
@@ -74,7 +75,10 @@ export async function prepareChatRequest({
 	const modelDef = MODELS.find((m) => m.id === modelInfo.id);
 	const thinkingCapability = modelDef?.capabilities.thinking;
 	const isThinkingModel = Boolean(thinkingCapability);
-	const nativeImageInput = modelDef?.capabilities.nativeImageInput === true;
+	const nativeImageInput = resolveNativeImageInput(modelDef, {
+		baseUrl,
+		usesOfficialModelId: getApiModelId(modelInfo.id) === modelInfo.id,
+	}).nativeImageInput;
 	const maxTokens = getMaxTokens();
 	const visionResolution = await prepareVisionMessages({
 		messages,

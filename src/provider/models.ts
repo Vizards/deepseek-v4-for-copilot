@@ -39,23 +39,40 @@ export type ModelPickerChatInformation = vscode.LanguageModelChatInformation &
 		readonly configurationSchema?: ThinkingEffortConfigurationSchema;
 	};
 
+export interface ModelPickerOptions {
+	hasApiKey: boolean;
+	pricingCurrency?: PricingCurrency;
+	now?: Date;
+	usesOfficialModel?: boolean;
+	/**
+	 * Capability routing result. When it turns on native image input for an entry
+	 * whose catalog capability is proxy-only, the picker says so instead of
+	 * silently behaving differently from the catalog.
+	 */
+	nativeImageInput?: boolean;
+}
+
 export function toChatInfo(
 	m: ModelDefinition,
-	hasApiKey: boolean,
-	pricingCurrency?: PricingCurrency,
-	now = new Date(),
-	usesOfficialModel = true,
+	options: ModelPickerOptions,
 ): ModelPickerChatInformation {
+	const { hasApiKey, pricingCurrency, now = new Date(), usesOfficialModel = true } = options;
+	const nativeImageInput = options.nativeImageInput ?? (m.capabilities.nativeImageInput === true);
 	const retirement = getModelRetirementNotice(m.id, usesOfficialModel);
 	const modelDetail = resolveModelText(m, 'detail') ?? m.detail;
 	const modelTooltip = resolveModelText(m, 'tooltip');
 	const thinkingCapability = m.capabilities.thinking;
+	const detail = !hasApiKey
+		? t('auth.apiKeyRequiredDetail')
+		: nativeImageInput && m.capabilities.nativeImageInput !== true
+			? `${modelDetail}${t('model.detail.nativeVisionSuffix')}`
+			: modelDetail;
 	return {
 		id: m.id,
 		name: m.name,
 		family: m.family,
 		version: m.version,
-		detail: hasApiKey ? modelDetail : t('auth.apiKeyRequiredDetail'),
+		detail,
 		tooltip: hasApiKey ? modelTooltip : t('auth.apiKeyRequiredDetail'),
 		statusIcon: !hasApiKey || retirement ? new vscode.ThemeIcon('warning') : undefined,
 		...(retirement ? { warningText: { [retirement.code]: retirement.message } } : {}),

@@ -74,6 +74,24 @@ export function getStabilizeToolListEnabled(): boolean {
 	return config.get<boolean>('experimental.stabilizeToolList', false);
 }
 
+export type NativeVisionRouting = 'auto' | 'always' | 'never';
+
+/**
+ * How a model entry decides whether it accepts images natively.
+ *
+ * The retired Flash aliases (`deepseek-v4-flash`, `deepseek-v4-flash-vision-exp`)
+ * are documented as being served by DeepSeek-V4.1-Flash, which accepts images.
+ * Their catalog entry still describes the retired model, so `auto` follows the
+ * documented official routing: native image input on the official endpoint, the
+ * declared (proxy) capability everywhere else. Remapped model IDs and custom
+ * endpoints stay on the declared capability; `always` / `never` override either way.
+ */
+export function getNativeVisionRouting(): NativeVisionRouting {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<string>('nativeVisionRouting', 'auto');
+	return value === 'always' || value === 'never' ? value : 'auto';
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

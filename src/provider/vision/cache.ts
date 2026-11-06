@@ -12,6 +12,8 @@ const CACHE_FILE_NAME = 'vision-description-cache.json';
 const CACHE_FILE_VERSION = 1;
 const CACHE_FLUSH_DELAY_MS = 500;
 const HOURS_TO_MS = 60 * 60 * 1000;
+/** Upper bound for one shared generation, so a stalled describer cannot pin an entry. */
+const SHARED_GENERATION_TIMEOUT_MS = 120 * 1000;
 
 interface VisionDescriptionCacheEntry {
 	text: string;
@@ -23,10 +25,32 @@ interface PersistedVisionDescriptionCache {
 	entries: Record<string, VisionDescriptionCacheEntry>;
 }
 
+interface InflightGeneration {
+	promise: Promise<string>;
+}
+
+/**
+ * Thrown to one waiter whose own request was cancelled. Other waiters keep their
+ * generation: their cancellation token never touched the shared work.
+ */
+export class VisionDescriptionAbandonedError extends Error {
+	constructor() {
+		super('The requesting turn was cancelled while waiting for a vision description');
+		this.name = 'VisionDescriptionAbandonedError';
+	}
+}
+
 export interface VisionDescriptionResolution {
 	text: string;
-	/** `cache` replayed a stored description, `shared` joined an in-flight call, `generated` called the describer. */
+	/** `cache` replayed a stored description, `shared` joined an in-flight call, `generated` started one. */
 	source: 'cache' | 'shared' | 'generated';
+}
+
+export interface VisionDescriptionRequest {
+	/** The calling turn's token. Cancelling it abandons only this waiter. */
+	token: vscode.CancellationToken;
+	/** Runs the describer against the shared token, not the caller's. */
+	generate: (sharedToken: vscode.CancellationToken) => Promise<string>;
 }
 
 /**
@@ -63,12 +87,15 @@ export function createVisionDescriptionCacheKey(input: {
  * (14 days by default) and the store is capped, so a long session cannot grow it
  * without limit.
  *
- * Two requests that hit the same uncached image share one generation: paying twice
- * would be wasteful, and the two different texts would make later replays disagree.
+ * Two requests that need the same uncached image share one generation: paying twice
+ * is wasteful, and two different texts would make later replays disagree. The shared
+ * generation owns its cancellation: it runs on a private token source with its own
+ * timeout, so one caller cancelling its turn only abandons that caller. Its result
+ * still lands in the cache for the next turn.
  */
 class VisionDescriptionCache {
 	private entries = new Map<string, VisionDescriptionCacheEntry>();
-	private inflight = new Map<string, Promise<string>>();
+	private inflight = new Map<string, InflightGeneration>();
 	private globalStorageUri: vscode.Uri | undefined;
 	private loadPromise: Promise<void> | undefined;
 	private flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -85,18 +112,16 @@ class VisionDescriptionCache {
 	}
 
 	/** Resolve one description, reusing the store or an in-flight generation. */
-	async resolve(
-		key: string,
-		generate: () => Promise<string>,
-	): Promise<VisionDescriptionResolution> {
-		const existingGeneration = this.inflight.get(key);
-		if (existingGeneration) {
-			return { text: await existingGeneration, source: 'shared' };
+	async resolve(key: string, request: VisionDescriptionRequest): Promise<VisionDescriptionResolution> {
+		const pending = this.inflight.get(key);
+		if (pending) {
+			return { text: await this.awaitGeneration(pending, request.token), source: 'shared' };
 		}
 
 		if (!this.isEnabled()) {
 			// Coalescing still applies: identical inputs must produce identical text.
-			return { text: await this.startGeneration(key, generate, false), source: 'generated' };
+			const generation = this.startGeneration(key, request, false);
+			return { text: await this.awaitGeneration(generation, request.token), source: 'generated' };
 		}
 
 		await this.ensureLoaded();
@@ -105,13 +130,14 @@ class VisionDescriptionCache {
 			return { text: cached, source: 'cache' };
 		}
 
-		const pending = this.inflight.get(key);
-		if (pending) {
-			// A load or another caller may have filled the gap while we were awaiting.
-			return { text: await pending, source: 'shared' };
+		const raced = this.inflight.get(key);
+		if (raced) {
+			// The load may have taken long enough for another caller to start generating.
+			return { text: await this.awaitGeneration(raced, request.token), source: 'shared' };
 		}
 
-		return { text: await this.startGeneration(key, generate, true), source: 'generated' };
+		const generation = this.startGeneration(key, request, true);
+		return { text: await this.awaitGeneration(generation, request.token), source: 'generated' };
 	}
 
 	/** Test/diagnostic hook: number of live entries. */
@@ -119,28 +145,66 @@ class VisionDescriptionCache {
 		return this.entries.size;
 	}
 
+	/**
+	 * Wait for the shared generation, but give up as soon as this waiter's own turn is
+	 * cancelled. The generation itself keeps running on its private token.
+	 */
+	private async awaitGeneration(
+		generation: InflightGeneration,
+		token: vscode.CancellationToken,
+	): Promise<string> {
+		if (token.isCancellationRequested) {
+			throw new VisionDescriptionAbandonedError();
+		}
+
+		let subscription: vscode.Disposable | undefined;
+		try {
+			return await Promise.race([
+				generation.promise,
+				new Promise<never>((_resolve, reject) => {
+					subscription = token.onCancellationRequested(() => {
+						reject(new VisionDescriptionAbandonedError());
+					});
+				}),
+			]);
+		} finally {
+			subscription?.dispose();
+		}
+	}
+
 	private startGeneration(
 		key: string,
-		generate: () => Promise<string>,
+		request: VisionDescriptionRequest,
 		store: boolean,
-	): Promise<string> {
-		const promise = (async () => {
-			const text = await generate();
-			if (store) {
-				this.storeEntry(key, text);
-			}
-			return text;
-		})();
-
-		this.inflight.set(key, promise);
-		// Failed (including cancelled) generations must disappear so a retry is possible.
-		const release = (): void => {
-			if (this.inflight.get(key) === promise) {
-				this.inflight.delete(key);
-			}
+	): InflightGeneration {
+		const source = new vscode.CancellationTokenSource();
+		const timeout = setTimeout(() => source.cancel(), SHARED_GENERATION_TIMEOUT_MS);
+		// Identity holder, so the finally block can tell whether this entry is still
+		// the live one without referencing the not-yet-assigned promise.
+		const generation: InflightGeneration = {
+			promise: Promise.resolve(''),
 		};
-		void promise.then(release, release);
-		return promise;
+		generation.promise = (async () => {
+			try {
+				const text = await request.generate(source.token);
+				if (store) {
+					this.storeEntry(key, text);
+				}
+				return text;
+			} finally {
+				clearTimeout(timeout);
+				source.dispose();
+				// Failed (including timed out) generations must disappear so retries can run.
+				if (this.inflight.get(key) === generation) {
+					this.inflight.delete(key);
+				}
+			}
+		})();
+		this.inflight.set(key, generation);
+		// Keep an unobserved rejection from surfacing as an unhandled rejection when
+		// every waiter abandoned the generation.
+		void generation.promise.catch(() => undefined);
+		return generation;
 	}
 
 	private readEntry(key: string): string | undefined {
@@ -170,7 +234,9 @@ class VisionDescriptionCache {
 	}
 
 	private isPersistent(): boolean {
-		return this.isEnabled() && getVisionDescriptionCachePersist() && this.globalStorageUri !== undefined;
+		return (
+			this.isEnabled() && getVisionDescriptionCachePersist() && this.globalStorageUri !== undefined
+		);
 	}
 
 	/**

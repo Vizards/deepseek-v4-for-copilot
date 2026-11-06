@@ -147,6 +147,41 @@
             "experimental"
           ]
         },
+        "deepseek-copilot.nativeVisionRouting": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "markdownEnumDescriptions": [
+            "%deepseek-copilot.config.nativeVisionRouting.auto.description%",
+            "%deepseek-copilot.config.nativeVisionRouting.always.description%",
+            "%deepseek-copilot.config.nativeVisionRouting.never.description%"
+          ],
+          "markdownDescription": "%deepseek-copilot.config.nativeVisionRouting.description%",
+          "tags": [
+            "advanced"
+          ]
+        },
+        "deepseek-copilot.visionDescriptionCacheTtlHours": {
+          "type": "number",
+          "default": 336,
+          "minimum": 0,
+          "markdownDescription": "%deepseek-copilot.config.visionDescriptionCacheTtlHours.description%",
+          "tags": [
+            "advanced"
+          ]
+        },
+        "deepseek-copilot.visionDescriptionCachePersist": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%deepseek-copilot.config.visionDescriptionCachePersist.description%",
+          "tags": [
+            "advanced"
+          ]
+        },
         "deepseek-copilot.modelIdOverrides": {
           "type": "object",
           "default": {

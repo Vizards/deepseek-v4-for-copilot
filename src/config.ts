@@ -74,6 +74,52 @@ export function getStabilizeToolListEnabled(): boolean {
 	return config.get<boolean>('experimental.stabilizeToolList', false);
 }
 
+export type NativeVisionRouting = 'auto' | 'always' | 'never';
+
+/**
+ * How a model entry decides whether it accepts images natively.
+ *
+ * The retired Flash aliases (`deepseek-v4-flash`, `deepseek-v4-flash-vision-exp`)
+ * are documented as being served by DeepSeek-V4.1-Flash, which accepts images.
+ * Their catalog entry still describes the retired model, so `auto` follows the
+ * documented official routing: native image input on the official endpoint, the
+ * declared (proxy) capability everywhere else. Remapped model IDs and custom
+ * endpoints stay on the declared capability; `always` / `never` override either way.
+ */
+export function getNativeVisionRouting(): NativeVisionRouting {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<string>('nativeVisionRouting', 'auto');
+	return value === 'always' || value === 'never' ? value : 'auto';
+}
+
+export const DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS = 336;
+export const MAX_VISION_DESCRIPTION_CACHE_ENTRIES = 256;
+
+/**
+ * Lifetime of a cached vision description, in hours. 0 disables the cache.
+ *
+ * Descriptions are generated text, so the cache exists to keep a replayed image
+ * byte-identical across turns (a mutated description invalidates the entire
+ * DeepSeek prompt-cache prefix). Expiry bounds how stale a description may get.
+ */
+export function getVisionDescriptionCacheTtlHours(): number {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const value = config.get<number>(
+		'visionDescriptionCacheTtlHours',
+		DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS,
+	);
+	return Number.isFinite(value) && value >= 0 ? value : DEFAULT_VISION_DESCRIPTION_CACHE_TTL_HOURS;
+}
+
+/**
+ * Whether cached descriptions survive an extension host restart.
+ * Off by default: descriptions contain image content in plain text.
+ */
+export function getVisionDescriptionCachePersist(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('visionDescriptionCachePersist', false);
+}
+
 /**
  * Migrate the legacy boolean `deepseek-copilot.debug` setting to `debugMode`.
  *

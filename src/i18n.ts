@@ -28,6 +28,7 @@ const zh: Translations = {
 	'model.flash.detail': '快速高效',
 	'model.pro.detail': '深度推理',
 	'model.flash-vision-exp.detail': '原生视觉实验模型',
+	'model.detail.nativeVisionSuffix': ' · 原生图像输入',
 	'model.flash.tooltip': '快速高效的 DeepSeek V4 模型，推理能力接近 V4 Pro，API 定价更经济。',
 	'model.pro.tooltip': 'DeepSeek V4 模型，面向 Agent 编程、广泛世界知识和高阶推理任务。',
 	'model.pricing.currentPeak': '高峰时段',
@@ -248,6 +249,7 @@ const en: Translations = {
 	'model.flash.detail': 'Fast, general-purpose model',
 	'model.pro.detail': 'Most capable reasoning model',
 	'model.flash-vision-exp.detail': 'Experimental native vision model',
+	'model.detail.nativeVisionSuffix': ' · native image input',
 	'model.flash.tooltip':
 		'Fast, efficient DeepSeek V4 model with reasoning close to V4 Pro and economical API pricing.',
 	'model.pro.tooltip':

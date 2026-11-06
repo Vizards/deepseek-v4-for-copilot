@@ -1,6 +1,13 @@
 import { t } from '../i18n';
 
-const LEGACY_FLASH_MODEL_IDS = new Set(['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp']);
+/**
+ * Model IDs the official API keeps accepting while serving DeepSeek-V4.1-Flash.
+ * Exported so capability routing can follow the same documented redirect.
+ */
+export const LEGACY_FLASH_MODEL_IDS: ReadonlySet<string> = new Set([
+	'deepseek-v4-flash',
+	'deepseek-v4-flash-vision-exp',
+]);
 
 interface ModelRetirementNotice {
 	code: 'model_deprecated';

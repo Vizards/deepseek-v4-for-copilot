@@ -45,6 +45,15 @@ export interface VisionDescriptionRequest {
 export interface VisionDescriber {
 	readonly id: string;
 	readonly source: VisionProxySource;
+	/**
+	 * Stable identity of everything that can change the generated text: the source,
+	 * the effective endpoint and model, and any output-affecting payload mapping.
+	 * Description caching keys on it, so re-pointing the backend must miss.
+	 *
+	 * Credentials are deliberately excluded: rotating a token does not change what
+	 * the model returns, and including it would throw the cache away on every login.
+	 */
+	readonly cacheIdentity: string;
 	describe(request: VisionDescriptionRequest): Promise<string>;
 }
 
@@ -79,6 +88,9 @@ export interface VisionResolutionStats {
 	tool: VisionResolutionToolStats;
 	currentImageMessages: number;
 	generatedImageMessages: number;
+	// Descriptions served without a new vision call: a cache hit or a coalesced
+	// in-flight generation.
+	cachedImageMessages: number;
 	replayedImageMessages: number;
 	omittedImageMessages: number;
 	unavailableImageMessages: number;

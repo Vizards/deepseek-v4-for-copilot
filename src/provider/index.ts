@@ -5,6 +5,7 @@ import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl, normalizeBaseUrl } from '../endpoint';
 import { t } from '../i18n';
 import { logger } from '../logger';
+import { resolveNativeImageInput } from './capabilities';
 import { createCacheDiagnosticsRecorder, dumpProviderInput } from './debug';
 import { toChatInfo } from './models';
 import { BalanceCurrencyResolver } from './pricing/currency';
@@ -133,20 +134,23 @@ export class DeepSeekChatProvider implements vscode.LanguageModelChatProvider {
 	): Promise<vscode.LanguageModelChatInformation[]> {
 		const hasKey = await this.authManager.hasApiKey();
 		const pricingCurrency = this.balanceCurrencyResolver.getDisplayCurrency();
-		const isOfficialEndpoint = isOfficialDeepSeekBaseUrl(normalizeBaseUrl(getBaseUrl()));
+		const baseUrl = normalizeBaseUrl(getBaseUrl());
+		const isOfficialEndpoint = isOfficialDeepSeekBaseUrl(baseUrl);
 		const now = new Date();
 		if (hasKey) {
 			this.balanceCurrencyResolver.refreshInBackground();
 		}
-		return MODELS.map((model) =>
-			toChatInfo(
-				model,
-				hasKey,
+		return MODELS.map((model) => {
+			const usesOfficialModelId = getApiModelId(model.id) === model.id;
+			return toChatInfo(model, {
+				hasApiKey: hasKey,
 				pricingCurrency,
 				now,
-				isOfficialEndpoint && getApiModelId(model.id) === model.id,
-			),
-		);
+				usesOfficialModel: isOfficialEndpoint && usesOfficialModelId,
+				nativeImageInput: resolveNativeImageInput(model, { baseUrl, usesOfficialModelId })
+					.nativeImageInput,
+			});
+		});
 	}
 
 	async provideLanguageModelChatResponse(

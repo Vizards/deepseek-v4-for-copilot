@@ -20,6 +20,25 @@ export function safeStringify(value: unknown): string {
 	return json;
 }
 
+/** `JSON.stringify` with sorted object keys, so equal shapes serialize identically. */
+export function stableStringify(value: unknown): string {
+	if (value === null || typeof value !== 'object') {
+		return JSON.stringify(value) ?? 'null';
+	}
+
+	if (Array.isArray(value)) {
+		return `[${value.map(stableStringify).join(',')}]`;
+	}
+
+	const entries = Object.entries(value as Record<string, unknown>)
+		.filter(([, entryValue]) => entryValue !== undefined)
+		.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+
+	return `{${entries
+		.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`)
+		.join(',')}}`;
+}
+
 export function toWellFormedString(value: string): string {
 	const toWellFormed = (value as WellFormedString).toWellFormed;
 	if (typeof toWellFormed === 'function') {

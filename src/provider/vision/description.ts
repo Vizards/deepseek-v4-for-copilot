@@ -68,25 +68,18 @@ export function createVisionDescriptionSession(
 
 			const prompt = getVisionPrompt();
 			const cacheKey = createVisionDescriptionCacheKey({
-				describerId: currentDescriber.id,
+				cacheIdentity: currentDescriber.cacheIdentity,
 				prompt,
 				images,
 			});
-			// Replay the previous description for this exact image set. Regenerating it
-			// would change the text, and every token after it would miss the cache.
-			const cachedDescription = await visionDescriptionCache.get(cacheKey);
-			if (cachedDescription !== undefined) {
-				stats.cachedImageMessages += 1;
-				recordImageOutcome(stats, owner, images.length, 'forwarded');
-				return wrapDescription(cachedDescription);
-			}
 
 			try {
-				const description = await currentDescriber.describe({
-					prompt,
-					images,
-					token,
-				});
+				// One text per backend, prompt and image set: a replay must never mutate,
+				// and two concurrent requests must not each buy their own version of it.
+				const resolution = await visionDescriptionCache.resolve(cacheKey, () =>
+					currentDescriber.describe({ prompt, images, token }),
+				);
+				const description = resolution.text;
 				if (description.length === 0) {
 					stats.failedImageMessages += 1;
 					recordImageOutcome(stats, owner, images.length, 'dropped');
@@ -97,8 +90,11 @@ export function createVisionDescriptionSession(
 					return IMAGE_DESCRIPTION_UNAVAILABLE;
 				}
 
-				stats.generatedImageMessages += 1;
-				visionDescriptionCache.set(cacheKey, description);
+				if (resolution.source === 'generated') {
+					stats.generatedImageMessages += 1;
+				} else {
+					stats.cachedImageMessages += 1;
+				}
 				recordImageOutcome(stats, owner, images.length, 'forwarded');
 				return wrapDescription(description);
 			} catch (error) {

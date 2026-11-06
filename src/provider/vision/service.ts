@@ -95,6 +95,7 @@ function createInvalidApiEndpointDescriber(error: unknown): VisionDescriber {
 	return {
 		id: 'api-endpoint:invalid-configuration',
 		source: 'api-endpoint',
+		cacheIdentity: 'api-endpoint:invalid-configuration',
 		async describe(): Promise<string> {
 			if (isVisionProxyError(error)) {
 				throw error;

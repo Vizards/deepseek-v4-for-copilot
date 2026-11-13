@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.6](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.5...v0.9.6) (2026-11-13)
+
+
+### Bug Fixes
+
+* declare Agents Window support ([#312](https://github.com/Vizards/deepseek-v4-for-copilot/issues/312)) ([ce4c261](https://github.com/Vizards/deepseek-v4-for-copilot/commit/ce4c2619ec0808caee659f55295e121a9ce6b6d9)), closes [#309](https://github.com/Vizards/deepseek-v4-for-copilot/issues/309)
+
 ## [0.9.5](https://github.com/Vizards/deepseek-v4-for-copilot/compare/v0.9.4...v0.9.5) (2026-11-01)
 
 

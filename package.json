@@ -39,6 +39,11 @@
     "onStartupFinished"
   ],
   "enabledApiProposals": [],
+  "capabilities": {
+    "agentsWindow": {
+      "supported": true
+    }
+  },
   "main": "./out/extension.js",
   "contributes": {
     "languageModelChatProviders": [

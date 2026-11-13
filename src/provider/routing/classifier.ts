@@ -13,6 +13,7 @@ export type RequestKind =
 	| 'git-branch-name'
 	| 'git-commit-message'
 	| 'rename-suggestions'
+	| 'tool-permission-judge'
 	| 'background'
 	| 'unknown';
 
@@ -31,6 +32,10 @@ const GIT_COMMIT_MESSAGE_PREFIX =
 	'You are an AI programming assistant, helping a software developer to come with the best git commit message';
 const RENAME_SUGGESTIONS_PREFIX = 'You are a distinguished software engineer';
 const MAIN_AGENT_PREFIX = 'You are an expert AI programming assistant';
+// Copilot CLI asks the selected model to judge one proposed tool action per tool call
+// while its approval mode is "assisted". Labelling that request keeps its cost visible
+// in the log; its thinking level is left to the host and the user's model configuration.
+const TOOL_PERMISSION_JUDGE_PREFIX = 'You judge one proposed developer-tool action';
 const TERMINAL_NOTIFICATION_PATTERN = /^\[Terminal\s+\S+\s+notification:/;
 const REQUEST_KINDS_WITH_FORCED_NONE_THINKING = new Set<RequestKind>([
 	'todo-tracker',
@@ -121,6 +126,9 @@ function classifyRequest(input: {
 	}
 	if (firstText.startsWith(RENAME_SUGGESTIONS_PREFIX)) {
 		return 'rename-suggestions';
+	}
+	if (firstText.startsWith(TOOL_PERMISSION_JUDGE_PREFIX)) {
+		return 'tool-permission-judge';
 	}
 	if (
 		firstText.startsWith(MAIN_AGENT_PREFIX) ||

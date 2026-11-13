@@ -111,6 +111,8 @@ API Key 存储在 VS Code 的 `SecretStorage` 中（macOS 钥匙串 / Windows �
 | `deepseek-copilot.maxTokens` | `0` | 最大输出 Token 数（`0` = API 默认值）。可用于成本控制 |
 | `deepseek-copilot.modelIdOverrides` | 预填官方 ID 映射 | 各 DeepSeek 模型入口对应的 API 模型 ID。仅在使用模型名不同的兼容第三方 API 时修改 |
 | `deepseek-copilot.debugMode` | `minimal` | 诊断模式：`minimal` 仅上报 token 用量，`metadata` 输出隐私安全日志，`verbose` 将完整请求 dump 和 pipeline snapshot 写入扩展 global storage。完整 dump 可能包含敏感提示词文本、工具定义、文件片段和图片描述。使用 `DeepSeek: 打开请求 Dump 目录` 打开 dump 位置 |
+| `deepseek-copilot.visionDescriptionCacheTtlHours` | `336` | 同一张图片的视觉代理描述可复用的时长（小时，`0` 表示不复用）。复用后历史图片保持一致，prompt 缓存前缀才不会被断开 |
+| `deepseek-copilot.visionDescriptionCachePersist` | `false` | 把描述缓存写入扩展 global storage，重启后仍可复用。描述以纯文本形式包含图片内容 |
 | `deepseek-copilot.visionModel` | *(自动)* | V4 Flash 和 Pro 使用的视觉代理。自动模式会在可用时选择 Flash Vision Exp；也可通过 `DeepSeek: 配置视觉代理` 改用其他 VS Code 模型或 API 端点 |
 | `deepseek-copilot.visionPrompt` | *(内置)* | V4 Flash/Pro 的视觉代理用于描述图片附件的提示词，不影响 V4.1 Flash 或 Flash Vision Exp 的原生图片请求 |
 | `deepseek-copilot.experimental.stabilizeToolList` | `false` | 实验性设置。尝试预先激活 VS Code/Copilot 的虚拟工具，让传给 DeepSeek API 的 `tools` 参数在多轮对话中更完整、更稳定。当已启用工具跨轮次变化时，可能提高上下文缓存命中率。代价是 input tokens 可能增加；缓存命中的 input tokens 单价更低，但仍会计入用量。64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化 |

@@ -1,3 +1,4 @@
+import { stableStringify } from '../../../../json';
 import { VisionProxyClient } from '../../protocols/client';
 import type { VisionDescriptionRequest, VisionDescriber, VisionProxyConfig } from '../../types';
 
@@ -19,6 +20,12 @@ class EndpointVisionDescriber implements VisionDescriber {
 
 	get id(): string {
 		return `${this.config.providerFamily}:${this.config.modelId}`;
+	}
+
+	get cacheIdentity(): string {
+		const { providerFamily, apiType, modelId, url, extraBody } = this.config;
+		const payload = extraBody ? stableStringify(extraBody) : '';
+		return `api-endpoint:${providerFamily}:${apiType}:${modelId}:${url}:${payload}`;
 	}
 
 	describe(request: VisionDescriptionRequest): Promise<string> {

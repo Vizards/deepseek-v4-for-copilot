@@ -22,6 +22,7 @@ export function createVisionResolutionStats(): VisionResolutionStats {
 		},
 		currentImageMessages: 0,
 		generatedImageMessages: 0,
+		cachedImageMessages: 0,
 		replayedImageMessages: 0,
 		omittedImageMessages: 0,
 		unavailableImageMessages: 0,

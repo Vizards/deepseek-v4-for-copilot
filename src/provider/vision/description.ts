@@ -3,6 +3,11 @@ import { t } from '../../i18n';
 import { toWellFormedString } from '../../json';
 import { createVisionProxyFailureNotice, createVisionProxyMissingNotice } from '../tools/notices';
 import {
+	createVisionDescriptionCacheKey,
+	VisionDescriptionAbandonedError,
+	visionDescriptionCache,
+} from './cache';
+import {
 	IMAGE_DESCRIPTION_PREFIX,
 	IMAGE_DESCRIPTION_SUFFIX,
 	IMAGE_DESCRIPTION_UNAVAILABLE,
@@ -65,12 +70,24 @@ export function createVisionDescriptionSession(
 				return IMAGE_DESCRIPTION_UNAVAILABLE;
 			}
 
+			const prompt = getVisionPrompt();
+			const cacheKey = createVisionDescriptionCacheKey({
+				cacheIdentity: currentDescriber.cacheIdentity,
+				prompt,
+				images,
+			});
+
 			try {
-				const description = await currentDescriber.describe({
-					prompt: getVisionPrompt(),
-					images,
+				// One text per backend, prompt and image set: a replay must never mutate,
+				// and two concurrent requests must not each buy their own version of it.
+				const resolution = await visionDescriptionCache.resolve(cacheKey, {
 					token,
+					// The shared work runs on the cache's own token: cancelling this turn
+					// abandons only this waiter, never another request's description.
+					generate: (sharedToken) =>
+						currentDescriber.describe({ prompt, images, token: sharedToken }),
 				});
+				const description = resolution.text;
 				if (description.length === 0) {
 					stats.failedImageMessages += 1;
 					recordImageOutcome(stats, owner, images.length, 'dropped');
@@ -81,13 +98,15 @@ export function createVisionDescriptionSession(
 					return IMAGE_DESCRIPTION_UNAVAILABLE;
 				}
 
-				stats.generatedImageMessages += 1;
+				if (resolution.source === 'generated') {
+					stats.generatedImageMessages += 1;
+				} else {
+					stats.cachedImageMessages += 1;
+				}
 				recordImageOutcome(stats, owner, images.length, 'forwarded');
-				return toWellFormedString(
-					IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX,
-				);
+				return wrapDescription(description);
 			} catch (error) {
-				if (isCancellation(error, token)) {
+				if (error instanceof VisionDescriptionAbandonedError || isCancellation(error, token)) {
 					stats.unavailableImageMessages += 1;
 					recordImageOutcome(stats, owner, images.length, 'dropped');
 					return IMAGE_DESCRIPTION_UNAVAILABLE;
@@ -113,6 +132,10 @@ export function createVisionDescriptionSession(
 			};
 		},
 	};
+}
+
+function wrapDescription(description: string): string {
+	return toWellFormedString(IMAGE_DESCRIPTION_PREFIX + description + IMAGE_DESCRIPTION_SUFFIX);
 }
 
 function recordImageOutcome(

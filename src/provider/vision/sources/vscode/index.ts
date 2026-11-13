@@ -100,6 +100,10 @@ export class VSCodeLanguageModelVisionDescriber implements VisionDescriber {
 		return this.model.id;
 	}
 
+	get cacheIdentity(): string {
+		return `vscode-lm:${this.model.vendor}:${this.model.family}:${this.model.id}`;
+	}
+
 	async describe(request: VisionDescriptionRequest): Promise<string> {
 		const visionMsg = vscode.LanguageModelChatMessage.User([
 			...request.images.map(

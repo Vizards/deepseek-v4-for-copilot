@@ -130,7 +130,7 @@ export class DeepSeekClient {
 						}
 
 						// Thinking content → report with correct field name so VS Code renders collapsible blocks
-						const reasoning = choice.delta.reasoning_content;
+						const reasoning = choice.delta.reasoning_content ?? choice.delta.reasoning;
 						if (reasoning) {
 							callbacks.onThinking(reasoning);
 						}

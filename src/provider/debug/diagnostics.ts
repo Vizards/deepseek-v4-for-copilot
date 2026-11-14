@@ -978,6 +978,7 @@ function formatVisionTrace(
 			`toolDropped=${toolDroppedImageParts}`,
 			`current=${pipelineStats.currentImageMessages}`,
 			`generated=${pipelineStats.generatedImageMessages}`,
+			`cached=${pipelineStats.cachedImageMessages}`,
 			`replayed=${pipelineStats.replayedImageMessages}`,
 			`omitted=${pipelineStats.omittedImageMessages}`,
 		);
@@ -1028,6 +1029,7 @@ function hasVisionPipelineActivity(stats: VisionPipelineStats | undefined): bool
 		stats.tool.droppedImageParts > 0 ||
 		stats.currentImageMessages > 0 ||
 		stats.generatedImageMessages > 0 ||
+		stats.cachedImageMessages > 0 ||
 		stats.replayedImageMessages > 0 ||
 		stats.omittedImageMessages > 0 ||
 		stats.unavailableImageMessages > 0 ||

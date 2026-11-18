@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import vscode from 'vscode';
 import { createUserFacingError } from '../client';
+import { COPILOT_USAGE_DATA_PART_MIME } from '../consts';
 import { logger } from '../logger';
 import type { DeepSeekToolCall, DeepSeekUsage } from '../types';
 import {
@@ -23,8 +24,6 @@ interface ResponseStreamState {
 	initialResponseNoticeReported: boolean;
 	replayMarkerReported: boolean;
 }
-
-const COPILOT_USAGE_DATA_PART_MIME = 'usage';
 
 export interface StreamChatCompletionOptions {
 	prepared: PreparedChatRequest;
@@ -50,6 +49,9 @@ export function streamChatCompletion({
 		initialResponseNoticeReported: false,
 		replayMarkerReported: false,
 	};
+	// Characters in the body the client sends. Calibration pairs it with the prompt
+	// token count the server reports for that same body.
+	let encodedRequestChars = 0;
 	const cancelListener = observeCancellationToken(token, prepared.cacheDiagnostics);
 
 	return prepared.client
@@ -86,11 +88,19 @@ export function streamChatCompletion({
 					);
 				},
 
+				onRequestEncoded: (bodyChars: number) => {
+					encodedRequestChars = bodyChars;
+				},
+
 				onUsage: (usage) => {
 					state.reasoningRunId = undefined;
+					// Turns carrying native images keep the ratio frozen. Their body is dominated by
+					// base64, which the provider tokenizes far denser than text, and
+					// finalizeVisionResolutionStats sets hasNativeImages from the image_url parts of
+					// the converted payload, so this gate covers every body that holds one.
 					const charsPerToken = prepared.hasNativeImages
 						? getCharsPerToken()
-						: updateCharsPerToken(prepared.totalRequestChars, usage, getCharsPerToken());
+						: updateCharsPerToken(encodedRequestChars, usage, getCharsPerToken());
 					if (!prepared.hasNativeImages) {
 						setCharsPerToken(charsPerToken);
 					}

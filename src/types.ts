@@ -106,6 +106,8 @@ export interface StreamCallbacks {
 	onError: (error: Error) => void;
 	onDone: () => void;
 	onUsage?: (usage: DeepSeekUsage) => void;
+	// Character length of the serialized request body, reported before it is sent.
+	onRequestEncoded?: (bodyChars: number) => void;
 }
 
 // ---- Model definitions ----

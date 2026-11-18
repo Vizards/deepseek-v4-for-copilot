@@ -5,7 +5,7 @@ import { getApiModelId, getBaseUrl, getMaxTokens, getRequestHeaders } from '../c
 import { MODELS } from '../consts';
 import { isOfficialDeepSeekBaseUrl } from '../endpoint';
 import type { DeepSeekRequest } from '../types';
-import { convertMessages, countMessageChars } from './convert';
+import { convertMessages } from './convert';
 import {
 	dumpDeepSeekRequest,
 	type CacheDiagnosticsRecorder,
@@ -27,7 +27,6 @@ export interface PreparedChatRequest {
 	client: DeepSeekClient;
 	request: DeepSeekRequest;
 	isThinkingModel: boolean;
-	totalRequestChars: number;
 	hasNativeImages: boolean;
 	trailingToolResultIds: string[];
 	cacheDiagnostics: CacheDiagnosticsRun;
@@ -89,7 +88,6 @@ export async function prepareChatRequest({
 	finalizeVisionResolutionStats(visionResolution.stats, deepseekMessages);
 	const tools = prepareRequestTools(modelDef?.capabilities.toolCalling, options);
 
-	const totalRequestChars = countMessageChars(deepseekMessages);
 	const hasNativeImages =
 		visionResolution.stats.imageHandlingMode === 'native' &&
 		visionResolution.stats.input.forwardedImageParts +
@@ -161,7 +159,6 @@ export async function prepareChatRequest({
 		client,
 		request,
 		isThinkingModel,
-		totalRequestChars,
 		hasNativeImages,
 		trailingToolResultIds: collectTrailingToolResultIds(deepseekMessages),
 		cacheDiagnostics: diagnosticsRun,

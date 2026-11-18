@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import vscode from 'vscode';
 import { getDebugLoggingEnabled } from '../../config';
-import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
+import { HOST_CACHE_CONTROL_DATA_PART_MIME, LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { logger } from '../../logger';
 import type { DeepSeekMessage, DeepSeekRequest, DeepSeekTool, DeepSeekUsage } from '../../types';
 import { deepSeekContentToText } from '../content';
@@ -17,10 +17,10 @@ import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
 import type { ActivatePreflightInspection } from '../tools/preflight';
 import type { VisionResolutionStats as VisionPipelineStats, VisionProxySource } from '../vision';
 import { IMAGE_DESCRIPTION_UNAVAILABLE } from '../vision/consts';
+import { isImageDataPart } from '../vision/normalize';
 
 const LARGE_MESSAGE_CHARS = 10_000;
 const HASH_WINDOW_CHARS = 2_048;
-const HOST_CACHE_CONTROL_MIME = 'cache_control';
 const SYSTEM_PROMPT_SECTION_MAX_LINES = 40;
 const SAFE_SYSTEM_PROMPT_TAGS = new Set([
 	'agents',
@@ -913,10 +913,6 @@ function countImageDataBytes(message: vscode.LanguageModelChatRequestMessage): n
 	return bytes;
 }
 
-function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
-	return part instanceof vscode.LanguageModelDataPart && part.mimeType.startsWith('image/');
-}
-
 function getMessageText(message: vscode.LanguageModelChatRequestMessage): string {
 	let text = '';
 	for (const part of message.content) {
@@ -1091,14 +1087,22 @@ function formatVscodeMessageTrace(
 			if (part instanceof vscode.LanguageModelTextPart) {
 				textChars += part.value.length;
 			} else if (part instanceof vscode.LanguageModelDataPart) {
-				if (part.mimeType.startsWith('image/')) {
+				// The mime type arrives untyped with the part, so a missing or non-string value
+				// is classified as its own kind instead of throwing here. This trace runs on the
+				// request path with no handler above it, so a throw would fail the whole request.
+				const rawMimeType = typeof part.mimeType === 'string' ? part.mimeType : '';
+				const mimeType = rawMimeType.toLowerCase();
+				if (mimeType.startsWith('image/')) {
 					imageParts += 1;
-				} else if (part.mimeType === REPLAY_MARKER_MIME) {
+				} else if (rawMimeType === REPLAY_MARKER_MIME) {
+					// Matches the comparison the replay parser uses, so a type it will not read
+					// is not counted here as a marker that came through.
 					replayMarkerParts += 1;
-				} else if (part.mimeType === HOST_CACHE_CONTROL_MIME) {
+				} else if (mimeType === HOST_CACHE_CONTROL_DATA_PART_MIME) {
 					hostCacheControlParts += 1;
 				} else {
-					dataPartMimes.set(part.mimeType, (dataPartMimes.get(part.mimeType) ?? 0) + 1);
+					const mimeKey = rawMimeType || '<missing>';
+					dataPartMimes.set(mimeKey, (dataPartMimes.get(mimeKey) ?? 0) + 1);
 				}
 			} else if (part instanceof vscode.LanguageModelToolCallPart) {
 				toolCallParts += 1;

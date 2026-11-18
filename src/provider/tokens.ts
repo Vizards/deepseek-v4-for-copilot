@@ -95,8 +95,8 @@ function computePartTokenEstimate(part: object): PartTokenEstimate {
 		return { textChars, fixedTokens };
 	}
 
-  // 4. LanguageModelDataPart - a top level part reaches here unless the converter drops it, so the
-  //    marker and image branches below serve both top level parts and nested ones.
+	// 4. LanguageModelDataPart - a top level part reaches here unless the converter drops it, so the
+	//    marker and image branches below serve both top level parts and nested ones.
 	if (part instanceof vscode.LanguageModelDataPart) {
 		// The part arrives untyped, so a missing mime type falls through to the capped
 		// estimate instead of throwing while counting.

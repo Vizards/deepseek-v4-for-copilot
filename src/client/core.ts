@@ -53,10 +53,15 @@ export class DeepSeekClient {
 				headers.set(name, value);
 			}
 
+			// Serialize once and reuse the same string as the body, so the length handed to
+			// calibration describes exactly what the server counts prompt tokens for.
+			const serializedBody = safeStringify(requestBody);
+			callbacks.onRequestEncoded?.(serializedBody.length);
+
 			const response = await fetch(`${this.baseUrl}/chat/completions`, {
 				method: 'POST',
 				headers,
-				body: safeStringify(requestBody),
+				body: serializedBody,
 				signal: controller.signal,
 			});
 

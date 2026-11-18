@@ -1,12 +1,14 @@
 import vscode from 'vscode';
+import { COPILOT_USAGE_DATA_PART_MIME, HOST_CACHE_CONTROL_DATA_PART_MIME } from '../consts';
 import { safeStringify } from '../json';
+import { logger } from '../logger';
 import type {
 	DeepSeekContentPart,
 	DeepSeekMessage,
 	DeepSeekTool,
 	DeepSeekToolCall,
 } from '../types';
-import { parseFirstReplayMarker } from './replay';
+import { parseFirstReplayMarker, REPLAY_MARKER_MIME } from './replay';
 import {
 	isImageDataPart,
 	normalizeToolResult,
@@ -62,6 +64,8 @@ export function convertMessages(
 				});
 			} else if (part instanceof vscode.LanguageModelToolResultPart) {
 				toolResults.push(normalizeToolResult(part));
+			} else {
+				reportUnconsumedPart(part);
 			}
 		}
 
@@ -206,38 +210,62 @@ export function convertTools(
 	}));
 }
 
+const reportedUnconsumedPartKinds = new Set<string>();
+
 /**
- * Count total characters across all messages to calibrate chars-per-token ratio.
+ * Describes a part that no branch of convertMessages consumed, or returns undefined when the
+ * request is not meant to carry the part. Replay markers are read separately by
+ * parseFirstReplayMarker, and the two host tags arrive on ordinary requests.
  */
-export function countMessageChars(messages: DeepSeekMessage[]): number {
-	let total = 0;
-	for (const msg of messages) {
-		total += getMessageContentChars(msg.content);
-		total += msg.reasoning_content?.length ?? 0;
-		if (msg.tool_calls) {
-			for (const tc of msg.tool_calls) {
-				total += tc.function?.name?.length ?? 0;
-				total += tc.function?.arguments?.length ?? 0;
-			}
+function describeUnconsumedPart(part: unknown): { key: string; label: string } | undefined {
+	if (part instanceof vscode.LanguageModelDataPart) {
+		if (part.mimeType === REPLAY_MARKER_MIME) {
+			return undefined;
 		}
+		// The part arrives untyped here, so a missing mime type stays reportable instead of
+		// throwing before the warning is written.
+		const mimeType = typeof part.mimeType === 'string' ? part.mimeType.toLowerCase() : '';
+		// The usage part is written by this provider on every response and comes back with
+		// the next request, so dropping it is expected and not worth reporting.
+		if (mimeType === COPILOT_USAGE_DATA_PART_MIME) {
+			return undefined;
+		}
+		// The host attaches this one for its own prompt caching, so it arrives on ordinary
+		// requests and its absence from the payload is not a loss the reader can act on.
+		if (mimeType === HOST_CACHE_CONTROL_DATA_PART_MIME) {
+			return undefined;
+		}
+		if (!mimeType) {
+			// Outside the mime: namespace, so no real mime type can collide with this kind.
+			return { key: 'mime-type-missing', label: 'data part with no mime type' };
+		}
+		return { key: `mime:${mimeType}`, label: `data part type "${part.mimeType}"` };
 	}
-	return total;
+	const name =
+		part && typeof part === 'object'
+			? ((part as { constructor?: { name?: string } }).constructor?.name ?? 'object')
+			: typeof part;
+	return { key: `part:${name}`, label: `part type ${name}` };
 }
 
-function getMessageContentChars(content: DeepSeekMessage['content']): number {
-	if (typeof content === 'string') {
-		return content.length;
-	}
-
-	let total = 0;
-	for (const part of content) {
-		if (part.type === 'text') {
-			total += part.text.length;
-		} else if (part.type === 'image_url') {
-			// Do not count base64 URL chars. Native-image requests are excluded from
-			// adaptive charsPerToken updates, and image cost is handled separately.
-			total += 0;
+function reportUnconsumedPart(part: unknown): void {
+	// Runs inside the message loop, so nothing here may abort the conversion: the descriptor
+	// reads an untyped part and can throw on one the host has never sent before.
+	try {
+		const descriptor = describeUnconsumedPart(part);
+		// One report per kind keeps a repeated attachment from flooding the log.
+		if (!descriptor || reportedUnconsumedPartKinds.has(descriptor.key)) {
+			return;
 		}
+		const written = logger.warn(
+			`Dropped ${descriptor.label}; no converter branch carries it into the request.`,
+		);
+		if (!written) {
+			// The channel refused the line, so the kind stays unmarked and a later request retries.
+			return;
+		}
+		reportedUnconsumedPartKinds.add(descriptor.key);
+	} catch {
+		// Reporting one dropped part is never worth failing the request that carries it.
 	}
-	return total;
 }

@@ -30,6 +30,14 @@ export const SET_VISION_MODEL_URI_PATH = '/setVisionModel';
 // VS Code's internal LanguageModelChatMessageRole.System is not exposed in @types/vscode.
 export const LANGUAGE_MODEL_CHAT_SYSTEM_ROLE = 3;
 
+// MIME type of the response data part that reports token usage to Copilot. The host keeps
+// response parts in the transcript, so a later request arrives carrying this part back.
+export const COPILOT_USAGE_DATA_PART_MIME = 'usage';
+
+// MIME type of the data part the host attaches to messages for its own prompt caching.
+// Dropping it is expected, so its absence from the payload is not a loss worth reporting.
+export const HOST_CACHE_CONTROL_DATA_PART_MIME = 'cache_control';
+
 // ---- Secret keys ----
 
 /** SecretStorage key for the DeepSeek API key. */

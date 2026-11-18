@@ -20,6 +20,7 @@ import {
 import type { ConversationSegment } from '../segment';
 import { ACTIVATE_TOOL_PREFIX } from '../tools/consts';
 import type { VisionProxySource, VisionResolutionStats } from '../vision';
+import { isImageDataPart } from '../vision/normalize';
 
 let dumpCounter = 0;
 let providerInputDumpCounter = 0;
@@ -549,7 +550,7 @@ function serializeContentPart(part: unknown, index: number): SerializedContentPa
 			mimeType: part.mimeType,
 			byteLength: part.data.byteLength,
 			dataHash: hashBytes(part.data),
-			isImage: part.mimeType.toLowerCase().startsWith('image/'),
+			isImage: isImageDataPart(part),
 			replayMarker,
 		};
 	}

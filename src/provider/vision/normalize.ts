@@ -129,8 +129,12 @@ export function collectVisionInputSummary(
 }
 
 export function isImageDataPart(part: unknown): part is vscode.LanguageModelDataPart {
+	// The mime type arrives untyped with the part, so a missing or non-string value means
+	// "not an image" rather than an exception on the request path.
 	return (
-		part instanceof vscode.LanguageModelDataPart && part.mimeType.toLowerCase().startsWith('image/')
+		part instanceof vscode.LanguageModelDataPart &&
+		typeof part.mimeType === 'string' &&
+		part.mimeType.toLowerCase().startsWith('image/')
 	);
 }
 

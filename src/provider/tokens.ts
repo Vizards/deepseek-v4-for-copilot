@@ -9,15 +9,67 @@ interface PartTokenEstimate {
 }
 
 /**
+ * Sizing runs on every token count the host asks for, but a tool input only has to be
+ * serialized once. Keys are the part objects themselves, so entries go away with the
+ * transcript that holds them.
+ *
+ * This holds only while parts are read and never mutated after creation. Conversion
+ * and this module both treat them as immutable; a part edited in place would keep the
+ * estimate from its first sighting.
+ */
+const partTokenEstimateCache = new WeakMap<object, PartTokenEstimate>();
+
+/**
+ * Estimate a top level message part, the form the converter forwards or drops.
+ */
+function estimateMessagePartTokens(part: unknown): PartTokenEstimate {
+	if (isDroppedTopLevelDataPart(part)) {
+		return { textChars: 0, fixedTokens: 0 };
+	}
+	return estimatePartTokens(part);
+}
+
+/**
+ * A data part that is neither the replay marker nor an image is dropped by the message
+ * converter, so the request carries nothing for it and it must not be charged. Nested
+ * data parts are left alone because a tool result can still be serialized into the
+ * request, which means its bytes are not free.
+ */
+function isDroppedTopLevelDataPart(part: unknown): boolean {
+	// A mime type that is missing or not a string cannot be an image, so the converter drops
+	// that part too and it must not be charged.
+	return (
+		part instanceof vscode.LanguageModelDataPart &&
+		part.mimeType !== REPLAY_MARKER_MIME &&
+		!(typeof part.mimeType === 'string' && part.mimeType.toLowerCase().startsWith('image/'))
+	);
+}
+
+/**
  * Recursively estimate text chars and fixed token parts for a single content part.
  */
 function estimatePartTokens(part: unknown): PartTokenEstimate {
-	// 1. LanguageModelTextPart — the most common case
+	if (!part || typeof part !== 'object') {
+		return { textChars: 0, fixedTokens: 0 };
+	}
+
+	const cached = partTokenEstimateCache.get(part);
+	if (cached) {
+		return cached;
+	}
+
+	const estimate = computePartTokenEstimate(part);
+	partTokenEstimateCache.set(part, estimate);
+	return estimate;
+}
+
+function computePartTokenEstimate(part: object): PartTokenEstimate {
+	// 1. LanguageModelTextPart - the most common case
 	if (part instanceof vscode.LanguageModelTextPart) {
 		return { textChars: part.value.length, fixedTokens: 0 };
 	}
 
-	// 2. LanguageModelToolCallPart — count callId + name + JSON-serialized input
+	// 2. LanguageModelToolCallPart - count callId + name + JSON-serialized input
 	if (part instanceof vscode.LanguageModelToolCallPart) {
 		let chars = part.callId.length + part.name.length;
 		try {
@@ -29,7 +81,7 @@ function estimatePartTokens(part: unknown): PartTokenEstimate {
 		return { textChars: chars, fixedTokens: 0 };
 	}
 
-	// 3. LanguageModelToolResultPart — recursively count nested content parts
+	// 3. LanguageModelToolResultPart - recursively count nested content parts
 	if (part instanceof vscode.LanguageModelToolResultPart) {
 		let textChars = part.callId.length;
 		let fixedTokens = 0;
@@ -43,11 +95,12 @@ function estimatePartTokens(part: unknown): PartTokenEstimate {
 		return { textChars, fixedTokens };
 	}
 
-	// 4. LanguageModelDataPart — use a capped heuristic because our model never
-	//    receives binary data directly. Images are resolved to text descriptions
-	//    by the vision pipeline; raw byteLength would massively overestimate.
+	// 4. LanguageModelDataPart - a top level part reaches here unless the converter drops it, so the
+	//    marker and image branches below serve both top level parts and nested ones.
 	if (part instanceof vscode.LanguageModelDataPart) {
-		const mime = part.mimeType;
+		// The part arrives untyped, so a missing mime type falls through to the capped
+		// estimate instead of throwing while counting.
+		const mime = typeof part.mimeType === 'string' ? part.mimeType.toLowerCase() : '';
 		if (mime === REPLAY_MARKER_MIME) {
 			// Marker metadata is not sent as assistant content. Its vision text belongs
 			// logically to a previous user image message, but provideTokenCount only
@@ -60,15 +113,15 @@ function estimatePartTokens(part: unknown): PartTokenEstimate {
 		if (mime.startsWith('image/')) {
 			return { textChars: 0, fixedTokens: IMAGE_PART_FIXED_TOKENS };
 		}
-		// PDFs and other documents: use byteLength as a rough proxy but cap it
-		// to prevent a single large attachment from dominating the budget.
+		// Documents: a tool result can be serialized into the request, so keep the capped
+		// byteLength proxy instead of assuming the bytes cost nothing.
 		return {
 			textChars: Math.min(part.data?.byteLength ?? 0, 10000),
 			fixedTokens: 0,
 		};
 	}
 
-	// 5. LanguageModelThinkingPart (proposed API) — handle string | string[]
+	// 5. LanguageModelThinkingPart (proposed API) - handle string | string[]
 	if (isLanguageModelThinkingPart(part)) {
 		if (typeof part.value === 'string') {
 			return { textChars: part.value.length, fixedTokens: 0 };
@@ -83,14 +136,9 @@ function estimatePartTokens(part: unknown): PartTokenEstimate {
 		return { textChars: 0, fixedTokens: 0 };
 	}
 
-	// 6. LanguageModelPromptTsxPart — stringify the value if present
+	// 6. LanguageModelPromptTsxPart - stringify the value if present
 	// Duck-type check since PromptTsxPart may not always be available
-	if (
-		part &&
-		typeof part === 'object' &&
-		'value' in part &&
-		part.constructor?.name === 'LanguageModelPromptTsxPart'
-	) {
+	if ('value' in part && part.constructor?.name === 'LanguageModelPromptTsxPart') {
 		try {
 			return {
 				textChars: JSON.stringify((part as { value: unknown }).value).length,
@@ -102,15 +150,11 @@ function estimatePartTokens(part: unknown): PartTokenEstimate {
 	}
 
 	// Fallback: try to stringify unknown part types
-	if (part && typeof part === 'object') {
-		try {
-			return { textChars: JSON.stringify(part).length, fixedTokens: 0 };
-		} catch {
-			return { textChars: 0, fixedTokens: 0 };
-		}
+	try {
+		return { textChars: JSON.stringify(part).length, fixedTokens: 0 };
+	} catch {
+		return { textChars: 0, fixedTokens: 0 };
 	}
-
-	return { textChars: 0, fixedTokens: 0 };
 }
 
 /**
@@ -138,7 +182,7 @@ export function estimateTokenCount(
 	let totalChars = 0;
 	let fixedTokens = 0;
 	for (const part of text.content) {
-		const estimate = estimatePartTokens(part);
+		const estimate = estimateMessagePartTokens(part);
 		totalChars += estimate.textChars;
 		fixedTokens += estimate.fixedTokens;
 	}
